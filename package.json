@@ -1,0 +1,23 @@
+{
+  "name": "skillpkg-studio",
+  "version": "1.0.0",
+  "description": "",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AGISurge/skillpkg-studio.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/AGISurge/skillpkg-studio/issues"
+  },
+  "homepage": "https://github.com/AGISurge/skillpkg-studio#readme",
+  "devDependencies": {
+    "electron": "^41.2.1"
+  }
+}
