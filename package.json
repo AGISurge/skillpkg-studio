@@ -4,7 +4,7 @@
   "description": "",
   "main": "main.js",
   "scripts": {
-    "start": "electron .",
+    "start": "nodemon --watch main.js  --exec electron .",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
@@ -18,6 +18,7 @@
   },
   "homepage": "https://github.com/AGISurge/skillpkg-studio#readme",
   "devDependencies": {
-    "electron": "^41.2.1"
+    "electron": "^41.2.1",
+    "nodemon": "^3.1.14"
   }
 }
