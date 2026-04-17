@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import rehypeHighlight from 'rehype-highlight';
 import {
@@ -24,11 +24,10 @@ import {
 } from '@fluentui/react-icons';
 import './App.css';
 
-const MENU_ITEMS = [
+const MAIN_MENU_ITEMS = [
   { id: 'discover', label: '发现', icon: SearchRegular },
   { id: 'local', label: '本机', icon: BoxRegular },
   { id: 'favorites', label: '收藏', icon: StarRegular },
-  { id: 'agents', label: 'Agents', icon: PeopleRegular },
 ];
 
 const INITIAL_AGENTS = [
@@ -49,67 +48,6 @@ const INITIAL_AGENTS = [
     name: 'Cursor',
     pathMac: '~/.cursor/skills',
     pathWindows: '%USERPROFILE%\\.cursor\\skills',
-  },
-];
-
-const SAMPLE_SKILLS = [
-  {
-    id: 'focus-flow',
-    name: 'Focus Flow',
-    version: '1.2.0',
-    description: '为编程任务提供节奏管理和番茄协作流程。',
-    author: 'SkillPkg Labs',
-    tags: ['productivity', 'workflow'],
-    files: [
-      {
-        path: 'README.md',
-        content: `# Focus Flow\n\n让 Agent 按节奏完成任务。\n\n## 功能\n\n- 自动拆解任务\n- 时段提醒\n- 汇总报告\n\n\`\`\`bash\nfocus start --session deep-work\n\`\`\`\n`,
-      },
-      {
-        path: 'rules/manifest.json',
-        content: `{"name":"focus-flow","version":"1.2.0","entry":"README.md"}`,
-      },
-      {
-        path: 'prompts/start.md',
-        content: `# Start\n\n请基于当前任务输出执行节奏。`,
-      },
-    ],
-  },
-  {
-    id: 'repo-compass',
-    name: 'Repo Compass',
-    version: '0.9.4',
-    description: '快速扫描仓库结构并生成导航策略。',
-    author: 'Studio Core',
-    tags: ['analysis', 'navigation'],
-    files: [
-      {
-        path: 'README.md',
-        content: `# Repo Compass\n\n聚焦仓库理解。\n\n## 使用方式\n\n1. 读取目录结构\n2. 找出关键模块\n3. 输出阅读路线\n`,
-      },
-      {
-        path: 'playbooks/scan.md',
-        content: `# Scan\n\n- 先扫描顶层目录\n- 再查找关键模块`,
-      },
-    ],
-  },
-  {
-    id: 'design-sprint',
-    name: 'Design Sprint',
-    version: '2.1.1',
-    description: '帮助 Agent 组织产品设计冲刺流程。',
-    author: 'Studio Core',
-    tags: ['design', 'product'],
-    files: [
-      {
-        path: 'README.md',
-        content: `# Design Sprint\n\n快速梳理产品的设计流程。\n\n\`\`\`json\n{"day":1,"task":"sketch"}\n\`\`\``,
-      },
-      {
-        path: 'templates/brief.md',
-        content: `# Brief\n\n- 目标\n- 受众\n- 约束`,
-      },
-    ],
   },
 ];
 
@@ -203,14 +141,16 @@ function App() {
   const [activeSection, setActiveSection] = useState('discover');
   const [agents] = useState(INITIAL_AGENTS);
   const [discoverSkills] = useState(SAMPLE_DISCOVER);
-  const [localSkills, setLocalSkills] = useState(SAMPLE_SKILLS);
-  const [favorites, setFavorites] = useState(new Set(['focus-flow']));
+  const [localSkills, setLocalSkills] = useState([]);
+  const [favorites, setFavorites] = useState(new Set());
   const [selectedAgentId, setSelectedAgentId] = useState('claude');
   const [selectedSkillId, setSelectedSkillId] = useState(SAMPLE_DISCOVER[0].id);
   const [selectedFilePath, setSelectedFilePath] = useState('README.md');
   const [expandedFolders, setExpandedFolders] = useState(new Set());
+  const [agentsExpanded, setAgentsExpanded] = useState(true);
   const [apiKey, setApiKey] = useState('');
   const [notice, setNotice] = useState('');
+  const [installPath, setInstallPath] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogSkill, setDialogSkill] = useState(null);
   const [dialogAgents, setDialogAgents] = useState(new Set());
@@ -219,17 +159,49 @@ function App() {
   const fileInputRef = useRef(null);
 
   const [installedByAgent, setInstalledByAgent] = useState({
-    claude: new Set(['focus-flow', 'repo-compass']),
-    codex: new Set(['focus-flow']),
-    cursor: new Set(['focus-flow', 'design-sprint']),
+    claude: new Set(),
+    codex: new Set(),
+    cursor: new Set(),
   });
+
+  const loadLocalSkills = async (path) => {
+    if (!path) return;
+    if (!window?.skillpkg?.loadSkills) {
+      setNotice('当前环境不支持读取本地路径。');
+      return;
+    }
+    const skills = await window.skillpkg.loadSkills(path);
+    setLocalSkills(skills);
+    if (skills[0]) {
+      setSelectedSkillId(skills[0].id);
+      setSelectedFilePath(skills[0].files[0]?.path || '');
+    }
+  };
+
+  useEffect(() => {
+    const savedPath = window?.localStorage?.getItem('skillpkg.installPath');
+    if (savedPath) {
+      setInstallPath(savedPath);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (installPath) {
+      window?.localStorage?.setItem('skillpkg.installPath', installPath);
+      loadLocalSkills(installPath);
+    }
+  }, [installPath]);
 
   const currentSkillList = useMemo(() => {
     if (activeSection === 'discover') return discoverSkills;
     if (activeSection === 'favorites')
       return localSkills.filter((skill) => favorites.has(skill.id));
+    if (activeSection === 'agents') {
+      const installed = installedByAgent[selectedAgentId] || new Set();
+      return localSkills.filter((skill) => installed.has(skill.id));
+    }
     return localSkills;
-  }, [activeSection, discoverSkills, favorites, localSkills]);
+  }, [activeSection, discoverSkills, favorites, installedByAgent, localSkills, selectedAgentId]);
 
   const selectedSkill = useMemo(() => {
     return (
@@ -284,12 +256,18 @@ function App() {
     setDialogOpen(true);
   };
 
-  const confirmInstall = () => {
+  const confirmInstall = async () => {
     if (!dialogSkill) return;
-    setLocalSkills((prev) => {
-      if (prev.some((skill) => skill.id === dialogSkill.id)) return prev;
-      return [...prev, dialogSkill];
-    });
+    if (!installPath) {
+      setNotice('请先设置统一路径。');
+      return;
+    }
+    if (!window?.skillpkg?.installSkill) {
+      setNotice('当前环境不支持安装 Skill。');
+      return;
+    }
+    await window.skillpkg.installSkill({ installPath, skill: dialogSkill });
+    await loadLocalSkills(installPath);
     setInstalledByAgent((prev) => {
       const next = { ...prev };
       dialogAgents.forEach((agentId) => {
@@ -357,6 +335,16 @@ function App() {
     const key = `${selectedSkill.id}::${selectedFile.path}`;
     const draft = fileDrafts[key];
     if (draft === undefined) return;
+    if (!installPath || !window?.skillpkg?.saveSkillFile) {
+      setNotice('请先设置统一路径。');
+      return;
+    }
+    window.skillpkg.saveSkillFile({
+      installPath,
+      skillId: selectedSkill.id,
+      filePath: selectedFile.path,
+      content: draft,
+    });
     setLocalSkills((prev) =>
       prev.map((skill) => {
         if (skill.id !== selectedSkill.id) return skill;
@@ -375,6 +363,22 @@ function App() {
     });
     setNotice('已保存修改。');
     setEditing(false);
+  };
+
+  const handleSelectInstallPath = async () => {
+    try {
+      if (!window?.skillpkg?.selectInstallPath) {
+        setNotice('当前环境不支持选择本地路径。');
+        return;
+      }
+      const selectedPath = await window.skillpkg.selectInstallPath();
+      if (selectedPath) {
+        setInstallPath(selectedPath);
+        setNotice('已更新统一路径。');
+      }
+    } catch (error) {
+      setNotice('选择路径失败，请重试。');
+    }
   };
 
   const renderTree = (node, depth = 0) => {
@@ -438,6 +442,11 @@ function App() {
       : `\`\`\`${language}\n${displayedContent}\n\`\`\``
     : '';
 
+  const pageTitle =
+    activeSection === 'agents'
+      ? 'Agents'
+      : MAIN_MENU_ITEMS.find((item) => item.id === activeSection)?.label || '';
+
   return (
     <div className="app-shell">
       <aside className="sidebar">
@@ -449,7 +458,7 @@ function App() {
           </div>
         </div>
         <nav className="menu">
-          {MENU_ITEMS.map((item) => {
+          {MAIN_MENU_ITEMS.map((item) => {
             const Icon = item.icon;
             return (
               <button
@@ -463,6 +472,50 @@ function App() {
               </button>
             );
           })}
+          <button
+            type="button"
+            className={`menu-item ${activeSection === 'agents' ? 'active' : ''}`}
+            onClick={() => {
+              setAgentsExpanded((prev) => !prev);
+            }}
+          >
+            {agentsExpanded ? (
+              <ChevronDownRegular className="icon" />
+            ) : (
+              <ChevronRightRegular className="icon" />
+            )}
+            <PeopleRegular className="icon" />
+            <span>Agents</span>
+          </button>
+          {agentsExpanded && (
+            <div className="submenu">
+              {agents.map((agent) => (
+                <button
+                  type="button"
+                  key={agent.id}
+                  className={`menu-subitem ${
+                    activeSection === 'agents' && selectedAgentId === agent.id
+                      ? 'active'
+                      : ''
+                  }`}
+                  onClick={() => {
+                    setActiveSection('agents');
+                    setSelectedAgentId(agent.id);
+                    const installed = installedByAgent[agent.id] || new Set();
+                    const agentSkills = localSkills.filter((skill) => installed.has(skill.id));
+                    if (agentSkills[0]) {
+                      setSelectedSkillId(agentSkills[0].id);
+                      setSelectedFilePath(agentSkills[0].files[0]?.path || '');
+                    }
+                  }}
+                >
+                  <span className="dot" />
+                  <span>{agent.name}</span>
+                  <span className="count">{installedByAgent[agent.id]?.size || 0}</span>
+                </button>
+              ))}
+            </div>
+          )}
         </nav>
         <div className="sidebar-footer">
           <div className="status-card">
@@ -479,9 +532,7 @@ function App() {
       <main className="content">
         <header className="topbar">
           <div>
-            <div className="page-title">
-              {MENU_ITEMS.find((item) => item.id === activeSection)?.label}
-            </div>
+            <div className="page-title">{pageTitle}</div>
             <div className="page-subtitle">SkillPkg 管理与分发中心</div>
           </div>
           <div className="actions">
@@ -493,7 +544,7 @@ function App() {
               <FolderOpenRegular className="icon" />
               导入 Zip
             </button>
-            <button type="button" className="btn primary">
+            <button type="button" className="btn primary" onClick={handleSelectInstallPath}>
               <LinkRegular className="icon" />
               统一路径
             </button>
@@ -508,6 +559,12 @@ function App() {
         </header>
 
         {notice ? <div className="notice">{notice}</div> : null}
+        {installPath ? (
+          <div className="path-info">
+            <span className="label">统一路径</span>
+            <span className="value">{installPath}</span>
+          </div>
+        ) : null}
 
         {activeSection === 'discover' && (
           <section className="panel-grid fade-in">
@@ -606,23 +663,6 @@ function App() {
         {activeSection !== 'discover' && (
           <section className="panel-grid fade-in">
             <div className="panel list">
-              {activeSection === 'agents' && (
-                <div className="agent-tabs">
-                  {agents.map((agent) => (
-                    <button
-                      type="button"
-                      key={agent.id}
-                      className={`tab ${selectedAgentId === agent.id ? 'active' : ''}`}
-                      onClick={() => setSelectedAgentId(agent.id)}
-                    >
-                      {agent.name}
-                      <span className="tab-count">
-                        {installedByAgent[agent.id]?.size || 0}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              )}
               <div className="panel-header">
                 <div>
                   <div className="panel-title">
@@ -751,28 +791,30 @@ function App() {
                     </div>
                     <div className="viewer">
                       <div className="viewer-header">
-                        <div className="viewer-title">
-                          <CodeRegular className="icon" />
-                          {selectedFile?.path || '未选择文件'}
-                        </div>
-                        <div className="viewer-actions">
-                          <button
-                            type="button"
-                            className="btn ghost"
-                            onClick={() => setEditing((prev) => !prev)}
-                          >
-                            <EditRegular className="icon" />
-                            {editing ? '预览' : '编辑'}
-                          </button>
-                          <button
-                            type="button"
-                            className="btn primary"
-                            onClick={handleSaveFile}
-                            disabled={!editing}
-                          >
-                            <SaveRegular className="icon" />
-                            保存
-                          </button>
+                        <div className="viewer-header-inner">
+                          <div className="viewer-title">
+                            <CodeRegular className="icon" />
+                            {selectedFile?.path || '未选择文件'}
+                          </div>
+                          <div className="viewer-actions">
+                            <button
+                              type="button"
+                              className="btn ghost"
+                              onClick={() => setEditing((prev) => !prev)}
+                            >
+                              <EditRegular className="icon" />
+                              {editing ? '预览' : '编辑'}
+                            </button>
+                            <button
+                              type="button"
+                              className="btn primary"
+                              onClick={handleSaveFile}
+                              disabled={!editing}
+                            >
+                              <SaveRegular className="icon" />
+                              保存
+                            </button>
+                          </div>
                         </div>
                       </div>
                       <div className="viewer-content">
