@@ -1,0 +1,49 @@
+import { BoxRegular, PeopleRegular, SearchRegular, StarRegular } from '@fluentui/react-icons';
+
+export type RouteConfig = {
+  id: string;
+  path: string;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  showInMenu: boolean;
+  isAgentsRoot?: boolean;
+};
+
+export const routePaths = {
+  discover: '/discover',
+  local: '/local',
+  favorites: '/favorites',
+  agents: '/agents/:agentId?',
+};
+
+export const menuRoutes: RouteConfig[] = [
+  {
+    id: 'discover',
+    path: routePaths.discover,
+    label: '发现',
+    icon: SearchRegular,
+    showInMenu: true,
+  },
+  {
+    id: 'local',
+    path: routePaths.local,
+    label: '本机',
+    icon: BoxRegular,
+    showInMenu: true,
+  },
+  {
+    id: 'favorites',
+    path: routePaths.favorites,
+    label: '收藏',
+    icon: StarRegular,
+    showInMenu: true,
+  },
+  {
+    id: 'agents',
+    path: routePaths.agents,
+    label: 'Agents',
+    icon: PeopleRegular,
+    showInMenu: true,
+    isAgentsRoot: true,
+  },
+];

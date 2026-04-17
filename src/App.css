@@ -74,6 +74,7 @@
   align-items: center;
   gap: 8px;
   cursor: pointer;
+  text-decoration: none;
 }
 
 .menu-subitem.active,
@@ -109,6 +110,7 @@
   font-size: 14px;
   cursor: pointer;
   transition: all 0.2s ease;
+  text-decoration: none;
 }
 
 .menu-item.active,
