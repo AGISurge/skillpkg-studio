@@ -20,6 +20,18 @@ body {
   overflow: hidden;
 }
 
+body[data-theme='light'] {
+  background-color: #f5f7fb;
+  color: #1b2433;
+}
+
+@media (prefers-color-scheme: light) {
+  body[data-theme='system'] {
+    background-color: #f5f7fb;
+    color: #1b2433;
+  }
+}
+
 button,
 input,
 textarea {

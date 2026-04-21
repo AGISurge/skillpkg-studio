@@ -8,6 +8,7 @@ import { menuRoutes, routePaths } from './routes';
 import { validateSkill } from './utils/skillUtils';
 import Sidebar from './components/Sidebar';
 import InstallDialog from './components/InstallDialog';
+import SettingsDialog from './components/SettingsDialog';
 import DiscoverPage from './pages/DiscoverPage';
 import LocalPage from './pages/LocalPage';
 import FavoritesPage from './pages/FavoritesPage';
@@ -73,6 +74,18 @@ const SAMPLE_DISCOVER: Skill[] = [
   },
 ];
 
+type ThemeMode = 'system' | 'light' | 'dark';
+
+const THEME_STORAGE_KEY = 'skillpkg.theme';
+
+const getInitialTheme = (): ThemeMode => {
+  const saved = window?.localStorage?.getItem(THEME_STORAGE_KEY);
+  if (saved === 'light' || saved === 'dark' || saved === 'system') {
+    return saved;
+  }
+  return 'system';
+};
+
 const App = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -99,6 +112,8 @@ const App = () => {
   const [dialogAgents, setDialogAgents] = useState<Set<string>>(new Set());
   const [editing, setEditing] = useState(false);
   const [fileDrafts, setFileDrafts] = useState<Record<string, string>>({});
+  const [theme, setTheme] = useState<ThemeMode>(getInitialTheme);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const [installedByAgent, setInstalledByAgent] = useState<Record<string, Set<string>>>(
     () => ({
@@ -153,6 +168,12 @@ const App = () => {
       setInstallPath(savedPath);
     }
   }, []);
+
+  useEffect(() => {
+    if (!document?.body) return;
+    document.body.dataset.theme = theme;
+    window?.localStorage?.setItem(THEME_STORAGE_KEY, theme);
+  }, [theme]);
 
   useEffect(() => {
     if (installPath) {
@@ -375,6 +396,7 @@ const App = () => {
         selectedAgentId={selectedAgentId}
         installedByAgent={installedByAgent}
         onSelectAgent={handleSelectAgent}
+        onOpenSettings={() => setSettingsOpen(true)}
       />
 
       <main className="content">
@@ -533,6 +555,12 @@ const App = () => {
         }}
         onClose={() => setDialogOpen(false)}
         onConfirm={confirmInstall}
+      />
+      <SettingsDialog
+        open={settingsOpen}
+        theme={theme}
+        onChangeTheme={setTheme}
+        onClose={() => setSettingsOpen(false)}
       />
     </div>
   );

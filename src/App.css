@@ -122,6 +122,14 @@
 
 .sidebar-footer {
   margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.settings-item {
+  width: 100%;
+  justify-content: center;
 }
 
 .status-card {
@@ -641,6 +649,11 @@
   cursor: pointer;
 }
 
+.dialog-option.selected {
+  border-color: rgba(80, 120, 255, 0.5);
+  background: rgba(80, 120, 255, 0.15);
+}
+
 .option-title {
   font-size: 13px;
   font-weight: 600;
@@ -708,5 +721,193 @@
 
   .content {
     padding: 20px;
+  }
+}
+
+body[data-theme='light'] .app-shell {
+  background: radial-gradient(circle at top left, rgba(72, 136, 255, 0.18), transparent 45%),
+    radial-gradient(circle at 80% 20%, rgba(255, 198, 120, 0.28), transparent 50%),
+    #f5f7fb;
+  color: #1b2433;
+}
+
+body[data-theme='light'] .sidebar {
+  background: linear-gradient(180deg, #ffffff, #eef2f8);
+  border-right: 1px solid rgba(20, 30, 50, 0.08);
+}
+
+body[data-theme='light'] .menu-item.active,
+body[data-theme='light'] .menu-item:hover {
+  background: rgba(80, 120, 255, 0.16);
+  border-color: rgba(80, 120, 255, 0.35);
+  color: #1b2433;
+}
+
+body[data-theme='light'] .menu-subitem,
+body[data-theme='light'] .skill-card,
+body[data-theme='light'] .status-card,
+body[data-theme='light'] .panel,
+body[data-theme='light'] .viewer-content,
+body[data-theme='light'] .preview,
+body[data-theme='light'] .path-info,
+body[data-theme='light'] .field,
+body[data-theme='light'] .dialog,
+body[data-theme='light'] .dialog-option {
+  background: #ffffff;
+  border-color: rgba(20, 30, 50, 0.08);
+}
+
+body[data-theme='light'] .menu-subitem.active,
+body[data-theme='light'] .menu-subitem:hover,
+body[data-theme='light'] .skill-card.active,
+body[data-theme='light'] .skill-card:hover,
+body[data-theme='light'] .tree-item.active,
+body[data-theme='light'] .tree-item:hover,
+body[data-theme='light'] .dialog-option.selected {
+  background: rgba(80, 120, 255, 0.12);
+  border-color: rgba(80, 120, 255, 0.28);
+}
+
+body[data-theme='light'] .btn.ghost,
+body[data-theme='light'] .btn {
+  background: rgba(20, 30, 50, 0.06);
+  border-color: rgba(20, 30, 50, 0.1);
+}
+
+body[data-theme='light'] .btn.primary {
+  background: linear-gradient(135deg, #4b85ff, #3dc6b8);
+  color: #ffffff;
+}
+
+body[data-theme='light'] .notice {
+  background: rgba(61, 198, 184, 0.16);
+  border-color: rgba(61, 198, 184, 0.35);
+}
+
+body[data-theme='light'] .preview pre,
+body[data-theme='light'] .hljs {
+  background: #f3f6fb;
+  color: #1f2937;
+}
+
+body[data-theme='light'] .status.on {
+  background: rgba(61, 198, 184, 0.16);
+  color: #0f6f66;
+}
+
+body[data-theme='light'] .status.off {
+  background: rgba(255, 103, 103, 0.15);
+  color: #9b3a3a;
+}
+
+body[data-theme='light'] .brand-subtitle,
+body[data-theme='light'] .panel-subtitle,
+body[data-theme='light'] .skill-version,
+body[data-theme='light'] .skill-card p,
+body[data-theme='light'] .skill-meta,
+body[data-theme='light'] .detail-subtitle,
+body[data-theme='light'] .detail-meta,
+body[data-theme='light'] .detail-meta .label,
+body[data-theme='light'] .section-title,
+body[data-theme='light'] .empty-state,
+body[data-theme='light'] .dialog-subtitle,
+body[data-theme='light'] .option-subtitle,
+body[data-theme='light'] .path-info .label,
+body[data-theme='light'] .muted {
+  color: rgba(27, 36, 51, 0.6);
+}
+
+@media (prefers-color-scheme: light) {
+  body[data-theme='system'] .app-shell {
+    background: radial-gradient(circle at top left, rgba(72, 136, 255, 0.18), transparent 45%),
+      radial-gradient(circle at 80% 20%, rgba(255, 198, 120, 0.28), transparent 50%),
+      #f5f7fb;
+    color: #1b2433;
+  }
+
+  body[data-theme='system'] .sidebar {
+    background: linear-gradient(180deg, #ffffff, #eef2f8);
+    border-right: 1px solid rgba(20, 30, 50, 0.08);
+  }
+
+  body[data-theme='system'] .menu-item.active,
+  body[data-theme='system'] .menu-item:hover {
+    background: rgba(80, 120, 255, 0.16);
+    border-color: rgba(80, 120, 255, 0.35);
+    color: #1b2433;
+  }
+
+  body[data-theme='system'] .menu-subitem,
+  body[data-theme='system'] .skill-card,
+  body[data-theme='system'] .status-card,
+  body[data-theme='system'] .panel,
+  body[data-theme='system'] .viewer-content,
+  body[data-theme='system'] .preview,
+  body[data-theme='system'] .path-info,
+  body[data-theme='system'] .field,
+  body[data-theme='system'] .dialog,
+  body[data-theme='system'] .dialog-option {
+    background: #ffffff;
+    border-color: rgba(20, 30, 50, 0.08);
+  }
+
+  body[data-theme='system'] .menu-subitem.active,
+  body[data-theme='system'] .menu-subitem:hover,
+  body[data-theme='system'] .skill-card.active,
+  body[data-theme='system'] .skill-card:hover,
+  body[data-theme='system'] .tree-item.active,
+  body[data-theme='system'] .tree-item:hover,
+  body[data-theme='system'] .dialog-option.selected {
+    background: rgba(80, 120, 255, 0.12);
+    border-color: rgba(80, 120, 255, 0.28);
+  }
+
+  body[data-theme='system'] .btn.ghost,
+  body[data-theme='system'] .btn {
+    background: rgba(20, 30, 50, 0.06);
+    border-color: rgba(20, 30, 50, 0.1);
+  }
+
+  body[data-theme='system'] .btn.primary {
+    background: linear-gradient(135deg, #4b85ff, #3dc6b8);
+    color: #ffffff;
+  }
+
+  body[data-theme='system'] .notice {
+    background: rgba(61, 198, 184, 0.16);
+    border-color: rgba(61, 198, 184, 0.35);
+  }
+
+  body[data-theme='system'] .preview pre,
+  body[data-theme='system'] .hljs {
+    background: #f3f6fb;
+    color: #1f2937;
+  }
+
+  body[data-theme='system'] .status.on {
+    background: rgba(61, 198, 184, 0.16);
+    color: #0f6f66;
+  }
+
+  body[data-theme='system'] .status.off {
+    background: rgba(255, 103, 103, 0.15);
+    color: #9b3a3a;
+  }
+
+  body[data-theme='system'] .brand-subtitle,
+  body[data-theme='system'] .panel-subtitle,
+  body[data-theme='system'] .skill-version,
+  body[data-theme='system'] .skill-card p,
+  body[data-theme='system'] .skill-meta,
+  body[data-theme='system'] .detail-subtitle,
+  body[data-theme='system'] .detail-meta,
+  body[data-theme='system'] .detail-meta .label,
+  body[data-theme='system'] .section-title,
+  body[data-theme='system'] .empty-state,
+  body[data-theme='system'] .dialog-subtitle,
+  body[data-theme='system'] .option-subtitle,
+  body[data-theme='system'] .path-info .label,
+  body[data-theme='system'] .muted {
+    color: rgba(27, 36, 51, 0.6);
   }
 }

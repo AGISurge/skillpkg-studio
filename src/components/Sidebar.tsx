@@ -1,5 +1,9 @@
 import { NavLink } from 'react-router-dom';
-import { ChevronDownRegular, ChevronRightRegular } from '@fluentui/react-icons';
+import {
+  ChevronDownRegular,
+  ChevronRightRegular,
+  SettingsRegular,
+} from '@fluentui/react-icons';
 import type { Agent } from '../types/models';
 import type { RouteConfig } from '../routes';
 
@@ -12,6 +16,7 @@ type SidebarProps = {
   selectedAgentId: string;
   installedByAgent: Record<string, Set<string>>;
   onSelectAgent: (id: string) => void;
+  onOpenSettings: () => void;
 };
 
 const Sidebar = ({
@@ -23,6 +28,7 @@ const Sidebar = ({
   selectedAgentId,
   installedByAgent,
   onSelectAgent,
+  onOpenSettings,
 }: SidebarProps) => {
   return (
     <aside className="sidebar">
@@ -96,6 +102,10 @@ const Sidebar = ({
         )}
       </nav>
       <div className="sidebar-footer">
+        <button type="button" className="menu-item settings-item" onClick={onOpenSettings}>
+          <SettingsRegular className="icon" />
+          <span>设置</span>
+        </button>
         <div className="status-card">
           <div className="status-title">本地技能库</div>
           <div className="status-row">
