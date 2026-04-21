@@ -5,9 +5,7 @@
   grid-template-columns: 240px 1fr;
   min-height: 100vh;
   height: 100vh;
-  background: radial-gradient(circle at top left, rgba(103, 167, 255, 0.18), transparent 45%),
-    radial-gradient(circle at 80% 20%, rgba(255, 198, 120, 0.22), transparent 50%),
-    #0b0f1a;
+  background: #0b0f1a;
   color: #e7ecf3;
   overflow: hidden;
 }
@@ -130,6 +128,70 @@
 .settings-item {
   width: 100%;
   justify-content: center;
+}
+
+.settings-area {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.settings-popover {
+  position: absolute;
+  left: calc(100% + 12px);
+  bottom: 0;
+  background: rgba(15, 18, 28, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 200px;
+  z-index: 2;
+  animation: fade-in 0.2s ease;
+}
+
+.settings-title {
+  font-size: 12px;
+  color: rgba(231, 236, 243, 0.6);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.settings-entry {
+  border: 1px solid transparent;
+  background: rgba(255, 255, 255, 0.04);
+  color: inherit;
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.settings-entry:hover {
+  background: rgba(80, 120, 255, 0.15);
+  border-color: rgba(80, 120, 255, 0.4);
+}
+
+.settings-value {
+  margin-left: auto;
+  color: rgba(231, 236, 243, 0.6);
+  font-size: 11px;
+}
+
+.settings-input {
+  background: transparent;
+  border: none;
+  color: inherit;
+  outline: none;
+  font-size: 13px;
+  width: 100%;
 }
 
 .status-card {
@@ -725,9 +787,7 @@
 }
 
 body[data-theme='light'] .app-shell {
-  background: radial-gradient(circle at top left, rgba(72, 136, 255, 0.18), transparent 45%),
-    radial-gradient(circle at 80% 20%, rgba(255, 198, 120, 0.28), transparent 50%),
-    #f5f7fb;
+  background: #f5f7fb;
   color: #1b2433;
 }
 
@@ -752,7 +812,9 @@ body[data-theme='light'] .preview,
 body[data-theme='light'] .path-info,
 body[data-theme='light'] .field,
 body[data-theme='light'] .dialog,
-body[data-theme='light'] .dialog-option {
+body[data-theme='light'] .dialog-option,
+body[data-theme='light'] .settings-popover,
+body[data-theme='light'] .settings-entry {
   background: #ffffff;
   border-color: rgba(20, 30, 50, 0.08);
 }
@@ -763,7 +825,8 @@ body[data-theme='light'] .skill-card.active,
 body[data-theme='light'] .skill-card:hover,
 body[data-theme='light'] .tree-item.active,
 body[data-theme='light'] .tree-item:hover,
-body[data-theme='light'] .dialog-option.selected {
+body[data-theme='light'] .dialog-option.selected,
+body[data-theme='light'] .settings-entry:hover {
   background: rgba(80, 120, 255, 0.12);
   border-color: rgba(80, 120, 255, 0.28);
 }
@@ -801,6 +864,7 @@ body[data-theme='light'] .status.off {
 }
 
 body[data-theme='light'] .brand-subtitle,
+body[data-theme='light'] .page-subtitle,
 body[data-theme='light'] .panel-subtitle,
 body[data-theme='light'] .skill-version,
 body[data-theme='light'] .skill-card p,
@@ -812,6 +876,8 @@ body[data-theme='light'] .section-title,
 body[data-theme='light'] .empty-state,
 body[data-theme='light'] .dialog-subtitle,
 body[data-theme='light'] .option-subtitle,
+body[data-theme='light'] .settings-title,
+body[data-theme='light'] .settings-value,
 body[data-theme='light'] .path-info .label,
 body[data-theme='light'] .muted {
   color: rgba(27, 36, 51, 0.6);
@@ -819,9 +885,7 @@ body[data-theme='light'] .muted {
 
 @media (prefers-color-scheme: light) {
   body[data-theme='system'] .app-shell {
-    background: radial-gradient(circle at top left, rgba(72, 136, 255, 0.18), transparent 45%),
-      radial-gradient(circle at 80% 20%, rgba(255, 198, 120, 0.28), transparent 50%),
-      #f5f7fb;
+    background: #f5f7fb;
     color: #1b2433;
   }
 
@@ -846,7 +910,9 @@ body[data-theme='light'] .muted {
   body[data-theme='system'] .path-info,
   body[data-theme='system'] .field,
   body[data-theme='system'] .dialog,
-  body[data-theme='system'] .dialog-option {
+  body[data-theme='system'] .dialog-option,
+  body[data-theme='system'] .settings-popover,
+  body[data-theme='system'] .settings-entry {
     background: #ffffff;
     border-color: rgba(20, 30, 50, 0.08);
   }
@@ -857,7 +923,8 @@ body[data-theme='light'] .muted {
   body[data-theme='system'] .skill-card:hover,
   body[data-theme='system'] .tree-item.active,
   body[data-theme='system'] .tree-item:hover,
-  body[data-theme='system'] .dialog-option.selected {
+  body[data-theme='system'] .dialog-option.selected,
+  body[data-theme='system'] .settings-entry:hover {
     background: rgba(80, 120, 255, 0.12);
     border-color: rgba(80, 120, 255, 0.28);
   }
@@ -895,6 +962,7 @@ body[data-theme='light'] .muted {
   }
 
   body[data-theme='system'] .brand-subtitle,
+  body[data-theme='system'] .page-subtitle,
   body[data-theme='system'] .panel-subtitle,
   body[data-theme='system'] .skill-version,
   body[data-theme='system'] .skill-card p,
@@ -906,6 +974,8 @@ body[data-theme='light'] .muted {
   body[data-theme='system'] .empty-state,
   body[data-theme='system'] .dialog-subtitle,
   body[data-theme='system'] .option-subtitle,
+  body[data-theme='system'] .settings-title,
+  body[data-theme='system'] .settings-value,
   body[data-theme='system'] .path-info .label,
   body[data-theme='system'] .muted {
     color: rgba(27, 36, 51, 0.6);

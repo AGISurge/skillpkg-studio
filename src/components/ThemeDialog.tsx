@@ -2,14 +2,15 @@ import { DismissCircleRegular } from '@fluentui/react-icons';
 
 type ThemeMode = 'system' | 'light' | 'dark';
 
-type SettingsDialogProps = {
+type ThemeDialogProps = {
   open: boolean;
-  theme: ThemeMode;
-  onChangeTheme: (theme: ThemeMode) => void;
-  onClose: () => void;
+  value: ThemeMode;
+  onChange: (theme: ThemeMode) => void;
+  onConfirm: () => void;
+  onCancel: () => void;
 };
 
-const SettingsDialog = ({ open, theme, onChangeTheme, onClose }: SettingsDialogProps) => {
+const ThemeDialog = ({ open, value, onChange, onConfirm, onCancel }: ThemeDialogProps) => {
   if (!open) return null;
 
   const options: Array<{ value: ThemeMode; title: string; subtitle: string }> = [
@@ -35,10 +36,10 @@ const SettingsDialog = ({ open, theme, onChangeTheme, onClose }: SettingsDialogP
       <div className="dialog">
         <div className="dialog-header">
           <div>
-            <div className="dialog-title">设置</div>
-            <div className="dialog-subtitle">外观与主题偏好</div>
+            <div className="dialog-title">主题设置</div>
+            <div className="dialog-subtitle">选择应用外观模式</div>
           </div>
-          <button type="button" className="icon-btn" onClick={onClose}>
+          <button type="button" className="icon-btn" onClick={onCancel}>
             <DismissCircleRegular className="icon" />
           </button>
         </div>
@@ -46,13 +47,13 @@ const SettingsDialog = ({ open, theme, onChangeTheme, onClose }: SettingsDialogP
           {options.map((option) => (
             <label
               key={option.value}
-              className={`dialog-option ${theme === option.value ? 'selected' : ''}`}
+              className={`dialog-option ${value === option.value ? 'selected' : ''}`}
             >
               <input
                 type="radio"
                 name="theme"
-                checked={theme === option.value}
-                onChange={() => onChangeTheme(option.value)}
+                checked={value === option.value}
+                onChange={() => onChange(option.value)}
               />
               <div>
                 <div className="option-title">{option.title}</div>
@@ -62,8 +63,11 @@ const SettingsDialog = ({ open, theme, onChangeTheme, onClose }: SettingsDialogP
           ))}
         </div>
         <div className="dialog-footer">
-          <button type="button" className="btn primary" onClick={onClose}>
-            完成
+          <button type="button" className="btn ghost" onClick={onCancel}>
+            取消
+          </button>
+          <button type="button" className="btn primary" onClick={onConfirm}>
+            确定
           </button>
         </div>
       </div>
@@ -71,4 +75,4 @@ const SettingsDialog = ({ open, theme, onChangeTheme, onClose }: SettingsDialogP
   );
 };
 
-export default SettingsDialog;
+export default ThemeDialog;

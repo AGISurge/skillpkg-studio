@@ -3,6 +3,8 @@ import {
   ChevronDownRegular,
   ChevronRightRegular,
   SettingsRegular,
+  PaintBrushRegular,
+  KeyRegular,
 } from '@fluentui/react-icons';
 import type { Agent } from '../types/models';
 import type { RouteConfig } from '../routes';
@@ -16,7 +18,11 @@ type SidebarProps = {
   selectedAgentId: string;
   installedByAgent: Record<string, Set<string>>;
   onSelectAgent: (id: string) => void;
-  onOpenSettings: () => void;
+  theme: 'system' | 'light' | 'dark';
+  settingsOpen: boolean;
+  onToggleSettings: () => void;
+  onOpenTheme: () => void;
+  onOpenApiKey: () => void;
 };
 
 const Sidebar = ({
@@ -28,7 +34,11 @@ const Sidebar = ({
   selectedAgentId,
   installedByAgent,
   onSelectAgent,
-  onOpenSettings,
+  theme,
+  settingsOpen,
+  onToggleSettings,
+  onOpenTheme,
+  onOpenApiKey,
 }: SidebarProps) => {
   return (
     <aside className="sidebar">
@@ -102,12 +112,38 @@ const Sidebar = ({
         )}
       </nav>
       <div className="sidebar-footer">
-        <button type="button" className="menu-item settings-item" onClick={onOpenSettings}>
-          <SettingsRegular className="icon" />
-          <span>设置</span>
-        </button>
+        <div className="settings-area">
+          <button type="button" className="menu-item settings-item" onClick={onToggleSettings}>
+            <SettingsRegular className="icon" />
+            <span>设置</span>
+          </button>
+          {settingsOpen ? (
+            <div className="settings-popover">
+              <div className="settings-title">设置</div>
+              <button
+                type="button"
+                className="settings-entry"
+                onClick={onOpenTheme}
+              >
+                <PaintBrushRegular className="icon" />
+                <span>主题</span>
+                <span className="settings-value">
+                  {theme === 'system' ? '跟随系统' : theme === 'light' ? '浅色' : '深色'}
+                </span>
+              </button>
+              <button
+                type="button"
+                className="settings-entry"
+                onClick={onOpenApiKey}
+              >
+                <KeyRegular className="icon" />
+                <span>API Key</span>
+              </button>
+            </div>
+          ) : null}
+        </div>
         <div className="status-card">
-          <div className="status-title">本地技能库</div>
+          <div className="status-title muted">本地技能库</div>
           <div className="status-row">
             <span>{agents.length} Agents</span>
           </div>

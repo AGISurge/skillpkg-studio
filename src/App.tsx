@@ -8,7 +8,8 @@ import { menuRoutes, routePaths } from './routes';
 import { validateSkill } from './utils/skillUtils';
 import Sidebar from './components/Sidebar';
 import InstallDialog from './components/InstallDialog';
-import SettingsDialog from './components/SettingsDialog';
+import ThemeDialog from './components/ThemeDialog';
+import ApiKeyDialog from './components/ApiKeyDialog';
 import DiscoverPage from './pages/DiscoverPage';
 import LocalPage from './pages/LocalPage';
 import FavoritesPage from './pages/FavoritesPage';
@@ -114,6 +115,10 @@ const App = () => {
   const [fileDrafts, setFileDrafts] = useState<Record<string, string>>({});
   const [theme, setTheme] = useState<ThemeMode>(getInitialTheme);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [themeDialogOpen, setThemeDialogOpen] = useState(false);
+  const [apiKeyDialogOpen, setApiKeyDialogOpen] = useState(false);
+  const [themeDraft, setThemeDraft] = useState<ThemeMode>(theme);
+  const [apiKeyDraft, setApiKeyDraft] = useState(apiKey);
 
   const [installedByAgent, setInstalledByAgent] = useState<Record<string, Set<string>>>(
     () => ({
@@ -174,6 +179,18 @@ const App = () => {
     document.body.dataset.theme = theme;
     window?.localStorage?.setItem(THEME_STORAGE_KEY, theme);
   }, [theme]);
+
+  const openThemeDialog = () => {
+    setThemeDraft(theme);
+    setThemeDialogOpen(true);
+    setSettingsOpen(false);
+  };
+
+  const openApiKeyDialog = () => {
+    setApiKeyDraft(apiKey);
+    setApiKeyDialogOpen(true);
+    setSettingsOpen(false);
+  };
 
   useEffect(() => {
     if (installPath) {
@@ -396,7 +413,11 @@ const App = () => {
         selectedAgentId={selectedAgentId}
         installedByAgent={installedByAgent}
         onSelectAgent={handleSelectAgent}
-        onOpenSettings={() => setSettingsOpen(true)}
+        theme={theme}
+        settingsOpen={settingsOpen}
+        onToggleSettings={() => setSettingsOpen((prev) => !prev)}
+        onOpenTheme={openThemeDialog}
+        onOpenApiKey={openApiKeyDialog}
       />
 
       <main className="content">
@@ -556,11 +577,25 @@ const App = () => {
         onClose={() => setDialogOpen(false)}
         onConfirm={confirmInstall}
       />
-      <SettingsDialog
-        open={settingsOpen}
-        theme={theme}
-        onChangeTheme={setTheme}
-        onClose={() => setSettingsOpen(false)}
+      <ThemeDialog
+        open={themeDialogOpen}
+        value={themeDraft}
+        onChange={setThemeDraft}
+        onConfirm={() => {
+          setTheme(themeDraft);
+          setThemeDialogOpen(false);
+        }}
+        onCancel={() => setThemeDialogOpen(false)}
+      />
+      <ApiKeyDialog
+        open={apiKeyDialogOpen}
+        value={apiKeyDraft}
+        onChange={setApiKeyDraft}
+        onConfirm={() => {
+          setApiKey(apiKeyDraft);
+          setApiKeyDialogOpen(false);
+        }}
+        onCancel={() => setApiKeyDialogOpen(false)}
       />
     </div>
   );
