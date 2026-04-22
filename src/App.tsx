@@ -15,26 +15,29 @@ import LocalPage from './pages/LocalPage';
 import FavoritesPage from './pages/FavoritesPage';
 import AgentsPage from './pages/AgentsPage';
 
-const INITIAL_AGENTS: Agent[] = [
-  {
+const AGENT_TOOL_IDS = ['claude', 'codex', 'cursor'] as const;
+type AgentId = (typeof AGENT_TOOL_IDS)[number];
+
+const AGENT_CATALOG: Record<AgentId, Agent> = {
+  claude: {
     id: 'claude',
     name: 'Claude',
     pathMac: '~/.claude/skills',
     pathWindows: '%USERPROFILE%\\.claude\\skills',
   },
-  {
+  codex: {
     id: 'codex',
     name: 'Codex',
     pathMac: '~/.codex/skills',
     pathWindows: '%USERPROFILE%\\.codex\\skills',
   },
-  {
+  cursor: {
     id: 'cursor',
     name: 'Cursor',
     pathMac: '~/.cursor/skills',
     pathWindows: '%USERPROFILE%\\.cursor\\skills',
   },
-];
+};
 
 const SAMPLE_DISCOVER: Skill[] = [
   {
@@ -93,7 +96,7 @@ const App = () => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const [activeSection, setActiveSection] = useState('discover');
-  const [agents] = useState(INITIAL_AGENTS);
+  const [agents, setAgents] = useState<Agent[]>([]);
   const [discoverSkills] = useState(SAMPLE_DISCOVER);
   const [localSkills, setLocalSkills] = useState<Skill[]>([]);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
@@ -119,6 +122,7 @@ const App = () => {
   const [apiKeyDialogOpen, setApiKeyDialogOpen] = useState(false);
   const [themeDraft, setThemeDraft] = useState<ThemeMode>(theme);
   const [apiKeyDraft, setApiKeyDraft] = useState(apiKey);
+  const [refreshingAgents, setRefreshingAgents] = useState(false);
 
   const [installedByAgent, setInstalledByAgent] = useState<Record<string, Set<string>>>(
     () => ({
@@ -157,6 +161,43 @@ const App = () => {
     );
   }, [selectedFilePath, selectedSkill]);
 
+  const checkInstalledAgents = useCallback(
+    async (names: string | readonly string[]): Promise<string[]> => {
+      const list = Array.isArray(names) ? [...names] : [names];
+      if (!window?.skillpkg?.detectAgents) return [];
+      const results = await window.skillpkg.detectAgents(list);
+      return results.filter((result) => result.installed).map((result) => result.name);
+    },
+    []
+  );
+
+  const resolveInstalledAgents = useCallback(async (): Promise<Agent[]> => {
+    const installedIds = await checkInstalledAgents(AGENT_TOOL_IDS);
+    return installedIds
+      .filter((agentId): agentId is AgentId => AGENT_TOOL_IDS.includes(agentId as AgentId))
+      .map((agentId) => AGENT_CATALOG[agentId]);
+  }, [checkInstalledAgents]);
+
+  const refreshAgents = useCallback(async () => {
+    setRefreshingAgents(true);
+    const start = Date.now();
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    try {
+      const nextAgents = await resolveInstalledAgents();
+      setAgents(nextAgents);
+      if (nextAgents.length && !nextAgents.some((agent) => agent.id === selectedAgentId)) {
+        setSelectedAgentId(nextAgents[0].id);
+      }
+    } finally {
+      const elapsed = Date.now() - start;
+      const minDuration = 400;
+      if (elapsed < minDuration) {
+        await new Promise((resolve) => setTimeout(resolve, minDuration - elapsed));
+      }
+      setRefreshingAgents(false);
+    }
+  }, [resolveInstalledAgents, selectedAgentId]);
+
   const loadLocalSkills = useCallback(async (path: string) => {
     if (!path) return;
     if (!window?.skillpkg?.loadSkills) {
@@ -173,6 +214,22 @@ const App = () => {
       setInstallPath(savedPath);
     }
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    const loadAgents = async () => {
+      const nextAgents = await resolveInstalledAgents();
+      if (!active) return;
+      setAgents(nextAgents);
+      if (nextAgents.length && !nextAgents.some((agent) => agent.id === selectedAgentId)) {
+        setSelectedAgentId(nextAgents[0].id);
+      }
+    };
+    loadAgents();
+    return () => {
+      active = false;
+    };
+  }, [resolveInstalledAgents, selectedAgentId]);
 
   useEffect(() => {
     if (!document?.body) return;
@@ -204,7 +261,11 @@ const App = () => {
     if (path.startsWith('/agents')) {
       setActiveSection('agents');
       const agentId = path.split('/')[2];
-      if (agentId) setSelectedAgentId(agentId);
+      if (agentId && agents.some((agent) => agent.id === agentId)) {
+        setSelectedAgentId(agentId);
+      } else if (agents[0]) {
+        setSelectedAgentId(agents[0].id);
+      }
     } else if (path.startsWith('/favorites')) {
       setActiveSection('favorites');
     } else if (path.startsWith('/local')) {
@@ -212,7 +273,7 @@ const App = () => {
     } else {
       setActiveSection('discover');
     }
-  }, [location.pathname]);
+  }, [agents, location.pathname]);
 
   useEffect(() => {
     if (!currentSkillList.length) return;
@@ -413,6 +474,8 @@ const App = () => {
         selectedAgentId={selectedAgentId}
         installedByAgent={installedByAgent}
         onSelectAgent={handleSelectAgent}
+        onRefreshAgents={refreshAgents}
+        refreshingAgents={refreshingAgents}
         theme={theme}
         settingsOpen={settingsOpen}
         onToggleSettings={() => setSettingsOpen((prev) => !prev)}

@@ -5,6 +5,7 @@ import {
   SettingsRegular,
   PaintBrushRegular,
   KeyRegular,
+  ArrowClockwiseRegular,
 } from '@fluentui/react-icons';
 import type { Agent } from '../types/models';
 import type { RouteConfig } from '../routes';
@@ -18,6 +19,8 @@ type SidebarProps = {
   selectedAgentId: string;
   installedByAgent: Record<string, Set<string>>;
   onSelectAgent: (id: string) => void;
+  onRefreshAgents: () => void;
+  refreshingAgents: boolean;
   theme: 'system' | 'light' | 'dark';
   settingsOpen: boolean;
   onToggleSettings: () => void;
@@ -34,6 +37,8 @@ const Sidebar = ({
   selectedAgentId,
   installedByAgent,
   onSelectAgent,
+  onRefreshAgents,
+  refreshingAgents,
   theme,
   settingsOpen,
   onToggleSettings,
@@ -85,6 +90,27 @@ const Sidebar = ({
                 )}
                 <Icon className="icon" />
                 <span>{route.label}</span>
+                <span
+                  className="menu-refresh"
+                  role="button"
+                  tabIndex={0}
+                  aria-label="刷新 Agents"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onRefreshAgents();
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      onRefreshAgents();
+                    }
+                  }}
+                >
+                  <ArrowClockwiseRegular
+                    className={`icon ${refreshingAgents ? 'spin' : ''}`}
+                  />
+                </span>
               </button>
             );
           })}

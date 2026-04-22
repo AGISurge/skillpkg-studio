@@ -1,6 +1,8 @@
 const { app, BrowserWindow, ipcMain, dialog } = require('electron/main');
 const path = require('path');
 const fs = require('fs/promises');
+const os = require('os');
+const { execFile } = require('child_process');
 const isDev = require('electron-is-dev');
 const createWindow = () => {
   const win = new BrowserWindow({
@@ -30,6 +32,81 @@ const readJsonIfExists = async (filePath) => {
   } catch (error) {
     return null;
   }
+};
+
+const AGENT_APP_BUNDLES = {
+  claude: ['Claude.app'],
+  codex: ['Codex.app'],
+  cursor: ['Cursor.app'],
+};
+
+const AGENT_WINDOWS_DISPLAY_NAMES = {
+  claude: ['Claude'],
+  codex: ['Codex'],
+  cursor: ['Cursor'],
+};
+
+const pathExists = async (targetPath) => {
+  try {
+    await fs.access(targetPath);
+    return true;
+  } catch (error) {
+    return false;
+  }
+};
+
+const resolveAgentPaths = (agentId) => {
+  const platform = os.platform();
+  if (platform === 'darwin') {
+    const bundles = AGENT_APP_BUNDLES[agentId];
+    if (!bundles?.length) return [];
+    const homeDir = os.homedir();
+    const userApplications = homeDir ? path.join(homeDir, 'Applications') : null;
+    return bundles.flatMap((bundle) => {
+      const paths = [path.join('/Applications', bundle)];
+      if (userApplications) paths.push(path.join(userApplications, bundle));
+      return paths;
+    });
+  }
+  return [];
+};
+
+const REGISTRY_UNINSTALL_KEYS = [
+  'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall',
+  'HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall',
+  'HKLM\\Software\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall',
+];
+
+const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const queryRegistry = (key) =>
+  new Promise((resolve) => {
+    execFile('reg', ['query', key, '/s', '/v', 'DisplayName'], { windowsHide: true }, (error, stdout) => {
+      if (error) return resolve('');
+      resolve(stdout || '');
+    });
+  });
+
+const isInstalledViaRegistry = async (displayNames) => {
+  if (!displayNames?.length) return false;
+  const outputs = await Promise.all(REGISTRY_UNINSTALL_KEYS.map((key) => queryRegistry(key)));
+  const registryText = outputs.join('\n');
+  return displayNames.some((name) => {
+    const matcher = new RegExp(`\\b${escapeRegExp(name)}\\b`, 'i');
+    return matcher.test(registryText);
+  });
+};
+
+const isAgentInstalled = async (agentId) => {
+  const candidates = resolveAgentPaths(agentId);
+  for (const candidate of candidates) {
+    if (await pathExists(candidate)) return true;
+  }
+  if (os.platform() === 'win32') {
+    const displayNames = AGENT_WINDOWS_DISPLAY_NAMES[agentId] || [];
+    return isInstalledViaRegistry(displayNames);
+  }
+  return false;
 };
 
 const collectFiles = async (baseDir, currentDir = baseDir) => {
@@ -125,6 +202,17 @@ app.on('ready', () => {
     await ensureDir(path.dirname(targetPath));
     await fs.writeFile(targetPath, content || '');
     return true;
+  });
+
+  ipcMain.handle('detect-agents', async (_event, names) => {
+    const list = Array.isArray(names) ? names : names ? [names] : [];
+    const results = await Promise.all(
+      list.map(async (name) => ({
+        name,
+        installed: await isAgentInstalled(name),
+      }))
+    );
+    return results;
   });
 
   app.on('activate', () => {
