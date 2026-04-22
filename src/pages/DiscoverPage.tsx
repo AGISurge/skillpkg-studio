@@ -1,6 +1,6 @@
 import ReactMarkdown from 'react-markdown';
 import rehypeHighlight from 'rehype-highlight';
-import { ArrowDownloadRegular, KeyRegular } from '@fluentui/react-icons';
+import { ArrowDownloadRegular } from '@fluentui/react-icons';
 import type { Skill, SkillFile } from '../types/models';
 import { getMarkdownContent } from '../utils/skillUtils';
 
@@ -9,8 +9,6 @@ type DiscoverPageProps = {
   selectedSkillId: string;
   selectedSkill: Skill | null;
   selectedFile: SkillFile | null;
-  apiKey: string;
-  onApiKeyChange: (value: string) => void;
   onSelectSkill: (skill: Skill) => void;
   onInstall: (skill: Skill) => void;
 };
@@ -20,8 +18,6 @@ const DiscoverPage = ({
   selectedSkillId,
   selectedSkill,
   selectedFile,
-  apiKey,
-  onApiKeyChange,
   onSelectSkill,
   onInstall,
 }: DiscoverPageProps) => {
@@ -34,17 +30,6 @@ const DiscoverPage = ({
           <div>
             <div className="panel-title">发现技能</div>
             <div className="panel-subtitle">连接 SkillPkg 市集</div>
-          </div>
-          <div className="panel-actions">
-            <div className="field">
-              <KeyRegular className="icon" />
-              <input
-                type="password"
-                value={apiKey}
-                onChange={(event) => onApiKeyChange(event.target.value)}
-                placeholder="输入 API Key"
-              />
-            </div>
           </div>
         </div>
         <div className="skill-list">

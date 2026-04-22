@@ -464,8 +464,6 @@ const App = () => {
                 selectedSkillId={selectedDiscoverSkillId}
                 selectedSkill={selectedSkill}
                 selectedFile={selectedFile}
-                apiKey={apiKey}
-                onApiKeyChange={setApiKey}
                 onSelectSkill={(skill) => {
                   setSelectedDiscoverSkillId(skill.id);
                   setSelectedFilePath(skill.files[0]?.path || '');
