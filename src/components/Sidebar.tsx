@@ -10,6 +10,9 @@ import {
 import type { Agent } from '../types/models';
 import type { RouteConfig } from '../routes';
 
+/**
+ * 侧边栏参数。
+ */
 type SidebarProps = {
   routes: RouteConfig[];
   activeSection: string;
@@ -26,8 +29,12 @@ type SidebarProps = {
   onToggleSettings: () => void;
   onOpenTheme: () => void;
   onOpenApiKey: () => void;
+  onOpenMigration: () => void;
 };
 
+/**
+ * 左侧导航与设置区域。
+ */
 const Sidebar = ({
   routes,
   activeSection,
@@ -44,6 +51,7 @@ const Sidebar = ({
   onToggleSettings,
   onOpenTheme,
   onOpenApiKey,
+  onOpenMigration,
 }: SidebarProps) => {
   return (
     <aside className="sidebar">
@@ -164,6 +172,14 @@ const Sidebar = ({
               >
                 <KeyRegular className="icon" />
                 <span>API Key</span>
+              </button>
+              <button
+                type="button"
+                className="settings-entry"
+                onClick={onOpenMigration}
+              >
+                <ArrowClockwiseRegular className="icon" />
+                <span>数据迁移</span>
               </button>
             </div>
           ) : null}

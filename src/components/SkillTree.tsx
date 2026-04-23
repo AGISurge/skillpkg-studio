@@ -7,6 +7,9 @@ import {
 import type { SkillFile } from '../types/models';
 import { buildTree } from '../utils/skillUtils';
 
+/**
+ * 技能目录树参数。
+ */
 type SkillTreeProps = {
   files: SkillFile[];
   selectedFilePath: string;
@@ -15,6 +18,9 @@ type SkillTreeProps = {
   onSelectFile: (path: string) => void;
 };
 
+/**
+ * 技能目录树组件。
+ */
 const SkillTree = ({
   files,
   selectedFilePath,
@@ -24,6 +30,11 @@ const SkillTree = ({
 }: SkillTreeProps) => {
   const tree = buildTree(files);
 
+  /**
+   * 递归渲染目录树。
+   * @param node - 当前树节点。
+   * @param depth - 当前层级深度。
+   */
   const renderTree = (node: ReturnType<typeof buildTree>, depth = 0) => {
     const entries = Object.values(node.children).sort((a, b) => {
       if (a.type === b.type) return a.name.localeCompare(b.name);

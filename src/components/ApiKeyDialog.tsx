@@ -1,5 +1,8 @@
 import { DismissCircleRegular, KeyRegular } from '@fluentui/react-icons';
 
+/**
+ * API Key 弹窗参数。
+ */
 type ApiKeyDialogProps = {
   open: boolean;
   value: string;
@@ -8,6 +11,9 @@ type ApiKeyDialogProps = {
   onCancel: () => void;
 };
 
+/**
+ * 配置 API Key 的弹窗。
+ */
 const ApiKeyDialog = ({ open, value, onChange, onConfirm, onCancel }: ApiKeyDialogProps) => {
   if (!open) return null;
 

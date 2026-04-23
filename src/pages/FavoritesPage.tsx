@@ -1,6 +1,9 @@
 import type { Skill, SkillFile } from '../types/models';
 import SkillsPage from './SkillsPage';
 
+/**
+ * 收藏页参数。
+ */
 type FavoritesPageProps = {
   skills: Skill[];
   selectedSkillId: string;
@@ -20,6 +23,9 @@ type FavoritesPageProps = {
   onChangeDraft: (value: string) => void;
 };
 
+/**
+ * 收藏页封装，复用 SkillsPage。
+ */
 const FavoritesPage = (props: FavoritesPageProps) => (
   <SkillsPage
     {...props}

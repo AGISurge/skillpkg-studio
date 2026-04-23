@@ -1,5 +1,8 @@
 import { BoxRegular, PeopleRegular, SearchRegular, StarRegular } from '@fluentui/react-icons';
 
+/**
+ * 路由配置结构。
+ */
 export type RouteConfig = {
   id: string;
   path: string;
@@ -9,6 +12,9 @@ export type RouteConfig = {
   isAgentsRoot?: boolean;
 };
 
+/**
+ * 路由路径常量。
+ */
 export const routePaths = {
   discover: '/discover',
   local: '/local',
@@ -16,6 +22,9 @@ export const routePaths = {
   agents: '/agents/:agentId?',
 };
 
+/**
+ * 侧边栏菜单配置。
+ */
 export const menuRoutes: RouteConfig[] = [
   {
     id: 'discover',

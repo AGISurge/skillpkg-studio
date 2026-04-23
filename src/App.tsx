@@ -6,82 +6,28 @@ import './App.css';
 import type { Agent, Skill, SkillFile } from './types/models';
 import { menuRoutes, routePaths } from './routes';
 import { validateSkill } from './utils/skillUtils';
+import { AGENT_CATALOG, AGENT_TOOL_IDS } from './config/agents';
+import type { AgentId } from './config/agents';
+import { DISCOVER_MOCK_PATH } from './config/discover';
+import { mergeAgentSkills } from './utils/migrationUtils';
+import type { AgentSkillsResult, MigrationSkillEntry } from './utils/migrationUtils';
 import Sidebar from './components/Sidebar';
 import InstallDialog from './components/InstallDialog';
 import ThemeDialog from './components/ThemeDialog';
 import ApiKeyDialog from './components/ApiKeyDialog';
+import MigrationDialog from './components/MigrationDialog';
 import DiscoverPage from './pages/DiscoverPage';
 import LocalPage from './pages/LocalPage';
 import FavoritesPage from './pages/FavoritesPage';
 import AgentsPage from './pages/AgentsPage';
 
-const AGENT_TOOL_IDS = ['claude', 'codex', 'cursor'] as const;
-type AgentId = (typeof AGENT_TOOL_IDS)[number];
-
-const AGENT_CATALOG: Record<AgentId, Agent> = {
-  claude: {
-    id: 'claude',
-    name: 'Claude',
-    pathMac: '~/.claude/skills',
-    pathWindows: '%USERPROFILE%\\.claude\\skills',
-  },
-  codex: {
-    id: 'codex',
-    name: 'Codex',
-    pathMac: '~/.codex/skills',
-    pathWindows: '%USERPROFILE%\\.codex\\skills',
-  },
-  cursor: {
-    id: 'cursor',
-    name: 'Cursor',
-    pathMac: '~/.cursor/skills',
-    pathWindows: '%USERPROFILE%\\.cursor\\skills',
-  },
-};
-
-const SAMPLE_DISCOVER: Skill[] = [
-  {
-    id: 'service-guardian',
-    name: 'Service Guardian',
-    version: '1.0.3',
-    description: '对 API 调用进行守护与重试策略编排。',
-    author: 'SkillPkg Labs',
-    tags: ['ops', 'api'],
-    files: [
-      {
-        path: 'README.md',
-        content: `# Service Guardian\n\n守护 API 稳定性。\n\n\`\`\`js\nexport const policy = { retries: 3 };\n\`\`\``,
-      },
-      {
-        path: 'rules/policy.yaml',
-        content: `retries: 3\nbackoff: exponential`,
-      },
-    ],
-  },
-  {
-    id: 'release-pilot',
-    name: 'Release Pilot',
-    version: '0.8.0',
-    description: '为发布流程提供检查清单与风险评估。',
-    author: 'Studio Core',
-    tags: ['release', 'qa'],
-    files: [
-      {
-        path: 'README.md',
-        content: `# Release Pilot\n\n发布流程自动化。\n\n- 检查清单\n- 风险评估`,
-      },
-      {
-        path: 'checklists/prod.md',
-        content: `# Production Checklist\n\n- 变更确认\n- 回滚策略`,
-      },
-    ],
-  },
-];
-
 type ThemeMode = 'system' | 'light' | 'dark';
 
 const THEME_STORAGE_KEY = 'skillpkg.theme';
 
+/**
+ * 读取本地主题设置，未设置则回落到跟随系统。
+ */
 const getInitialTheme = (): ThemeMode => {
   const saved = window?.localStorage?.getItem(THEME_STORAGE_KEY);
   if (saved === 'light' || saved === 'dark' || saved === 'system') {
@@ -97,13 +43,11 @@ const App = () => {
 
   const [activeSection, setActiveSection] = useState('discover');
   const [agents, setAgents] = useState<Agent[]>([]);
-  const [discoverSkills] = useState(SAMPLE_DISCOVER);
+  const [discoverSkills, setDiscoverSkills] = useState<Skill[]>([]);
   const [localSkills, setLocalSkills] = useState<Skill[]>([]);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const [selectedAgentId, setSelectedAgentId] = useState('claude');
-  const [selectedDiscoverSkillId, setSelectedDiscoverSkillId] = useState(
-    SAMPLE_DISCOVER[0]?.id || ''
-  );
+  const [selectedDiscoverSkillId, setSelectedDiscoverSkillId] = useState('');
   const [selectedLibrarySkillId, setSelectedLibrarySkillId] = useState('');
   const [selectedFilePath, setSelectedFilePath] = useState('README.md');
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
@@ -114,6 +58,7 @@ const App = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogSkill, setDialogSkill] = useState<Skill | null>(null);
   const [dialogAgents, setDialogAgents] = useState<Set<string>>(new Set());
+  const [installConflict, setInstallConflict] = useState(false);
   const [editing, setEditing] = useState(false);
   const [fileDrafts, setFileDrafts] = useState<Record<string, string>>({});
   const [theme, setTheme] = useState<ThemeMode>(getInitialTheme);
@@ -123,6 +68,13 @@ const App = () => {
   const [themeDraft, setThemeDraft] = useState<ThemeMode>(theme);
   const [apiKeyDraft, setApiKeyDraft] = useState(apiKey);
   const [refreshingAgents, setRefreshingAgents] = useState(false);
+  const [migrationOpen, setMigrationOpen] = useState(false);
+  const [migrationLoading, setMigrationLoading] = useState(false);
+  const [migrationSubmitting, setMigrationSubmitting] = useState(false);
+  const [migrationSkills, setMigrationSkills] = useState<MigrationSkillEntry[]>([]);
+  const [migrationSelected, setMigrationSelected] = useState<Set<string>>(new Set());
+  const [migrationSources, setMigrationSources] = useState<Record<string, string>>({});
+  const [migrationNotice, setMigrationNotice] = useState('');
 
   const [installedByAgent, setInstalledByAgent] = useState<Record<string, Set<string>>>(
     () => ({
@@ -161,6 +113,10 @@ const App = () => {
     );
   }, [selectedFilePath, selectedSkill]);
 
+  /**
+   * 通过桥接接口探测已安装的 Agent。
+   * @param names - 需要检测的 Agent 标识或标识列表。
+   */
   const checkInstalledAgents = useCallback(
     async (names: string | readonly string[]): Promise<string[]> => {
       const list = Array.isArray(names) ? [...names] : [names];
@@ -171,6 +127,9 @@ const App = () => {
     []
   );
 
+  /**
+   * 根据已安装的 Agent 标识构建 Agent 列表。
+   */
   const resolveInstalledAgents = useCallback(async (): Promise<Agent[]> => {
     const installedIds = await checkInstalledAgents(AGENT_TOOL_IDS);
     return installedIds
@@ -178,6 +137,38 @@ const App = () => {
       .map((agentId) => AGENT_CATALOG[agentId]);
   }, [checkInstalledAgents]);
 
+  /**
+   * 扫描指定 Agent 的技能并合并为去重列表。
+   * @param agentList - 需要扫描的 Agent 列表。
+   */
+  const loadMigrationSkills = useCallback(async (agentList: Agent[]) => {
+    if (!window?.skillpkg?.loadAgentSkills) return [] as MigrationSkillEntry[];
+    const results = (await window.skillpkg.loadAgentSkills(agentList)) as AgentSkillsResult[];
+    return mergeAgentSkills(results);
+  }, []);
+
+  /**
+   * 同步每个 Agent 已安装的技能列表。
+   * @param agentList - 当前可用的 Agent 列表。
+   */
+  const syncInstalledByAgent = useCallback(async (agentList: Agent[]) => {
+    if (!window?.skillpkg?.loadAgentSkills) return;
+    const results = (await window.skillpkg.loadAgentSkills(agentList)) as AgentSkillsResult[];
+    setInstalledByAgent((prev) => {
+      const next: Record<string, Set<string>> = { ...prev };
+      agentList.forEach((agent) => {
+        next[agent.id] = new Set();
+      });
+      results.forEach((result) => {
+        next[result.agentId] = new Set(result.skills.map((skill) => skill.id));
+      });
+      return next;
+    });
+  }, []);
+
+  /**
+   * 刷新已安装 Agent 列表，并让刷新图标至少旋转一小段时间。
+   */
   const refreshAgents = useCallback(async () => {
     setRefreshingAgents(true);
     const start = Date.now();
@@ -188,6 +179,7 @@ const App = () => {
       if (nextAgents.length && !nextAgents.some((agent) => agent.id === selectedAgentId)) {
         setSelectedAgentId(nextAgents[0].id);
       }
+      await syncInstalledByAgent(nextAgents);
     } finally {
       const elapsed = Date.now() - start;
       const minDuration = 400;
@@ -196,8 +188,141 @@ const App = () => {
       }
       setRefreshingAgents(false);
     }
-  }, [resolveInstalledAgents, selectedAgentId]);
+  }, [resolveInstalledAgents, selectedAgentId, syncInstalledByAgent]);
 
+  /**
+   * 打开迁移弹窗并填充数据。
+   */
+  const openMigrationDialog = useCallback(async () => {
+    setSettingsOpen(false);
+    setMigrationOpen(true);
+    setMigrationNotice('');
+    setMigrationLoading(true);
+    setMigrationSelected(new Set());
+    setMigrationSources({});
+    const agentList = await resolveInstalledAgents();
+    setAgents(agentList);
+    if (agentList.length && !agentList.some((agent) => agent.id === selectedAgentId)) {
+      setSelectedAgentId(agentList[0].id);
+    }
+    const entries = await loadMigrationSkills(agentList);
+    setMigrationSkills(entries);
+    setMigrationLoading(false);
+  }, [loadMigrationSkills, resolveInstalledAgents, selectedAgentId]);
+
+  /**
+   * 勾选或取消迁移列表中的技能。
+   * @param skillId - 技能唯一标识。
+   */
+  const toggleMigrationSkill = useCallback((skillId: string) => {
+    setMigrationSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(skillId)) next.delete(skillId);
+      else next.add(skillId);
+      return next;
+    });
+  }, []);
+
+  /**
+   * 迁移列表全选/取消全选。
+   */
+  const toggleMigrationAll = useCallback(() => {
+    setMigrationSelected((prev) => {
+      if (migrationSkills.length && prev.size === migrationSkills.length) {
+        return new Set();
+      }
+      return new Set(migrationSkills.map((skill) => skill.id));
+    });
+  }, [migrationSkills]);
+
+  /**
+   * 为多来源技能选择来源 Agent。
+   * @param skillId - 需要选择来源的技能标识。
+   * @param agentId - 作为来源的 Agent 标识。
+   */
+  const selectMigrationSource = useCallback((skillId: string, agentId: string) => {
+    setMigrationSources((prev) => ({ ...prev, [skillId]: agentId }));
+  }, []);
+
+  /**
+   * 按当前选择执行迁移。
+   */
+  const confirmMigration = useCallback(async () => {
+    if (!installPath) {
+      setMigrationNotice('请先设置统一路径。');
+      return;
+    }
+    if (!migrationSelected.size) {
+      setMigrationNotice('请选择要迁移的技能。');
+      return;
+    }
+    const skipped: string[] = [];
+    const items = migrationSkills
+      .filter((skill) => migrationSelected.has(skill.id))
+      .map((skill) => {
+        const sourceId =
+          skill.agents.length === 1 ? skill.agents[0].id : migrationSources[skill.id];
+        if (!sourceId) {
+          skipped.push(skill.name);
+          return null;
+        }
+        const agent = agents.find((entry) => entry.id === sourceId);
+        if (!agent) {
+          skipped.push(skill.name);
+          return null;
+        }
+        return {
+          agentId: sourceId,
+          skillId: skill.id,
+          pathMac: agent.pathMac,
+          pathWindows: agent.pathWindows,
+        };
+      })
+      .filter(Boolean);
+    if (!items.length) {
+      setMigrationNotice(
+        skipped.length
+          ? `以下技能未选择来源，已跳过：${skipped.join('、')}`
+          : '未发现可迁移的技能。'
+      );
+      return;
+    }
+    if (!window?.skillpkg?.migrateSkills) {
+      setMigrationNotice('当前环境不支持迁移功能。');
+      return;
+    }
+    setMigrationSubmitting(true);
+    try {
+      const results = await window.skillpkg.migrateSkills({
+        installPath,
+        items: items as Array<{
+          agentId: string;
+          skillId: string;
+          pathMac: string;
+          pathWindows: string;
+        }>,
+      });
+      const failed = results.filter((result) => !result.ok);
+      const doneCount = results.filter((result) => result.ok).length;
+      if (failed.length) {
+        setMigrationNotice(
+          `已迁移 ${doneCount} 项，失败 ${failed.length} 项。` +
+            (skipped.length ? ` 未选择来源已跳过：${skipped.join('、')}` : '')
+        );
+      } else if (skipped.length) {
+        setMigrationNotice(`已迁移 ${doneCount} 项。未选择来源已跳过：${skipped.join('、')}`);
+      } else {
+        setMigrationNotice(`迁移完成，共 ${doneCount} 项。`);
+      }
+    } finally {
+      setMigrationSubmitting(false);
+    }
+  }, [agents, installPath, migrationSelected, migrationSkills, migrationSources]);
+
+  /**
+   * 从统一路径加载技能列表。
+   * @param path - 统一技能存放路径。
+   */
   const loadLocalSkills = useCallback(async (path: string) => {
     if (!path) return;
     if (!window?.skillpkg?.loadSkills) {
@@ -208,12 +333,32 @@ const App = () => {
     setLocalSkills(skills);
   }, []);
 
+  /**
+   * 从本地模拟路径加载发现页技能。
+   */
+  const loadDiscoverSkills = useCallback(async () => {
+    if (!window?.skillpkg?.loadSkills) {
+      setNotice('当前环境不支持读取发现页数据。');
+      return;
+    }
+    const skills = await window.skillpkg.loadSkills(DISCOVER_MOCK_PATH);
+    setDiscoverSkills(skills);
+    if (skills[0] && !skills.some((skill) => skill.id === selectedDiscoverSkillId)) {
+      setSelectedDiscoverSkillId(skills[0].id);
+      setSelectedFilePath(skills[0].files[0]?.path || '');
+    }
+  }, [selectedDiscoverSkillId]);
+
   useEffect(() => {
     const savedPath = window?.localStorage?.getItem('skillpkg.installPath');
     if (savedPath) {
       setInstallPath(savedPath);
     }
   }, []);
+
+  useEffect(() => {
+    loadDiscoverSkills();
+  }, [loadDiscoverSkills]);
 
   useEffect(() => {
     let active = true;
@@ -224,12 +369,13 @@ const App = () => {
       if (nextAgents.length && !nextAgents.some((agent) => agent.id === selectedAgentId)) {
         setSelectedAgentId(nextAgents[0].id);
       }
+      await syncInstalledByAgent(nextAgents);
     };
     loadAgents();
     return () => {
       active = false;
     };
-  }, [resolveInstalledAgents, selectedAgentId]);
+  }, [resolveInstalledAgents, selectedAgentId, syncInstalledByAgent]);
 
   useEffect(() => {
     if (!document?.body) return;
@@ -237,12 +383,18 @@ const App = () => {
     window?.localStorage?.setItem(THEME_STORAGE_KEY, theme);
   }, [theme]);
 
+  /**
+   * 打开主题选择弹窗并预填草稿值。
+   */
   const openThemeDialog = () => {
     setThemeDraft(theme);
     setThemeDialogOpen(true);
     setSettingsOpen(false);
   };
 
+  /**
+   * 打开 API Key 弹窗并预填草稿值。
+   */
   const openApiKeyDialog = () => {
     setApiKeyDraft(apiKey);
     setApiKeyDialogOpen(true);
@@ -290,6 +442,10 @@ const App = () => {
   }, [activeSection, currentSkillList, selectedSkillId]);
 
 
+  /**
+   * 切换技能收藏状态。
+   * @param skillId - 需要切换的技能标识。
+   */
   const toggleFavorite = (skillId: string) => {
     setFavorites((prev) => {
       const next = new Set(prev);
@@ -302,6 +458,10 @@ const App = () => {
     });
   };
 
+  /**
+   * 打开安装弹窗。
+   * @param skill - 待安装的技能信息。
+   */
   const openInstallDialog = (skill: Skill) => {
     if (!validateSkill(skill)) {
       setNotice('Skill 校验失败：缺少必要字段或文件。');
@@ -310,10 +470,15 @@ const App = () => {
     const allAgents = new Set(agents.map((agent) => agent.id));
     setDialogAgents(allAgents);
     setDialogSkill(skill);
+    setInstallConflict(false);
     setDialogOpen(true);
   };
 
-  const confirmInstall = async () => {
+  /**
+   * 执行安装（可选覆盖已有技能）。
+   * @param overwrite - 是否覆盖已有技能目录。
+   */
+  const confirmInstall = async (overwrite = false) => {
     if (!dialogSkill) return;
     if (!installPath) {
       setNotice('请先设置统一路径。');
@@ -323,7 +488,21 @@ const App = () => {
       setNotice('当前环境不支持安装 Skill。');
       return;
     }
-    await window.skillpkg.installSkill({ installPath, skill: dialogSkill });
+    if (!dialogAgents.size) {
+      setNotice('请至少选择一个 Agent。');
+      return;
+    }
+    const selectedAgents = agents.filter((agent) => dialogAgents.has(agent.id));
+    const result = await window.skillpkg.installSkill({
+      installPath,
+      skill: dialogSkill,
+      agents: selectedAgents,
+      overwrite,
+    });
+    if (!result.ok && result.reason === 'exists') {
+      setInstallConflict(true);
+      return;
+    }
     await loadLocalSkills(installPath);
     setInstalledByAgent((prev) => {
       const next = { ...prev };
@@ -338,6 +517,31 @@ const App = () => {
     setDialogOpen(false);
   };
 
+  /**
+   * 打开当前技能的本地存放位置。
+   */
+  const openSkillLocation = async () => {
+    if (!dialogSkill || !installPath) {
+      setNotice('请先设置统一路径。');
+      return;
+    }
+    if (!window?.skillpkg?.openSkillPath) {
+      setNotice('当前环境不支持打开路径。');
+      return;
+    }
+    const ok = await window.skillpkg.openSkillPath({
+      installPath,
+      skillId: dialogSkill.id,
+    });
+    if (!ok) {
+      setNotice('未找到该 Skill 的本地路径。');
+    }
+  };
+
+  /**
+   * 将选择的 zip 转换成占位技能记录。
+   * @param event - 文件选择变更事件（包含 zip 文件）。
+   */
   const handleImportZip = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -360,6 +564,10 @@ const App = () => {
     event.target.value = '';
   };
 
+  /**
+   * 切换当前 Agent 的安装状态。
+   * @param skillId - 需要切换的技能标识。
+   */
   const handleInstallToggle = (skillId: string) => {
     setInstalledByAgent((prev) => {
       const next = { ...prev };
@@ -376,17 +584,28 @@ const App = () => {
     });
   };
 
+  /**
+   * 选择当前技能中的文件。
+   * @param path - 相对技能根目录的文件路径。
+   */
   const handleFileSelect = (path: string) => {
     setSelectedFilePath(path);
     setEditing(false);
   };
 
+  /**
+   * 更新当前文件的草稿内容。
+   * @param value - 新的草稿内容。
+   */
   const updateDraft = (value: string) => {
     if (!selectedSkill || !selectedFile) return;
     const key = `${selectedSkill.id}::${selectedFile.path}`;
     setFileDrafts((prev) => ({ ...prev, [key]: value }));
   };
 
+  /**
+   * 通过桥接接口保存当前草稿。
+   */
   const handleSaveFile = async () => {
     if (!selectedSkill || !selectedFile) return;
     const key = `${selectedSkill.id}::${selectedFile.path}`;
@@ -422,6 +641,9 @@ const App = () => {
     setEditing(false);
   };
 
+  /**
+   * 选择统一路径并重新加载本地技能。
+   */
   const handleSelectInstallPath = async () => {
     try {
       if (!window?.skillpkg?.selectInstallPath) {
@@ -438,6 +660,10 @@ const App = () => {
     }
   };
 
+  /**
+   * 展开/收起技能树中的文件夹。
+   * @param path - 相对技能根目录的文件夹路径。
+   */
   const handleToggleFolder = (path: string) => {
     setExpandedFolders((prev) => {
       const next = new Set(prev);
@@ -447,6 +673,10 @@ const App = () => {
     });
   };
 
+  /**
+   * 进入 Agent 视图并选中该 Agent 的首个技能。
+   * @param agentId - 需要激活的 Agent 标识。
+   */
   const handleSelectAgent = (agentId: string) => {
     setSelectedAgentId(agentId);
     const installed = installedByAgent[agentId] || new Set();
@@ -481,6 +711,7 @@ const App = () => {
         onToggleSettings={() => setSettingsOpen((prev) => !prev)}
         onOpenTheme={openThemeDialog}
         onOpenApiKey={openApiKeyDialog}
+        onOpenMigration={openMigrationDialog}
       />
 
       <main className="content">
@@ -635,8 +866,15 @@ const App = () => {
             return next;
           });
         }}
+        conflict={installConflict}
+        onOverwrite={() => confirmInstall(true)}
+        onKeep={() => {
+          setInstallConflict(false);
+          setDialogOpen(false);
+        }}
+        onOpenSkillPath={openSkillLocation}
         onClose={() => setDialogOpen(false)}
-        onConfirm={confirmInstall}
+        onConfirm={() => confirmInstall(false)}
       />
       <ThemeDialog
         open={themeDialogOpen}
@@ -657,6 +895,21 @@ const App = () => {
           setApiKeyDialogOpen(false);
         }}
         onCancel={() => setApiKeyDialogOpen(false)}
+      />
+      <MigrationDialog
+        open={migrationOpen}
+        loading={migrationLoading}
+        migrating={migrationSubmitting}
+        installPath={installPath}
+        skills={migrationSkills}
+        selectedIds={migrationSelected}
+        selectedSources={migrationSources}
+        notice={migrationNotice}
+        onToggleAll={toggleMigrationAll}
+        onToggleSkill={toggleMigrationSkill}
+        onSelectSource={selectMigrationSource}
+        onConfirm={confirmMigration}
+        onCancel={() => setMigrationOpen(false)}
       />
     </div>
   );

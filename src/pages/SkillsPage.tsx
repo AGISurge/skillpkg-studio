@@ -10,6 +10,9 @@ import type { Skill, SkillFile } from '../types/models';
 import SkillTree from '../components/SkillTree';
 import SkillViewer from '../components/SkillViewer';
 
+/**
+ * 技能列表与详情页参数。
+ */
 type SkillsPageProps = {
   title: string;
   subtitle: string;
@@ -35,6 +38,9 @@ type SkillsPageProps = {
   onChangeDraft: (value: string) => void;
 };
 
+/**
+ * 通用技能页面（本机/收藏/Agents 复用）。
+ */
 const SkillsPage = ({
   title,
   subtitle,
@@ -102,17 +108,22 @@ const SkillsPage = ({
                 <div className="skill-meta">
                   <span>{skill.author}</span>
                   {mode === 'agents' && (
-                    <span className={`status ${isInstalled ? 'on' : 'off'}`}>
-                      {isInstalled ? (
-                        <>
-                          <CheckmarkCircleRegular className="icon" /> 已安装
-                        </>
-                      ) : (
-                        <>
-                          <DismissCircleRegular className="icon" /> 未安装
-                        </>
-                      )}
-                    </span>
+                    <>
+                      <span className={`source-tag ${skill.source === 'linked' ? 'linked' : 'local'}`}>
+                        {skill.source === 'linked' ? '统一路径' : '本地'}
+                      </span>
+                      <span className={`status ${isInstalled ? 'on' : 'off'}`}>
+                        {isInstalled ? (
+                          <>
+                            <CheckmarkCircleRegular className="icon" /> 已安装
+                          </>
+                        ) : (
+                          <>
+                            <DismissCircleRegular className="icon" /> 未安装
+                          </>
+                        )}
+                      </span>
+                    </>
                   )}
                 </div>
                 {mode === 'agents' && onInstallToggle && (

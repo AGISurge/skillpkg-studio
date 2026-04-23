@@ -1,7 +1,13 @@
 import { DismissCircleRegular } from '@fluentui/react-icons';
 
+/**
+ * 主题模式枚举。
+ */
 type ThemeMode = 'system' | 'light' | 'dark';
 
+/**
+ * 主题弹窗参数。
+ */
 type ThemeDialogProps = {
   open: boolean;
   value: ThemeMode;
@@ -10,6 +16,9 @@ type ThemeDialogProps = {
   onCancel: () => void;
 };
 
+/**
+ * 主题选择弹窗。
+ */
 const ThemeDialog = ({ open, value, onChange, onConfirm, onCancel }: ThemeDialogProps) => {
   if (!open) return null;
 

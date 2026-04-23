@@ -5,5 +5,8 @@ contextBridge.exposeInMainWorld('skillpkg', {
   loadSkills: (installPath) => ipcRenderer.invoke('load-skills', installPath),
   installSkill: (payload) => ipcRenderer.invoke('install-skill', payload),
   detectAgents: (names) => ipcRenderer.invoke('detect-agents', names),
+  loadAgentSkills: (agents) => ipcRenderer.invoke('load-agent-skills', agents),
+  migrateSkills: (payload) => ipcRenderer.invoke('migrate-skills', payload),
+  openSkillPath: (payload) => ipcRenderer.invoke('open-skill-path', payload),
   saveSkillFile: (payload) => ipcRenderer.invoke('save-skill-file', payload),
 });

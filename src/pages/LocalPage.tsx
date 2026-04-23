@@ -1,6 +1,9 @@
 import type { Skill, SkillFile } from '../types/models';
 import SkillsPage from './SkillsPage';
 
+/**
+ * 本地技能页参数。
+ */
 type LocalPageProps = {
   skills: Skill[];
   selectedSkillId: string;
@@ -21,6 +24,9 @@ type LocalPageProps = {
   onChangeDraft: (value: string) => void;
 };
 
+/**
+ * 本地技能页封装，复用 SkillsPage。
+ */
 const LocalPage = (props: LocalPageProps) => (
   <SkillsPage
     {...props}

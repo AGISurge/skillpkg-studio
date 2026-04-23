@@ -4,6 +4,9 @@ import { ArrowDownloadRegular } from '@fluentui/react-icons';
 import type { Skill, SkillFile } from '../types/models';
 import { getMarkdownContent } from '../utils/skillUtils';
 
+/**
+ * 发现页参数。
+ */
 type DiscoverPageProps = {
   skills: Skill[];
   selectedSkillId: string;
@@ -13,6 +16,9 @@ type DiscoverPageProps = {
   onInstall: (skill: Skill) => void;
 };
 
+/**
+ * 发现技能列表与详情预览。
+ */
 const DiscoverPage = ({
   skills,
   selectedSkillId,

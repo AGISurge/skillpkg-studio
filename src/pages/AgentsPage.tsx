@@ -1,6 +1,9 @@
 import type { Skill, SkillFile } from '../types/models';
 import SkillsPage from './SkillsPage';
 
+/**
+ * Agents 页面参数。
+ */
 type AgentsPageProps = {
   skills: Skill[];
   selectedSkillId: string;
@@ -24,6 +27,9 @@ type AgentsPageProps = {
   onChangeDraft: (value: string) => void;
 };
 
+/**
+ * Agents 页面封装，复用 SkillsPage。
+ */
 const AgentsPage = ({ currentAgentName, installedSkillIds, ...rest }: AgentsPageProps) => (
   <SkillsPage
     {...rest}
