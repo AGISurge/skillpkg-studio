@@ -68,7 +68,6 @@ const AppLayout = () => {
         <header className="topbar">
           <div>
             <div className="page-title">{currentRoute?.label}</div>
-            <div className="page-subtitle">SkillPkg 管理与分发中心</div>
           </div>
           {!isSettingsPage ? (
             <div className="actions">
