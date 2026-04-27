@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
-import { FolderOpenRegular, LinkRegular, PanelLeftExpandRegular } from '@fluentui/react-icons';
+import { FolderOpenRegular, LinkRegular } from '@fluentui/react-icons';
 import './App.css';
 import type { Agent, Skill, SkillFile } from './types/models';
 import { menuRoutes, routePaths } from './routes';
@@ -20,9 +20,7 @@ import SettingsPage from './pages/SettingsPage';
 
 type ThemeMode = 'system' | 'light' | 'dark';
 
-// cSpell:ignore skillpkg
 const THEME_STORAGE_KEY = 'skillpkg.theme';
-const SIDEBAR_FLOATING_WIDTH = 900;
 
 /**
  * 读取本地主题设置，未设置则回落到跟随系统。
@@ -62,8 +60,6 @@ const App = () => {
   const [fileDrafts, setFileDrafts] = useState<Record<string, string>>({});
   const [theme, setTheme] = useState<ThemeMode>(getInitialTheme);
   const [refreshingAgents, setRefreshingAgents] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [sidebarFloating, setSidebarFloating] = useState(false);
 
   const [installedByAgent, setInstalledByAgent] = useState<Record<string, Set<string>>>(
     () => ({
@@ -244,21 +240,6 @@ const App = () => {
     document.body.dataset.theme = theme;
     window?.localStorage?.setItem(THEME_STORAGE_KEY, theme);
   }, [theme]);
-
-  useEffect(() => {
-    if (!window.matchMedia) return;
-
-    const mediaQuery = window.matchMedia(`(max-width: ${SIDEBAR_FLOATING_WIDTH}px)`);
-    const syncSidebarMode = (matches: boolean) => {
-      setSidebarFloating(matches);
-      setSidebarOpen((current) => (matches ? false : current));
-    };
-
-    syncSidebarMode(mediaQuery.matches);
-    const handleChange = (event: MediaQueryListEvent) => syncSidebarMode(event.matches);
-    mediaQuery.addEventListener('change', handleChange);
-    return () => mediaQuery.removeEventListener('change', handleChange);
-  }, []);
 
   useEffect(() => {
     if (installPath) {
@@ -557,43 +538,19 @@ const App = () => {
   const visibleSection = isSettingsPage ? 'settings' : activeSection;
 
   return (
-    <div className={`app-shell ${sidebarOpen ? '' : 'sidebar-collapsed'} ${sidebarFloating ? 'sidebar-floating-mode' : ''}`}>
-      {sidebarOpen ? (
-        <>
-          {sidebarFloating ? (
-            <button
-              type="button"
-              className="sidebar-scrim"
-              aria-label="关闭侧栏"
-              onClick={() => setSidebarOpen(false)}
-            />
-          ) : null}
-          <Sidebar
-            routes={menuRoutes}
-            activeSection={activeSection}
-            agentsExpanded={agentsExpanded}
-            onToggleAgents={() => setAgentsExpanded((prev) => !prev)}
-            agents={agents}
-            selectedAgentId={selectedAgentId}
-            installedByAgent={installedByAgent}
-            onSelectAgent={handleSelectAgent}
-            onRefreshAgents={refreshAgents}
-            refreshingAgents={refreshingAgents}
-            isFloating={sidebarFloating}
-            onCollapse={() => setSidebarOpen(false)}
-          />
-        </>
-      ) : (
-        <button
-          type="button"
-          className="sidebar-expand"
-          aria-label="展开侧栏"
-          title="展开侧栏"
-          onClick={() => setSidebarOpen(true)}
-        >
-          <PanelLeftExpandRegular className="icon" />
-        </button>
-      )}
+    <div className="app-shell">
+      <Sidebar
+        routes={menuRoutes}
+        activeSection={activeSection}
+        agentsExpanded={agentsExpanded}
+        onToggleAgents={() => setAgentsExpanded((prev) => !prev)}
+        agents={agents}
+        selectedAgentId={selectedAgentId}
+        installedByAgent={installedByAgent}
+        onSelectAgent={handleSelectAgent}
+        onRefreshAgents={refreshAgents}
+        refreshingAgents={refreshingAgents}
+      />
 
       <main className="content">
         <header className="topbar">
