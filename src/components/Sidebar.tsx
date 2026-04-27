@@ -1,5 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import {
+  PanelLeftContractRegular,
   ChevronDownRegular,
   ChevronRightRegular,
   SettingsRegular,
@@ -22,6 +23,8 @@ type SidebarProps = {
   onSelectAgent: (id: string) => void;
   onRefreshAgents: () => void;
   refreshingAgents: boolean;
+  isFloating?: boolean;
+  onCollapse: () => void;
 };
 
 /**
@@ -38,14 +41,27 @@ const Sidebar = ({
   onSelectAgent,
   onRefreshAgents,
   refreshingAgents,
+  isFloating = false,
+  onCollapse,
 }: SidebarProps) => {
   return (
-    <aside className="sidebar">
-      <div className="flex justify-start gap-2 items-center">
-        <img src="/logo.png" className="size-8" alt="SkillPKG Logo"/>
-        <div>
-          <div className="font-bold font-sans-serif">SkillPKG Studio</div>
+    <aside className={`sidebar ${isFloating ? 'floating' : ''}`}>
+      <div className="sidebar-head">
+        <div className="flex justify-start gap-2 items-center">
+          <img src="/logo.png" className="size-8" alt="SkillPKG Logo"/>
+          <div>
+            <div className="font-bold font-sans-serif">SkillPKG Studio</div>
+          </div>
         </div>
+        <button
+          type="button"
+          className="sidebar-toggle"
+          aria-label="收起侧栏"
+          title="收起侧栏"
+          onClick={onCollapse}
+        >
+          <PanelLeftContractRegular className="icon" />
+        </button>
       </div>
       <nav className="menu">
         {routes
