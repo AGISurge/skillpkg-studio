@@ -56,10 +56,10 @@ const Sidebar = ({
   return (
     <aside className="sidebar">
       <div className="brand">
-        <div className="brand-icon">SP</div>
+        <img src="/logo.png" className="size-12" alt="SkillPKG Logo"/>
         <div>
           <div className="brand-title">SkillPkg Studio</div>
-          <div className="brand-subtitle">Electron + React</div>
+          <a href="https://skillpkg.com" className="brand-subtitle">skillpkg.com</a>
         </div>
       </div>
       <nav className="menu">
