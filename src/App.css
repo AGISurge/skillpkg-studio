@@ -269,31 +269,6 @@ body[data-theme='light'] {
   color: var(--app-text-strong);
 }
 
-.sidebar-footer {
-  margin-top: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.settings-item {
-  width: 100%;
-  justify-content: center;
-}
-
-.settings-area {
-  display: flex;
-  align-items: stretch;
-}
-
-.settings-input {
-  background: transparent;
-  border: none;
-  color: inherit;
-  outline: none;
-  font-size: 13px;
-  width: 100%;
-}
 
 .settings-page {
   display: flex;

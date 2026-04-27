@@ -20,6 +20,7 @@ import SettingsPage from './pages/SettingsPage';
 
 type ThemeMode = 'system' | 'light' | 'dark';
 
+// cSpell:ignore skillpkg
 const THEME_STORAGE_KEY = 'skillpkg.theme';
 
 /**

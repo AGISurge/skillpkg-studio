@@ -130,19 +130,17 @@ const Sidebar = ({
           </div>
         )}
       </nav>
-      <div className="sidebar-footer">
-        <div className="settings-area">
+      <div className='flex-grow'/>
+      <div className='flex justify-between items-center'>
+          <div>&nbsp;</div>
           <NavLink
             to="/settings"
-            className={({ isActive }: { isActive: boolean }) =>
-              `menu-item settings-item ${isActive ? 'active' : ''}`
-            }
+            className=""
             aria-label="设置"
           >
             <SettingsRegular className="icon" />
           </NavLink>
         </div>
-      </div>
     </aside>
   );
 };

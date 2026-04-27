@@ -57,7 +57,7 @@ const AGENT_WINDOWS_DISPLAY_NAMES = {
   cursor: ['Cursor'],
 };
 
-const getDefaultInstallPath = () => path.join(os.homedir(), 'skillpkg', 'skills');
+const getDefaultInstallPath = () => path.join(os.homedir(), '.skillpkg', 'skills');
 
 /**
  * 检查路径是否存在。
