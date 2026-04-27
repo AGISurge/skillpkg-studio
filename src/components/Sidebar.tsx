@@ -55,11 +55,10 @@ const Sidebar = ({
 }: SidebarProps) => {
   return (
     <aside className="sidebar">
-      <div className="brand">
-        <img src="/logo.png" className="size-12" alt="SkillPKG Logo"/>
+      <div className="flex justify-start gap-2 items-center">
+        <img src="/logo.png" className="size-8" alt="SkillPKG Logo"/>
         <div>
-          <div className="brand-title">SkillPkg Studio</div>
-          <a href="https://skillpkg.com" className="brand-subtitle">skillpkg.com</a>
+          <div className="font-bold font-sans-serif">SkillPKG Studio</div>
         </div>
       </div>
       <nav className="menu">
