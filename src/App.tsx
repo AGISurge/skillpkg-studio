@@ -246,6 +246,8 @@ const App = () => {
   }, [theme]);
 
   useEffect(() => {
+    if (!window.matchMedia) return;
+
     const mediaQuery = window.matchMedia(`(max-width: ${SIDEBAR_FLOATING_WIDTH}px)`);
     const syncSidebarMode = (matches: boolean) => {
       setSidebarFloating(matches);

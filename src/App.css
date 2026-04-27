@@ -475,6 +475,10 @@ body[data-theme='light'] {
   overflow: hidden;
 }
 
+.app-shell.sidebar-collapsed:not(.sidebar-floating-mode) .content {
+  padding-left: 70px;
+}
+
 .topbar {
   display: flex;
   justify-content: space-between;
