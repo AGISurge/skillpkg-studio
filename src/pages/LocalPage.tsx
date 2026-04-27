@@ -1,5 +1,6 @@
-import { useEffect } from 'react';
-import { useAppContext } from '../AppContext';
+import { useEffect, useMemo } from 'react';
+import { FolderOpenRegular, LinkRegular } from '@fluentui/react-icons';
+import { useAppContext, useToolbar } from '../AppContext';
 import SkillsPage from './SkillsPage';
 
 /**
@@ -14,6 +15,7 @@ const LocalPage = () => {
     expandedFolders,
     editing,
     fileDrafts,
+    fileInputRef,
     setSelectedLibrarySkillId,
     setSelectedFilePath,
     setEditing,
@@ -22,8 +24,34 @@ const LocalPage = () => {
     handleFileSelect,
     handleToggleFolder,
     handleSaveFile,
+    handleImportZip,
+    handleSelectInstallPath,
     updateDraft,
   } = useAppContext();
+
+  const toolbar = useMemo(
+    () => (
+      <>
+        <button type="button" className="btn ghost" onClick={() => fileInputRef.current?.click()}>
+          <FolderOpenRegular className="icon" />
+          导入 Zip
+        </button>
+        <button type="button" className="btn primary" onClick={handleSelectInstallPath}>
+          <LinkRegular className="icon" />
+          统一路径
+        </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".zip"
+          className="hidden"
+          onChange={handleImportZip}
+        />
+      </>
+    ),
+    [fileInputRef, handleImportZip, handleSelectInstallPath],
+  );
+  useToolbar(toolbar);
 
   const selectedSkill =
     localSkills.find((skill) => skill.id === selectedLibrarySkillId) ||

@@ -1,8 +1,11 @@
+import { useEffect, useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { FolderOpenRegular, LinkRegular } from '@fluentui/react-icons';
+import { PanelLeftContractRegular, PanelLeftExpandRegular } from '@fluentui/react-icons';
 import Sidebar from './Sidebar';
 import { menuRoutes } from '../routes';
-import { useAppContext } from '../AppContext';
+import { useAppContext, useToolbarContent } from '../AppContext';
+
+const SIDEBAR_FLOATING_WIDTH = 900;
 
 const getActiveSection = (path: string) => {
   if (path.startsWith('/agents')) return 'agents';
@@ -29,10 +32,12 @@ const AppLayout = () => {
     setSelectedAgentId,
     setSelectedLibrarySkillId,
     setSelectedFilePath,
-    fileInputRef,
-    handleImportZip,
-    handleSelectInstallPath,
   } = useAppContext();
+
+  const toolbarContent = useToolbarContent();
+
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarFloating, setSidebarFloating] = useState(false);
 
   const activeSection = getActiveSection(location.pathname);
   const isSettingsPage = activeSection === 'settings';
@@ -49,45 +54,62 @@ const AppLayout = () => {
     navigate(`/agents/${agentId}`);
   };
 
+  useEffect(() => {
+    if (!window.matchMedia) return;
+    const mediaQuery = window.matchMedia(`(max-width: ${SIDEBAR_FLOATING_WIDTH}px)`);
+    const syncSidebarMode = (matches: boolean) => {
+      setSidebarFloating(matches);
+      setSidebarOpen((current) => (matches ? false : current));
+    };
+    syncSidebarMode(mediaQuery.matches);
+    const handleChange = (event: MediaQueryListEvent) => syncSidebarMode(event.matches);
+    mediaQuery.addEventListener('change', handleChange);
+    return () => mediaQuery.removeEventListener('change', handleChange);
+  }, []);
+
   return (
-    <div className="app-shell">
-      <Sidebar
-        routes={menuRoutes}
-        activeSection={activeSection}
-        agentsExpanded={agentsExpanded}
-        onToggleAgents={() => setAgentsExpanded((prev) => !prev)}
-        agents={agents}
-        selectedAgentId={selectedAgentId}
-        installedByAgent={installedByAgent}
-        onSelectAgent={handleSelectAgent}
-        onRefreshAgents={refreshAgents}
-        refreshingAgents={refreshingAgents}
-      />
+    <div className={`app-shell ${sidebarOpen ? '' : 'sidebar-collapsed'} ${sidebarFloating ? 'sidebar-floating-mode' : ''}`}>
+      {sidebarOpen ? (
+        <>
+          {sidebarFloating ? (
+            <button
+              type="button"
+              className="sidebar-scrim"
+              aria-label="关闭侧栏"
+              onClick={() => setSidebarOpen(false)}
+            />
+          ) : null}
+          <Sidebar
+            routes={menuRoutes}
+            activeSection={activeSection}
+            agentsExpanded={agentsExpanded}
+            onToggleAgents={() => setAgentsExpanded((prev) => !prev)}
+            agents={agents}
+            selectedAgentId={selectedAgentId}
+            installedByAgent={installedByAgent}
+            onSelectAgent={handleSelectAgent}
+            onRefreshAgents={refreshAgents}
+            refreshingAgents={refreshingAgents}
+            isFloating={sidebarFloating}
+          />
+        </>
+      ) : null}
 
       <main className="content">
         <header className="topbar">
-          <div>
+          <div className="topbar-left">
+            <button
+              type="button"
+              className="opacity-50 hover:opacity-100 transition-opacity rounded focus-visible:ring focus-visible:ring-primary"
+              aria-label={sidebarOpen ? '收起侧栏' : '展开侧栏'}
+              title={sidebarOpen ? '收起侧栏' : '展开侧栏'}
+              onClick={() => setSidebarOpen((prev) => !prev)}
+            >
+              {sidebarOpen ? <PanelLeftContractRegular className="icon" /> : <PanelLeftExpandRegular className="icon" />}
+            </button>
             <div className="page-title">{currentRoute?.label}</div>
           </div>
-          {!isSettingsPage ? (
-            <div className="actions">
-              <button type="button" className="btn ghost" onClick={() => fileInputRef.current?.click()}>
-                <FolderOpenRegular className="icon" />
-                导入 Zip
-              </button>
-              <button type="button" className="btn primary" onClick={handleSelectInstallPath}>
-                <LinkRegular className="icon" />
-                统一路径
-              </button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".zip"
-                className="hidden"
-                onChange={handleImportZip}
-              />
-            </div>
-          ) : null}
+          {toolbarContent ? <div className="topbar-right actions">{toolbarContent}</div> : null}
         </header>
 
         {notice ? <div className="notice">{notice}</div> : null}

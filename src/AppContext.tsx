@@ -17,6 +17,33 @@ import type { AgentSkillsResult } from './utils/migrationUtils';
 
 export type ThemeMode = 'system' | 'light' | 'dark';
 
+// --- Toolbar context: pages register their own toolbar actions ---
+
+const ToolbarContext = createContext<ReactNode>(null);
+
+export const ToolbarProvider = ({ children }: { children: ReactNode }) => {
+  const [toolbar, setToolbar] = useState<ReactNode>(null);
+  return (
+    <ToolbarContext.Provider value={toolbar}>
+      <ToolbarSetterContext.Provider value={setToolbar}>
+        {children}
+      </ToolbarSetterContext.Provider>
+    </ToolbarContext.Provider>
+  );
+};
+
+const ToolbarSetterContext = createContext<React.Dispatch<React.SetStateAction<ReactNode>>>(() => {});
+
+export const useToolbar = (content: ReactNode) => {
+  const setToolbar = useContext(ToolbarSetterContext);
+  useEffect(() => {
+    setToolbar(content);
+    return () => setToolbar(null);
+  }, [content, setToolbar]);
+};
+
+export const useToolbarContent = () => useContext(ToolbarContext);
+
 const THEME_STORAGE_KEY = 'skillpkg.theme';
 
 const getInitialTheme = (): ThemeMode => {

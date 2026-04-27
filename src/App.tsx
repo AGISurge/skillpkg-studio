@@ -1,6 +1,6 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import './App.css';
-import { AppProvider, useAppContext } from './AppContext';
+import { AppProvider, ToolbarProvider, useAppContext } from './AppContext';
 import { routePaths } from './routes';
 import AppLayout from './components/AppLayout';
 import InstallDialog from './components/InstallDialog';
@@ -69,7 +69,9 @@ const AppRoutes = () => (
 
 const App = () => (
   <AppProvider>
-    <AppRoutes />
+    <ToolbarProvider>
+      <AppRoutes />
+    </ToolbarProvider>
   </AppProvider>
 );
 
