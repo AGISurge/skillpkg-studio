@@ -17,22 +17,22 @@ body,
 body {
   margin: 0;
   font-family: 'Source Sans 3', sans-serif;
-  background-color: #0b0f1a;
-  color: #e7ecf3;
+  background-color: var(--app-bg, #0b0f1a);
+  color: var(--app-text, #e7ecf3);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow: hidden;
 }
 
 body[data-theme='light'] {
-  background-color: #f5f7fb;
-  color: #1b2433;
+  background-color: var(--app-bg, #f5f7fb);
+  color: var(--app-text, #1b2433);
 }
 
 @media (prefers-color-scheme: light) {
   body[data-theme='system'] {
-    background-color: #f5f7fb;
-    color: #1b2433;
+    background-color: var(--app-bg, #f5f7fb);
+    color: var(--app-text, #1b2433);
   }
 }
 
