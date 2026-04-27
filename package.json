@@ -23,9 +23,9 @@
     "web-vitals": "^2.1.4"
   },
   "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build",
-    "test": "react-scripts test",
+    "start": "craco start",
+    "build": "craco build",
+    "test": "craco test",
     "eject": "react-scripts eject",
     "elec": "electron .",
     "dev": "concurrently -k \"cross-env BROWSER=none npm start\" \"wait-on http://localhost:3000 && electron .\""
@@ -55,6 +55,7 @@
     "node": "22.22.2"
   },
   "devDependencies": {
+    "@craco/craco": "^7.1.0",
     "@types/jest": "^29.5.14",
     "@types/react": "^19.1.1",
     "@types/react-dom": "^19.1.1",
