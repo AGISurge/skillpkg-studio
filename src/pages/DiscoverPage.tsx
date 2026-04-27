@@ -1,32 +1,30 @@
 import ReactMarkdown from 'react-markdown';
 import rehypeHighlight from 'rehype-highlight';
 import { ArrowDownloadRegular } from '@fluentui/react-icons';
-import type { Skill, SkillFile } from '../types/models';
 import { getMarkdownContent } from '../utils/skillUtils';
-
-/**
- * 发现页参数。
- */
-type DiscoverPageProps = {
-  skills: Skill[];
-  selectedSkillId: string;
-  selectedSkill: Skill | null;
-  selectedFile: SkillFile | null;
-  onSelectSkill: (skill: Skill) => void;
-  onInstall: (skill: Skill) => void;
-};
+import { useAppContext } from '../AppContext';
 
 /**
  * 发现技能列表与详情预览。
  */
-const DiscoverPage = ({
-  skills,
-  selectedSkillId,
-  selectedSkill,
-  selectedFile,
-  onSelectSkill,
-  onInstall,
-}: DiscoverPageProps) => {
+const DiscoverPage = () => {
+  const {
+    discoverSkills,
+    selectedDiscoverSkillId,
+    selectedFilePath,
+    setSelectedDiscoverSkillId,
+    setSelectedFilePath,
+    openInstallDialog,
+  } = useAppContext();
+
+  const selectedSkill =
+    discoverSkills.find((skill) => skill.id === selectedDiscoverSkillId) ||
+    discoverSkills[0] ||
+    null;
+  const selectedFile =
+    selectedSkill?.files.find((file) => file.path === selectedFilePath) ||
+    selectedSkill?.files[0] ||
+    null;
   const markdownContent = getMarkdownContent(selectedFile);
 
   return (
@@ -39,12 +37,15 @@ const DiscoverPage = ({
           </div>
         </div>
         <div className="skill-list">
-          {skills.map((skill) => (
+          {discoverSkills.map((skill) => (
             <button
               type="button"
               key={skill.id}
-              className={`skill-card ${selectedSkillId === skill.id ? 'active' : ''}`}
-              onClick={() => onSelectSkill(skill)}
+              className={`skill-card ${selectedSkill?.id === skill.id ? 'active' : ''}`}
+              onClick={() => {
+                setSelectedDiscoverSkillId(skill.id);
+                setSelectedFilePath(skill.files[0]?.path || '');
+              }}
             >
               <div className="skill-card-header">
                 <div>
@@ -70,7 +71,7 @@ const DiscoverPage = ({
                 <div className="detail-title">{selectedSkill.name}</div>
                 <div className="detail-subtitle">{selectedSkill.description}</div>
               </div>
-              <button type="button" className="btn primary" onClick={() => onInstall(selectedSkill)}>
+              <button type="button" className="btn primary" onClick={() => openInstallDialog(selectedSkill)}>
                 <ArrowDownloadRegular className="icon" />
                 安装到本机
               </button>

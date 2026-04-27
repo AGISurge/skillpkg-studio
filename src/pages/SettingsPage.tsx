@@ -12,21 +12,11 @@ import {
 import {
   InputGroup,
   InputGroupAddon,
-  InputGroupButton,
   InputGroupInput,
 } from "../components/ui/input-group";
-import { Button } from "@/components/ui/button";
+import { useAppContext } from "../AppContext";
 
 type ThemeMode = "system" | "light" | "dark";
-
-type SettingsPageProps = {
-  theme: ThemeMode;
-  apiKey: string;
-  installPath: string;
-  onChangeTheme: (theme: ThemeMode) => void;
-  onChangeApiKey: (apiKey: string) => void;
-  onSelectInstallPath: () => void;
-};
 
 const themeOptions: Array<{
   value: ThemeMode;
@@ -38,14 +28,15 @@ const themeOptions: Array<{
   { value: "system", title: "跟随系统", icon: DesktopRegular },
 ];
 
-const SettingsPage = ({
-  theme,
-  apiKey,
-  installPath,
-  onChangeTheme,
-  onChangeApiKey,
-  onSelectInstallPath,
-}: SettingsPageProps) => {
+const SettingsPage = () => {
+  const {
+    theme,
+    apiKey,
+    installPath,
+    setTheme,
+    setApiKey,
+    handleSelectInstallPath,
+  } = useAppContext();
   const [apiKeyVisible, setApiKeyVisible] = useState(false);
 
   return (
@@ -69,7 +60,7 @@ const SettingsPage = ({
                 type="button"
                 key={option.value}
                 className={`theme-choice ${theme === option.value ? "selected" : ""}`}
-                onClick={() => onChangeTheme(option.value)}
+                onClick={() => setTheme(option.value)}
                 role="radio"
                 aria-checked={theme === option.value}
               >
@@ -96,7 +87,7 @@ const SettingsPage = ({
             type={apiKeyVisible ? "text" : "password"}
             value={apiKey}
             className="px-2 focus:outline-none focus:ring-0 focus-visible:ring-0"
-            onChange={(event) => onChangeApiKey(event.target.value)}
+            onChange={(event) => setApiKey(event.target.value)}
             placeholder="输入 API Key"
             autoComplete="off"
           />
@@ -125,7 +116,7 @@ const SettingsPage = ({
           <button
             type="button"
             className="btn ghost"
-            onClick={onSelectInstallPath}
+            onClick={handleSelectInstallPath}
           >
             <FolderRegular className="icon" />
             选择文件夹
