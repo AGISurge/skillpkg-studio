@@ -148,11 +148,9 @@ const Sidebar = ({
         <div className="settings-area">
           <button type="button" className="menu-item settings-item" onClick={onToggleSettings}>
             <SettingsRegular className="icon" />
-            <span>设置</span>
           </button>
           {settingsOpen ? (
             <div className="settings-popover">
-              <div className="settings-title">设置</div>
               <button
                 type="button"
                 className="settings-entry"
@@ -182,13 +180,6 @@ const Sidebar = ({
               </button>
             </div>
           ) : null}
-        </div>
-        <div className="status-card">
-          <div className="status-title muted">本地技能库</div>
-          <div className="status-row">
-            <span>{agents.length} Agents</span>
-          </div>
-          <div className="status-row muted">统一路径已准备</div>
         </div>
       </div>
     </aside>
