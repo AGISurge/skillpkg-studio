@@ -57,6 +57,8 @@ const AGENT_WINDOWS_DISPLAY_NAMES = {
   cursor: ['Cursor'],
 };
 
+const getDefaultInstallPath = () => path.join(os.homedir(), 'skillpkg', 'skills');
+
 /**
  * 检查路径是否存在。
  * @param targetPath - 需要检查的路径。
@@ -356,6 +358,10 @@ const readSkillFromDir = async (skillDir, skillId, source) => {
 
 app.on('ready', () => {
   createWindow();
+
+  ipcMain.handle('get-default-install-path', async () => {
+    return getDefaultInstallPath();
+  });
 
   ipcMain.handle('select-install-path', async () => {
     const result = await dialog.showOpenDialog({

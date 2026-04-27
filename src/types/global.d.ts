@@ -7,6 +7,10 @@ declare global {
      */
     skillpkg?: {
       /**
+       * 获取默认统一安装路径。
+       */
+      getDefaultInstallPath: () => Promise<string>;
+      /**
        * 选择统一安装路径。
        */
       selectInstallPath: () => Promise<string | null>;

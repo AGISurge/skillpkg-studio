@@ -3,8 +3,6 @@ import {
   ChevronDownRegular,
   ChevronRightRegular,
   SettingsRegular,
-  PaintBrushRegular,
-  KeyRegular,
   ArrowClockwiseRegular,
 } from '@fluentui/react-icons';
 import type { Agent } from '../types/models';
@@ -24,12 +22,6 @@ type SidebarProps = {
   onSelectAgent: (id: string) => void;
   onRefreshAgents: () => void;
   refreshingAgents: boolean;
-  theme: 'system' | 'light' | 'dark';
-  settingsOpen: boolean;
-  onToggleSettings: () => void;
-  onOpenTheme: () => void;
-  onOpenApiKey: () => void;
-  onOpenMigration: () => void;
 };
 
 /**
@@ -46,12 +38,6 @@ const Sidebar = ({
   onSelectAgent,
   onRefreshAgents,
   refreshingAgents,
-  theme,
-  settingsOpen,
-  onToggleSettings,
-  onOpenTheme,
-  onOpenApiKey,
-  onOpenMigration,
 }: SidebarProps) => {
   return (
     <aside className="sidebar">
@@ -146,40 +132,15 @@ const Sidebar = ({
       </nav>
       <div className="sidebar-footer">
         <div className="settings-area">
-          <button type="button" className="menu-item settings-item" onClick={onToggleSettings}>
+          <NavLink
+            to="/settings"
+            className={({ isActive }: { isActive: boolean }) =>
+              `menu-item settings-item ${isActive ? 'active' : ''}`
+            }
+            aria-label="设置"
+          >
             <SettingsRegular className="icon" />
-          </button>
-          {settingsOpen ? (
-            <div className="settings-popover">
-              <button
-                type="button"
-                className="settings-entry"
-                onClick={onOpenTheme}
-              >
-                <PaintBrushRegular className="icon" />
-                <span>主题</span>
-                <span className="settings-value">
-                  {theme === 'system' ? '跟随系统' : theme === 'light' ? '浅色' : '深色'}
-                </span>
-              </button>
-              <button
-                type="button"
-                className="settings-entry"
-                onClick={onOpenApiKey}
-              >
-                <KeyRegular className="icon" />
-                <span>API Key</span>
-              </button>
-              <button
-                type="button"
-                className="settings-entry"
-                onClick={onOpenMigration}
-              >
-                <ArrowClockwiseRegular className="icon" />
-                <span>数据迁移</span>
-              </button>
-            </div>
-          ) : null}
+          </NavLink>
         </div>
       </div>
     </aside>

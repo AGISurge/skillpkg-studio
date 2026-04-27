@@ -1,4 +1,10 @@
-import { BoxRegular, PeopleRegular, SearchRegular, StarRegular } from '@fluentui/react-icons';
+import {
+  BoxRegular,
+  PeopleRegular,
+  SearchRegular,
+  SettingsRegular,
+  StarRegular,
+} from '@fluentui/react-icons';
 
 /**
  * 路由配置结构。
@@ -20,6 +26,7 @@ export const routePaths = {
   local: '/local',
   favorites: '/favorites',
   agents: '/agents/:agentId?',
+  settings: '/settings',
 };
 
 /**
@@ -54,5 +61,12 @@ export const menuRoutes: RouteConfig[] = [
     icon: PeopleRegular,
     showInMenu: true,
     isAgentsRoot: true,
+  },
+  {
+    id: 'settings',
+    path: routePaths.settings,
+    label: '设置',
+    icon: SettingsRegular,
+    showInMenu: false,
   },
 ];

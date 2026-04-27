@@ -9,17 +9,14 @@ import { validateSkill } from './utils/skillUtils';
 import { AGENT_CATALOG, AGENT_TOOL_IDS } from './config/agents';
 import type { AgentId } from './config/agents';
 import { DISCOVER_MOCK_PATH } from './config/discover';
-import { mergeAgentSkills } from './utils/migrationUtils';
-import type { AgentSkillsResult, MigrationSkillEntry } from './utils/migrationUtils';
+import type { AgentSkillsResult } from './utils/migrationUtils';
 import Sidebar from './components/Sidebar';
 import InstallDialog from './components/InstallDialog';
-import ThemeDialog from './components/ThemeDialog';
-import ApiKeyDialog from './components/ApiKeyDialog';
-import MigrationDialog from './components/MigrationDialog';
 import DiscoverPage from './pages/DiscoverPage';
 import LocalPage from './pages/LocalPage';
 import FavoritesPage from './pages/FavoritesPage';
 import AgentsPage from './pages/AgentsPage';
+import SettingsPage from './pages/SettingsPage';
 
 type ThemeMode = 'system' | 'light' | 'dark';
 
@@ -62,19 +59,7 @@ const App = () => {
   const [editing, setEditing] = useState(false);
   const [fileDrafts, setFileDrafts] = useState<Record<string, string>>({});
   const [theme, setTheme] = useState<ThemeMode>(getInitialTheme);
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const [themeDialogOpen, setThemeDialogOpen] = useState(false);
-  const [apiKeyDialogOpen, setApiKeyDialogOpen] = useState(false);
-  const [themeDraft, setThemeDraft] = useState<ThemeMode>(theme);
-  const [apiKeyDraft, setApiKeyDraft] = useState(apiKey);
   const [refreshingAgents, setRefreshingAgents] = useState(false);
-  const [migrationOpen, setMigrationOpen] = useState(false);
-  const [migrationLoading, setMigrationLoading] = useState(false);
-  const [migrationSubmitting, setMigrationSubmitting] = useState(false);
-  const [migrationSkills, setMigrationSkills] = useState<MigrationSkillEntry[]>([]);
-  const [migrationSelected, setMigrationSelected] = useState<Set<string>>(new Set());
-  const [migrationSources, setMigrationSources] = useState<Record<string, string>>({});
-  const [migrationNotice, setMigrationNotice] = useState('');
 
   const [installedByAgent, setInstalledByAgent] = useState<Record<string, Set<string>>>(
     () => ({
@@ -138,16 +123,6 @@ const App = () => {
   }, [checkInstalledAgents]);
 
   /**
-   * 扫描指定 Agent 的技能并合并为去重列表。
-   * @param agentList - 需要扫描的 Agent 列表。
-   */
-  const loadMigrationSkills = useCallback(async (agentList: Agent[]) => {
-    if (!window?.skillpkg?.loadAgentSkills) return [] as MigrationSkillEntry[];
-    const results = (await window.skillpkg.loadAgentSkills(agentList)) as AgentSkillsResult[];
-    return mergeAgentSkills(results);
-  }, []);
-
-  /**
    * 同步每个 Agent 已安装的技能列表。
    * @param agentList - 当前可用的 Agent 列表。
    */
@@ -191,135 +166,6 @@ const App = () => {
   }, [resolveInstalledAgents, selectedAgentId, syncInstalledByAgent]);
 
   /**
-   * 打开迁移弹窗并填充数据。
-   */
-  const openMigrationDialog = useCallback(async () => {
-    setSettingsOpen(false);
-    setMigrationOpen(true);
-    setMigrationNotice('');
-    setMigrationLoading(true);
-    setMigrationSelected(new Set());
-    setMigrationSources({});
-    const agentList = await resolveInstalledAgents();
-    setAgents(agentList);
-    if (agentList.length && !agentList.some((agent) => agent.id === selectedAgentId)) {
-      setSelectedAgentId(agentList[0].id);
-    }
-    const entries = await loadMigrationSkills(agentList);
-    setMigrationSkills(entries);
-    setMigrationLoading(false);
-  }, [loadMigrationSkills, resolveInstalledAgents, selectedAgentId]);
-
-  /**
-   * 勾选或取消迁移列表中的技能。
-   * @param skillId - 技能唯一标识。
-   */
-  const toggleMigrationSkill = useCallback((skillId: string) => {
-    setMigrationSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(skillId)) next.delete(skillId);
-      else next.add(skillId);
-      return next;
-    });
-  }, []);
-
-  /**
-   * 迁移列表全选/取消全选。
-   */
-  const toggleMigrationAll = useCallback(() => {
-    setMigrationSelected((prev) => {
-      if (migrationSkills.length && prev.size === migrationSkills.length) {
-        return new Set();
-      }
-      return new Set(migrationSkills.map((skill) => skill.id));
-    });
-  }, [migrationSkills]);
-
-  /**
-   * 为多来源技能选择来源 Agent。
-   * @param skillId - 需要选择来源的技能标识。
-   * @param agentId - 作为来源的 Agent 标识。
-   */
-  const selectMigrationSource = useCallback((skillId: string, agentId: string) => {
-    setMigrationSources((prev) => ({ ...prev, [skillId]: agentId }));
-  }, []);
-
-  /**
-   * 按当前选择执行迁移。
-   */
-  const confirmMigration = useCallback(async () => {
-    if (!installPath) {
-      setMigrationNotice('请先设置统一路径。');
-      return;
-    }
-    if (!migrationSelected.size) {
-      setMigrationNotice('请选择要迁移的技能。');
-      return;
-    }
-    const skipped: string[] = [];
-    const items = migrationSkills
-      .filter((skill) => migrationSelected.has(skill.id))
-      .map((skill) => {
-        const sourceId =
-          skill.agents.length === 1 ? skill.agents[0].id : migrationSources[skill.id];
-        if (!sourceId) {
-          skipped.push(skill.name);
-          return null;
-        }
-        const agent = agents.find((entry) => entry.id === sourceId);
-        if (!agent) {
-          skipped.push(skill.name);
-          return null;
-        }
-        return {
-          agentId: sourceId,
-          skillId: skill.id,
-          pathMac: agent.pathMac,
-          pathWindows: agent.pathWindows,
-        };
-      })
-      .filter(Boolean);
-    if (!items.length) {
-      setMigrationNotice(
-        skipped.length
-          ? `以下技能未选择来源，已跳过：${skipped.join('、')}`
-          : '未发现可迁移的技能。'
-      );
-      return;
-    }
-    if (!window?.skillpkg?.migrateSkills) {
-      setMigrationNotice('当前环境不支持迁移功能。');
-      return;
-    }
-    setMigrationSubmitting(true);
-    try {
-      const results = await window.skillpkg.migrateSkills({
-        installPath,
-        items: items as Array<{
-          agentId: string;
-          skillId: string;
-          pathMac: string;
-          pathWindows: string;
-        }>,
-      });
-      const failed = results.filter((result) => !result.ok);
-      const doneCount = results.filter((result) => result.ok).length;
-      if (failed.length) {
-        setMigrationNotice(
-          `已迁移 ${doneCount} 项，失败 ${failed.length} 项。` +
-            (skipped.length ? ` 未选择来源已跳过：${skipped.join('、')}` : '')
-        );
-      } else if (skipped.length) {
-        setMigrationNotice(`已迁移 ${doneCount} 项。未选择来源已跳过：${skipped.join('、')}`);
-      } else {
-        setMigrationNotice(`迁移完成，共 ${doneCount} 项。`);
-      }
-    } finally {
-      setMigrationSubmitting(false);
-    }
-  }, [agents, installPath, migrationSelected, migrationSkills, migrationSources]);
-
-  /**
    * 从统一路径加载技能列表。
    * @param path - 统一技能存放路径。
    */
@@ -350,10 +196,22 @@ const App = () => {
   }, [selectedDiscoverSkillId]);
 
   useEffect(() => {
-    const savedPath = window?.localStorage?.getItem('skillpkg.installPath');
-    if (savedPath) {
-      setInstallPath(savedPath);
-    }
+    let active = true;
+    const loadInitialPath = async () => {
+      const savedPath = window?.localStorage?.getItem('skillpkg.installPath');
+      if (savedPath) {
+        setInstallPath(savedPath);
+        return;
+      }
+      const defaultPath = await window?.skillpkg?.getDefaultInstallPath?.();
+      if (active && defaultPath) {
+        setInstallPath(defaultPath);
+      }
+    };
+    loadInitialPath();
+    return () => {
+      active = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -383,24 +241,6 @@ const App = () => {
     window?.localStorage?.setItem(THEME_STORAGE_KEY, theme);
   }, [theme]);
 
-  /**
-   * 打开主题选择弹窗并预填草稿值。
-   */
-  const openThemeDialog = () => {
-    setThemeDraft(theme);
-    setThemeDialogOpen(true);
-    setSettingsOpen(false);
-  };
-
-  /**
-   * 打开 API Key 弹窗并预填草稿值。
-   */
-  const openApiKeyDialog = () => {
-    setApiKeyDraft(apiKey);
-    setApiKeyDialogOpen(true);
-    setSettingsOpen(false);
-  };
-
   useEffect(() => {
     if (installPath) {
       window?.localStorage?.setItem('skillpkg.installPath', installPath);
@@ -422,6 +262,8 @@ const App = () => {
       setActiveSection('favorites');
     } else if (path.startsWith('/local')) {
       setActiveSection('local');
+    } else if (path.startsWith('/settings')) {
+      setActiveSection('settings');
     } else {
       setActiveSection('discover');
     }
@@ -692,6 +534,8 @@ const App = () => {
   const draftValue = fileKey ? fileDrafts[fileKey] : undefined;
   const currentAgentName = agents.find((agent) => agent.id === selectedAgentId)?.name || '';
   const installedSkillIds = installedByAgent[selectedAgentId] || new Set();
+  const isSettingsPage = location.pathname.startsWith('/settings');
+  const visibleSection = isSettingsPage ? 'settings' : activeSection;
 
   return (
     <div className="app-shell">
@@ -706,43 +550,39 @@ const App = () => {
         onSelectAgent={handleSelectAgent}
         onRefreshAgents={refreshAgents}
         refreshingAgents={refreshingAgents}
-        theme={theme}
-        settingsOpen={settingsOpen}
-        onToggleSettings={() => setSettingsOpen((prev) => !prev)}
-        onOpenTheme={openThemeDialog}
-        onOpenApiKey={openApiKeyDialog}
-        onOpenMigration={openMigrationDialog}
       />
 
       <main className="content">
         <header className="topbar">
           <div>
             <div className="page-title">
-              {menuRoutes.find((item) => item.id === activeSection)?.label}
+              {menuRoutes.find((item) => item.id === visibleSection)?.label}
             </div>
             <div className="page-subtitle">SkillPkg 管理与分发中心</div>
           </div>
-          <div className="actions">
-            <button type="button" className="btn ghost" onClick={() => fileInputRef.current?.click()}>
-              <FolderOpenRegular className="icon" />
-              导入 Zip
-            </button>
-            <button type="button" className="btn primary" onClick={handleSelectInstallPath}>
-              <LinkRegular className="icon" />
-              统一路径
-            </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".zip"
-              className="hidden"
-              onChange={handleImportZip}
-            />
-          </div>
+          {!isSettingsPage ? (
+            <div className="actions">
+              <button type="button" className="btn ghost" onClick={() => fileInputRef.current?.click()}>
+                <FolderOpenRegular className="icon" />
+                导入 Zip
+              </button>
+              <button type="button" className="btn primary" onClick={handleSelectInstallPath}>
+                <LinkRegular className="icon" />
+                统一路径
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".zip"
+                className="hidden"
+                onChange={handleImportZip}
+              />
+            </div>
+          ) : null}
         </header>
 
         {notice ? <div className="notice">{notice}</div> : null}
-        {installPath ? (
+        {installPath && !isSettingsPage ? (
           <div className="path-info">
             <span className="label">统一路径</span>
             <span className="value">{installPath}</span>
@@ -849,6 +689,19 @@ const App = () => {
               />
             }
           />
+          <Route
+            path={routePaths.settings}
+            element={
+              <SettingsPage
+                theme={theme}
+                apiKey={apiKey}
+                installPath={installPath}
+                onChangeTheme={setTheme}
+                onChangeApiKey={setApiKey}
+                onSelectInstallPath={handleSelectInstallPath}
+              />
+            }
+          />
           <Route path="/" element={<Navigate to={routePaths.discover} replace />} />
         </Routes>
       </main>
@@ -875,41 +728,6 @@ const App = () => {
         onOpenSkillPath={openSkillLocation}
         onClose={() => setDialogOpen(false)}
         onConfirm={() => confirmInstall(false)}
-      />
-      <ThemeDialog
-        open={themeDialogOpen}
-        value={themeDraft}
-        onChange={setThemeDraft}
-        onConfirm={() => {
-          setTheme(themeDraft);
-          setThemeDialogOpen(false);
-        }}
-        onCancel={() => setThemeDialogOpen(false)}
-      />
-      <ApiKeyDialog
-        open={apiKeyDialogOpen}
-        value={apiKeyDraft}
-        onChange={setApiKeyDraft}
-        onConfirm={() => {
-          setApiKey(apiKeyDraft);
-          setApiKeyDialogOpen(false);
-        }}
-        onCancel={() => setApiKeyDialogOpen(false)}
-      />
-      <MigrationDialog
-        open={migrationOpen}
-        loading={migrationLoading}
-        migrating={migrationSubmitting}
-        installPath={installPath}
-        skills={migrationSkills}
-        selectedIds={migrationSelected}
-        selectedSources={migrationSources}
-        notice={migrationNotice}
-        onToggleAll={toggleMigrationAll}
-        onToggleSkill={toggleMigrationSkill}
-        onSelectSource={selectMigrationSource}
-        onConfirm={confirmMigration}
-        onCancel={() => setMigrationOpen(false)}
       />
     </div>
   );
