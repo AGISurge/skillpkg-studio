@@ -5,6 +5,7 @@ contextBridge.exposeInMainWorld('skillpkg', {
   selectInstallPath: () => ipcRenderer.invoke('select-install-path'),
   loadSkills: (installPath) => ipcRenderer.invoke('load-skills', installPath),
   installSkill: (payload) => ipcRenderer.invoke('install-skill', payload),
+  // 检查指定的 Agent 是否安装
   detectAgents: (names) => ipcRenderer.invoke('detect-agents', names),
   loadAgentSkills: (agents) => ipcRenderer.invoke('load-agent-skills', agents),
   migrateSkills: (payload) => ipcRenderer.invoke('migrate-skills', payload),

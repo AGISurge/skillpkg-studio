@@ -5,6 +5,20 @@ const os = require('os');
 const { execFile } = require('child_process');
 const isDev = require('electron-is-dev');
 const initSqlJs = require('sql.js');
+
+// 全局缓存
+const agentInstallStatus = {};
+
+/**
+ * 获取当前平台类型
+ * @returns 'darwin' | 'win32' | 'other'
+ */
+const getCurrentPlatform = () => {
+  const platform = os.platform();
+  if (platform === 'darwin') return 'darwin';
+  if (platform === 'win32') return 'win32';
+  return 'other';
+};
 /**
  * 创建主窗口。
  */
@@ -316,20 +330,32 @@ const isInstalledViaRegistry = async (displayNames) => {
 };
 
 /**
- * 判断 Agent 是否已安装。
+ * 判断 Agent 是否已安装（带缓存）
  * @param agentId - 需要检测的 Agent 标识。
+ * @returns {Promise<boolean>}
  */
-const isAgentInstalled = async (agentId) => {
-  const candidates = resolveAgentPaths(agentId);
-  for (const candidate of candidates) {
-    if (await pathExists(candidate)) return true;
+async function isAgentInstalled(agentId) {
+  if (agentInstallStatus[agentId] !== undefined) {
+    return agentInstallStatus[agentId];
   }
-  if (os.platform() === 'win32') {
+  const platform = getCurrentPlatform();
+  let result = false;
+  if (platform === 'darwin') {
+    const candidates = resolveAgentPaths(agentId);
+    for (const candidate of candidates) {
+      if (await pathExists(candidate)) {
+        result = true;
+        break;
+      }
+    }
+  } else if (platform === 'win32') {
     const displayNames = AGENT_WINDOWS_DISPLAY_NAMES[agentId] || [];
-    return isInstalledViaRegistry(displayNames);
+    result = await isInstalledViaRegistry(displayNames);
   }
-  return false;
-};
+  // 其他平台 result 保持 false
+  agentInstallStatus[agentId] = result;
+  return result;
+}
 
 /**
  * Agent 基类，实现技能链接逻辑。
@@ -652,7 +678,7 @@ app.on('ready', async () => {
     shell.showItemInFolder(targetDir);
     return true;
   });
-
+  // 检查指定的 Agent 是否安装
   ipcMain.handle('detect-agents', async (_event, names) => {
     const list = Array.isArray(names) ? names : names ? [names] : [];
     const results = await Promise.all(

@@ -45,7 +45,7 @@ const Sidebar = ({
     <aside className={`sidebar ${isFloating ? 'floating' : ''}`}>
       <div className="sidebar-head">
         <div className="flex justify-start gap-2 items-center">
-          <img src="/logo.png" className="size-8" alt="SkillPKG Logo"/>
+          <img src="/logo.png" className="size-8" alt="SkillPKG Logo" />
           <div>
             <div className="font-bold font-sans-serif">SkillPKG Studio</div>
           </div>
@@ -119,7 +119,8 @@ const Sidebar = ({
                 key={agent.id}
                 className={({ isActive }: { isActive: boolean }) =>
                   `menu-subitem ${
-                    isActive || (activeSection === 'agents' && selectedAgentId === agent.id)
+                    isActive ||
+                    (activeSection === 'agents' && selectedAgentId === agent.id)
                       ? 'active'
                       : ''
                   }`
@@ -128,23 +129,21 @@ const Sidebar = ({
               >
                 <span className="dot" />
                 <span>{agent.name}</span>
-                <span className="count">{installedByAgent[agent.id]?.size || 0}</span>
+                <span className="count">
+                  {installedByAgent[agent.id]?.size || 0}
+                </span>
               </NavLink>
             ))}
           </div>
         )}
       </nav>
-      <div className='flex-grow'/>
-      <div className='flex justify-between items-center'>
-          <div>&nbsp;</div>
-          <NavLink
-            to="/settings"
-            className=""
-            aria-label="设置"
-          >
-            <SettingsRegular className="icon" />
-          </NavLink>
-        </div>
+      <div className="flex-grow" />
+      <div className="flex justify-between items-center">
+        <div>&nbsp;</div>
+        <NavLink to="/settings" className="" aria-label="设置">
+          <SettingsRegular className="icon" />
+        </NavLink>
+      </div>
     </aside>
   );
 };

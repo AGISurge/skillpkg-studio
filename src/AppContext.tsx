@@ -32,7 +32,9 @@ export const ToolbarProvider = ({ children }: { children: ReactNode }) => {
   );
 };
 
-const ToolbarSetterContext = createContext<React.Dispatch<React.SetStateAction<ReactNode>>>(() => {});
+const ToolbarSetterContext = createContext<
+  React.Dispatch<React.SetStateAction<ReactNode>>
+>(() => {});
 
 export const useToolbar = (content: ReactNode) => {
   const setToolbar = useContext(ToolbarSetterContext);
@@ -116,7 +118,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [selectedDiscoverSkillId, setSelectedDiscoverSkillId] = useState('');
   const [selectedLibrarySkillId, setSelectedLibrarySkillId] = useState('');
   const [selectedFilePath, setSelectedFilePath] = useState('README.md');
-  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
+  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(
+    new Set(),
+  );
   const [agentsExpanded, setAgentsExpanded] = useState(true);
   const [apiKey, setApiKey] = useState('');
   const [notice, setNotice] = useState('');
@@ -130,7 +134,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [theme, setTheme] = useState<ThemeMode>(getInitialTheme);
   const [refreshingAgents, setRefreshingAgents] = useState(false);
 
-  const [installedByAgent, setInstalledByAgent] = useState<Record<string, Set<string>>>(() => ({
+  const [installedByAgent, setInstalledByAgent] = useState<
+    Record<string, Set<string>>
+  >(() => ({
     claude: new Set(),
     codex: new Set(),
     cursor: new Set(),
@@ -138,10 +144,17 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   const selectedSkill = useMemo(() => {
     const skills = [...discoverSkills, ...localSkills];
-    return skills.find((skill) => skill.id === selectedLibrarySkillId) ||
+    return (
+      skills.find((skill) => skill.id === selectedLibrarySkillId) ||
       skills.find((skill) => skill.id === selectedDiscoverSkillId) ||
-      null;
-  }, [discoverSkills, localSkills, selectedDiscoverSkillId, selectedLibrarySkillId]);
+      null
+    );
+  }, [
+    discoverSkills,
+    localSkills,
+    selectedDiscoverSkillId,
+    selectedLibrarySkillId,
+  ]);
 
   const selectedFile = useMemo<SkillFile | null>(() => {
     if (!selectedSkill) return null;
@@ -152,23 +165,37 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     );
   }, [selectedFilePath, selectedSkill]);
 
-  const checkInstalledAgents = useCallback(async (names: string | readonly string[]) => {
-    const list = Array.isArray(names) ? [...names] : [names];
-    if (!window?.skillpkg?.detectAgents) return [];
-    const results = await window.skillpkg.detectAgents(list);
-    return results.filter((result) => result.installed).map((result) => result.name);
-  }, []);
+  /**
+   * 检查指定的 Agent 工具 ID 列表
+   */
+  const checkInstalledAgents = useCallback(
+    async (names: string | readonly string[]) => {
+      const list = Array.isArray(names) ? [...names] : [names];
+      if (!window?.skillpkg?.detectAgents) return [];
+      const results = await window.skillpkg.detectAgents(list);
+      return results
+        .filter((result) => result.installed)
+        .map((result) => result.name);
+    },
+    [],
+  );
 
   const resolveInstalledAgents = useCallback(async (): Promise<Agent[]> => {
+    // 检查当前环境中安装了哪些agent
     const installedIds = await checkInstalledAgents(AGENT_TOOL_IDS);
     return installedIds
-      .filter((agentId): agentId is AgentId => AGENT_TOOL_IDS.includes(agentId as AgentId))
+      .filter((agentId): agentId is AgentId =>
+        AGENT_TOOL_IDS.includes(agentId as AgentId),
+      )
       .map((agentId) => AGENT_CATALOG[agentId]);
   }, [checkInstalledAgents]);
 
   const syncInstalledByAgent = useCallback(async (agentList: Agent[]) => {
     if (!window?.skillpkg?.loadAgentSkills) return;
-    const results = (await window.skillpkg.loadAgentSkills(agentList)) as AgentSkillsResult[];
+    // 读取每个 Agent 已安装的技能 ID 列表，并更新状态。SkillPkg 主进程会根据实际情况返回数据，可能包含部分或全部 Agent 的安装信息。
+    const results = (await window.skillpkg.loadAgentSkills(
+      agentList,
+    )) as AgentSkillsResult[];
     setInstalledByAgent((prev) => {
       const next: Record<string, Set<string>> = { ...prev };
       agentList.forEach((agent) => {
@@ -184,11 +211,16 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const refreshAgents = useCallback(async () => {
     setRefreshingAgents(true);
     const start = Date.now();
-    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    await new Promise<void>((resolve) =>
+      requestAnimationFrame(() => resolve()),
+    );
     try {
       const nextAgents = await resolveInstalledAgents();
       setAgents(nextAgents);
-      if (nextAgents.length && !nextAgents.some((agent) => agent.id === selectedAgentId)) {
+      if (
+        nextAgents.length &&
+        !nextAgents.some((agent) => agent.id === selectedAgentId)
+      ) {
         setSelectedAgentId(nextAgents[0].id);
       }
       await syncInstalledByAgent(nextAgents);
@@ -196,7 +228,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       const elapsed = Date.now() - start;
       const minDuration = 400;
       if (elapsed < minDuration) {
-        await new Promise((resolve) => setTimeout(resolve, minDuration - elapsed));
+        await new Promise((resolve) =>
+          setTimeout(resolve, minDuration - elapsed),
+        );
       }
       setRefreshingAgents(false);
     }
@@ -218,8 +252,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
     const skills = await window.skillpkg.loadSkills(DISCOVER_MOCK_PATH);
+    console.log('skills ========>>>>>>>>>', skills);
     setDiscoverSkills(skills);
-    if (skills[0] && !skills.some((skill) => skill.id === selectedDiscoverSkillId)) {
+    if (
+      skills[0] &&
+      !skills.some((skill) => skill.id === selectedDiscoverSkillId)
+    ) {
       setSelectedDiscoverSkillId(skills[0].id);
       setSelectedFilePath(skills[0].files[0]?.path || '');
     }
@@ -254,7 +292,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       const nextAgents = await resolveInstalledAgents();
       if (!active) return;
       setAgents(nextAgents);
-      if (nextAgents.length && !nextAgents.some((agent) => agent.id === selectedAgentId)) {
+      if (
+        nextAgents.length &&
+        !nextAgents.some((agent) => agent.id === selectedAgentId)
+      ) {
         setSelectedAgentId(nextAgents[0].id);
       }
       await syncInstalledByAgent(nextAgents);
@@ -361,7 +402,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const handleImportZip = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
-    const id = file.name.replace(/\.zip$/i, '').toLowerCase().replace(/\s+/g, '-');
+    const id = file.name
+      .replace(/\.zip$/i, '')
+      .toLowerCase()
+      .replace(/\s+/g, '-');
     const importedSkill: Skill = {
       id,
       name: file.name.replace(/\.zip$/i, ''),
@@ -428,10 +472,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         return {
           ...skill,
           files: skill.files.map((file) =>
-            file.path === selectedFile.path ? { ...file, content: draft } : file
+            file.path === selectedFile.path
+              ? { ...file, content: draft }
+              : file,
           ),
         };
-      })
+      }),
     );
     setFileDrafts((prev) => {
       const next = { ...prev };
