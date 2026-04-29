@@ -535,7 +535,20 @@ app.on('ready', async () => {
     if (result.canceled) return null;
     return result.filePaths?.[0] || null;
   });
-
+  // 获取每个 Agent 已安装的技能数量，用于在 UI 上显示。
+  ipcMain.handle('get-agent-skill-counts', async () => {
+    if (!db) return {};
+    const stmt = db.prepare(
+      'SELECT agentId, COUNT(*) as count FROM skill_agent_link GROUP BY agentId',
+    );
+    const result = {};
+    while (stmt.step()) {
+      const row = stmt.getAsObject();
+      result[row.agentId] = row.count;
+    }
+    stmt.free();
+    return result;
+  });
   ipcMain.handle('load-skills', async (_event, installPath) => {
     return loadSkillsFromPath(installPath);
   });

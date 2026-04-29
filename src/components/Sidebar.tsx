@@ -17,6 +17,7 @@ type SidebarProps = {
   agentsExpanded: boolean;
   onToggleAgents: () => void;
   agents: Agent[];
+  agentSkillCounts: Record<string, number>;
   selectedAgentId: string;
   installedByAgent: Record<string, Set<string>>;
   onSelectAgent: (id: string) => void;
@@ -35,6 +36,7 @@ const Sidebar = ({
   onToggleAgents,
   agents,
   selectedAgentId,
+  agentSkillCounts,
   installedByAgent,
   onSelectAgent,
   onRefreshAgents,
@@ -129,9 +131,8 @@ const Sidebar = ({
               >
                 <span className="dot" />
                 <span>{agent.name}</span>
-                <span className="count">
-                  {installedByAgent[agent.id]?.size || 0}
-                </span>
+                <span>数量</span>
+                <span className="count">{agentSkillCounts[agent.id] || 0}</span>
               </NavLink>
             ))}
           </div>

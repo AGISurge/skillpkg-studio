@@ -78,6 +78,7 @@ type AppContextValue = {
   fileDrafts: Record<string, string>;
   theme: ThemeMode;
   refreshingAgents: boolean;
+  agentSkillCounts: Record<string, number>;
   installedByAgent: Record<string, Set<string>>;
   fileInputRef: React.RefObject<HTMLInputElement | null>;
   setTheme: (theme: ThemeMode) => void;
@@ -133,6 +134,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [fileDrafts, setFileDrafts] = useState<Record<string, string>>({});
   const [theme, setTheme] = useState<ThemeMode>(getInitialTheme);
   const [refreshingAgents, setRefreshingAgents] = useState(false);
+  const [agentSkillCounts, setAgentSkillCounts] = useState<
+    Record<string, number>
+  >({});
 
   const [installedByAgent, setInstalledByAgent] = useState<
     Record<string, Set<string>>
@@ -318,6 +322,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       loadLocalSkills(installPath);
     }
   }, [installPath, loadLocalSkills]);
+  useEffect(() => {
+    window?.skillpkg?.getAgentSkillCounts().then(setAgentSkillCounts);
+  }, []);
 
   const toggleFavorite = (skillId: string) => {
     setFavorites((prev) => {
@@ -535,6 +542,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     fileDrafts,
     theme,
     refreshingAgents,
+    agentSkillCounts,
     installedByAgent,
     fileInputRef,
     setTheme,

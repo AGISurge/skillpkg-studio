@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { PanelLeftContractRegular, PanelLeftExpandRegular } from '@fluentui/react-icons';
+import {
+  PanelLeftContractRegular,
+  PanelLeftExpandRegular,
+} from '@fluentui/react-icons';
 import Sidebar from './Sidebar';
 import { menuRoutes } from '../routes';
 import { useAppContext, useToolbarContent } from '../AppContext';
@@ -21,6 +24,7 @@ const AppLayout = () => {
   const {
     agents,
     selectedAgentId,
+    agentSkillCounts,
     installedByAgent,
     agentsExpanded,
     setAgentsExpanded,
@@ -56,19 +60,24 @@ const AppLayout = () => {
 
   useEffect(() => {
     if (!window.matchMedia) return;
-    const mediaQuery = window.matchMedia(`(max-width: ${SIDEBAR_FLOATING_WIDTH}px)`);
+    const mediaQuery = window.matchMedia(
+      `(max-width: ${SIDEBAR_FLOATING_WIDTH}px)`,
+    );
     const syncSidebarMode = (matches: boolean) => {
       setSidebarFloating(matches);
       setSidebarOpen((current) => (matches ? false : current));
     };
     syncSidebarMode(mediaQuery.matches);
-    const handleChange = (event: MediaQueryListEvent) => syncSidebarMode(event.matches);
+    const handleChange = (event: MediaQueryListEvent) =>
+      syncSidebarMode(event.matches);
     mediaQuery.addEventListener('change', handleChange);
     return () => mediaQuery.removeEventListener('change', handleChange);
   }, []);
 
   return (
-    <div className={`app-shell ${sidebarOpen ? '' : 'sidebar-collapsed'} ${sidebarFloating ? 'sidebar-floating-mode' : ''}`}>
+    <div
+      className={`app-shell ${sidebarOpen ? '' : 'sidebar-collapsed'} ${sidebarFloating ? 'sidebar-floating-mode' : ''}`}
+    >
       {sidebarOpen ? (
         <>
           {sidebarFloating ? (
@@ -87,6 +96,7 @@ const AppLayout = () => {
             agents={agents}
             selectedAgentId={selectedAgentId}
             installedByAgent={installedByAgent}
+            agentSkillCounts={agentSkillCounts}
             onSelectAgent={handleSelectAgent}
             onRefreshAgents={refreshAgents}
             refreshingAgents={refreshingAgents}
@@ -105,11 +115,17 @@ const AppLayout = () => {
               title={sidebarOpen ? '收起侧栏' : '展开侧栏'}
               onClick={() => setSidebarOpen((prev) => !prev)}
             >
-              {sidebarOpen ? <PanelLeftContractRegular className="icon" /> : <PanelLeftExpandRegular className="icon" />}
+              {sidebarOpen ? (
+                <PanelLeftContractRegular className="icon" />
+              ) : (
+                <PanelLeftExpandRegular className="icon" />
+              )}
             </button>
             <div className="page-title">{currentRoute?.label}</div>
           </div>
-          {toolbarContent ? <div className="topbar-right actions">{toolbarContent}</div> : null}
+          {toolbarContent ? (
+            <div className="topbar-right actions">{toolbarContent}</div>
+          ) : null}
         </header>
 
         {notice ? <div className="notice">{notice}</div> : null}

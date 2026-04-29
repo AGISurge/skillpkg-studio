@@ -24,25 +24,40 @@ declare global {
       installSkill: (payload: {
         installPath: string;
         skill: Skill;
-        agents: Array<{ id: string; name: string; pathMac: string; pathWindows: string }>;
+        agents: Array<{
+          id: string;
+          name: string;
+          pathMac: string;
+          pathWindows: string;
+        }>;
         overwrite?: boolean;
       }) => Promise<{ ok: boolean; reason?: string }>;
       /**
        * 打开指定技能的本地路径。
        */
-      openSkillPath: (payload: { installPath: string; skillId: string }) => Promise<boolean>;
+      openSkillPath: (payload: {
+        installPath: string;
+        skillId: string;
+      }) => Promise<boolean>;
       /**
        * 检测指定 Agent 是否已安装。
        */
       detectAgents: (
-        names: string | readonly string[]
+        names: string | readonly string[],
       ) => Promise<{ name: string; installed: boolean }[]>;
       /**
        * 扫描各 Agent 下的技能列表。
        */
       loadAgentSkills: (
-        agents: Array<{ id: string; name: string; pathMac: string; pathWindows: string }>
-      ) => Promise<Array<{ agentId: string; agentName: string; skills: Skill[] }>>;
+        agents: Array<{
+          id: string;
+          name: string;
+          pathMac: string;
+          pathWindows: string;
+        }>,
+      ) => Promise<
+        Array<{ agentId: string; agentName: string; skills: Skill[] }>
+      >;
       /**
        * 将技能从 Agent 目录迁移到统一路径。
        */
@@ -54,7 +69,14 @@ declare global {
           pathMac: string;
           pathWindows: string;
         }>;
-      }) => Promise<Array<{ agentId: string; skillId: string; ok: boolean; reason?: string }>>;
+      }) => Promise<
+        Array<{
+          agentId: string;
+          skillId: string;
+          ok: boolean;
+          reason?: string;
+        }>
+      >;
       /**
        * 保存技能文件内容。
        */
@@ -71,12 +93,27 @@ declare global {
         skillId?: string;
         agentId?: string;
       }) => Promise<
-        Array<{ id: number; skillId: string; agentId: string; version: string | null; description: string | null }>
+        Array<{
+          id: number;
+          skillId: string;
+          agentId: string;
+          version: string | null;
+          description: string | null;
+        }>
       >;
       /**
        * 获取 SQLite 数据库状态。
        */
-      getDbInfo: () => Promise<{ path: string; ok: boolean; error: string | null }>;
+      getDbInfo: () => Promise<{
+        path: string;
+        ok: boolean;
+        error: string | null;
+      }>;
+
+      /**
+       * 获取每个 Agent 已安装技能数量统计。
+       */
+      getAgentSkillCounts: () => Promise<Record<string, number>>;
     };
   }
 }
