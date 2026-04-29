@@ -64,6 +64,19 @@ declare global {
         filePath: string;
         content: string;
       }) => Promise<boolean>;
+      /**
+       * 获取已安装技能记录。
+       */
+      loadSkillInstallRecords: (filters?: {
+        skillId?: string;
+        agentId?: string;
+      }) => Promise<
+        Array<{ id: number; skillId: string; agentId: string; version: string | null; description: string | null }>
+      >;
+      /**
+       * 获取 SQLite 数据库状态。
+       */
+      getDbInfo: () => Promise<{ path: string; ok: boolean; error: string | null }>;
     };
   }
 }

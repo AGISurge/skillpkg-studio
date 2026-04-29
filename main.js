@@ -4,6 +4,7 @@ const fs = require('fs/promises');
 const os = require('os');
 const { execFile } = require('child_process');
 const isDev = require('electron-is-dev');
+const initSqlJs = require('sql.js');
 /**
  * 创建主窗口。
  */
@@ -57,7 +58,107 @@ const AGENT_WINDOWS_DISPLAY_NAMES = {
   cursor: ['Cursor'],
 };
 
-const getDefaultInstallPath = () => path.join(os.homedir(), '.skillpkg', 'skills');
+const getDefaultInstallPath = () =>
+  path.join(os.homedir(), '.skillpkg', 'skills');
+
+let db = null;
+let dbInitError = null;
+let dbSaveQueue = Promise.resolve();
+
+const getDatabasePath = () =>
+  path.join(app.getPath('userData'), 'skillpkg.sqlite');
+const initDatabase = async () => {
+  try {
+    const dbPath = getDatabasePath();
+    const SQL = await initSqlJs();
+    const existing = await fs.readFile(dbPath).catch(() => null);
+    if (existing && existing.length) {
+      db = new SQL.Database(new Uint8Array(existing));
+    } else {
+      db = new SQL.Database();
+    }
+    // 创建技能安装记录表，记录技能与 Agent 的关联信息。
+    db.run(`
+      CREATE TABLE IF NOT EXISTS skill_agent_link (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        skillId TEXT NOT NULL,
+        agentId TEXT NOT NULL,
+        version TEXT,
+        description TEXT,
+        createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(skillId, agentId)
+      );
+    `);
+    await saveDatabase();
+  } catch (error) {
+    dbInitError = error;
+    console.error('Database init failed:', error);
+  }
+};
+
+const saveDatabase = async () => {
+  if (!db) return;
+  const dbPath = getDatabasePath();
+  dbSaveQueue = dbSaveQueue
+    .then(async () => {
+      await ensureDir(path.dirname(dbPath));
+      const data = db.export();
+      await fs.writeFile(dbPath, Buffer.from(data));
+    })
+    .catch(() => {});
+  return dbSaveQueue;
+};
+
+const getDatabaseInfo = () => ({
+  path: getDatabasePath(),
+  ok: Boolean(db) && !dbInitError,
+  error: dbInitError ? String(dbInitError.message || dbInitError) : null,
+});
+
+const upsertSkillInstallRecord = async ({
+  skillId,
+  agentId,
+  version,
+  description,
+}) => {
+  if (!db || dbInitError) return;
+  db.run(
+    `
+    INSERT INTO skill_agent_link (skillId, agentId, version, description)
+    VALUES (?, ?, ?, ?)
+    ON CONFLICT(skillId, agentId)
+    DO UPDATE SET version = excluded.version, description = excluded.description;
+  `,
+    [skillId, agentId, version || null, description || null],
+  );
+  await saveDatabase();
+};
+
+const listSkillInstallRecords = (filters) => {
+  if (!db || dbInitError) return [];
+  const conditions = [];
+  const values = [];
+  if (filters?.skillId) {
+    conditions.push('skillId = ?');
+    values.push(filters.skillId);
+  }
+  if (filters?.agentId) {
+    conditions.push('agentId = ?');
+    values.push(filters.agentId);
+  }
+  const whereClause = conditions.length
+    ? ` WHERE ${conditions.join(' AND ')}`
+    : '';
+  const query = `SELECT id, skillId, agentId, version, description FROM skill_agent_link${whereClause} ORDER BY id DESC`;
+  const stmt = db.prepare(query);
+  stmt.bind(values);
+  const rows = [];
+  while (stmt.step()) {
+    rows.push(stmt.getAsObject());
+  }
+  stmt.free();
+  return rows;
+};
 
 /**
  * 检查路径是否存在。
@@ -86,6 +187,26 @@ const removeIfExists = async (targetPath) => {
     await fs.rm(targetPath, { recursive: true, force: true });
   } catch (error) {
     // ignore cleanup errors
+  }
+};
+
+const extractSkillMarkdownMetadata = (content) => {
+  if (!content) return null;
+  const versionMatch = content.match(/^\s*version\s*:\s*(.+)$/im);
+  const descriptionMatch = content.match(/^\s*description\s*:\s*(.+)$/im);
+  const version = versionMatch ? versionMatch[1].trim() : null;
+  const description = descriptionMatch ? descriptionMatch[1].trim() : null;
+  if (!version && !description) return null;
+  return { version, description };
+};
+
+const readSkillMarkdownMetadata = async (skillDir) => {
+  try {
+    const skillMdPath = path.join(skillDir, 'skill.md');
+    const content = await fs.readFile(skillMdPath, 'utf-8');
+    return extractSkillMarkdownMetadata(content);
+  } catch (error) {
+    return null;
   }
 };
 
@@ -126,7 +247,9 @@ const resolveAgentPaths = (agentId) => {
     const bundles = AGENT_APP_BUNDLES[agentId];
     if (!bundles?.length) return [];
     const homeDir = os.homedir();
-    const userApplications = homeDir ? path.join(homeDir, 'Applications') : null;
+    const userApplications = homeDir
+      ? path.join(homeDir, 'Applications')
+      : null;
     return bundles.flatMap((bundle) => {
       const paths = [path.join('/Applications', bundle)];
       if (userApplications) paths.push(path.join(userApplications, bundle));
@@ -165,10 +288,15 @@ const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
  */
 const queryRegistry = (key) =>
   new Promise((resolve) => {
-    execFile('reg', ['query', key, '/s', '/v', 'DisplayName'], { windowsHide: true }, (error, stdout) => {
-      if (error) return resolve('');
-      resolve(stdout || '');
-    });
+    execFile(
+      'reg',
+      ['query', key, '/s', '/v', 'DisplayName'],
+      { windowsHide: true },
+      (error, stdout) => {
+        if (error) return resolve('');
+        resolve(stdout || '');
+      },
+    );
   });
 
 /**
@@ -177,7 +305,9 @@ const queryRegistry = (key) =>
  */
 const isInstalledViaRegistry = async (displayNames) => {
   if (!displayNames?.length) return false;
-  const outputs = await Promise.all(REGISTRY_UNINSTALL_KEYS.map((key) => queryRegistry(key)));
+  const outputs = await Promise.all(
+    REGISTRY_UNINSTALL_KEYS.map((key) => queryRegistry(key)),
+  );
   const registryText = outputs.join('\n');
   return displayNames.some((name) => {
     const matcher = new RegExp(`\\b${escapeRegExp(name)}\\b`, 'i');
@@ -216,7 +346,8 @@ class BaseAgent {
    * 解析当前系统下的 Agent 技能存放路径。
    */
   resolveSkillPath() {
-    const template = os.platform() === 'win32' ? this.pathWindows : this.pathMac;
+    const template =
+      os.platform() === 'win32' ? this.pathWindows : this.pathMac;
     return resolveTemplatePath(template);
   }
 
@@ -295,7 +426,11 @@ const loadSkillsFromPath = async (installPath) => {
       const fullPath = path.join(installPath, entry.name);
       const isDirectory = entry.isDirectory();
       const isLinkedDirectory =
-        entry.isSymbolicLink() && (await fs.stat(fullPath).then((stats) => stats.isDirectory()).catch(() => false));
+        entry.isSymbolicLink() &&
+        (await fs
+          .stat(fullPath)
+          .then((stats) => stats.isDirectory())
+          .catch(() => false));
       // 既接受真实目录，也接受指向目录的软连接/链接目录。
       if (isDirectory || isLinkedDirectory) {
         const source = isLinkedDirectory ? 'linked' : 'local';
@@ -321,7 +456,10 @@ const collectFiles = async (baseDir, currentDir = baseDir) => {
     if (entry.isDirectory()) {
       results.push(...(await collectFiles(baseDir, fullPath)));
     } else if (entry.isFile()) {
-      const relativePath = path.relative(baseDir, fullPath).split(path.sep).join('/');
+      const relativePath = path
+        .relative(baseDir, fullPath)
+        .split(path.sep)
+        .join('/');
       if (relativePath === 'skill.json') continue;
       let content = '';
       try {
@@ -356,7 +494,8 @@ const readSkillFromDir = async (skillDir, skillId, source) => {
   };
 };
 
-app.on('ready', () => {
+app.on('ready', async () => {
+  await initDatabase();
   createWindow();
 
   ipcMain.handle('get-default-install-path', async () => {
@@ -395,28 +534,49 @@ app.on('ready', () => {
       author: skill.author,
       tags: skill.tags,
     };
-    await fs.writeFile(path.join(skillDir, 'skill.json'), JSON.stringify(metadata, null, 2));
+    await fs.writeFile(
+      path.join(skillDir, 'skill.json'),
+      JSON.stringify(metadata, null, 2),
+    );
     await Promise.all(
       (skill.files || []).map(async (file) => {
         const targetPath = path.join(skillDir, ...file.path.split('/'));
         await ensureDir(path.dirname(targetPath));
         await fs.writeFile(targetPath, file.content || '');
-      })
+      }),
     );
     const agentsToInstall = agentList
       .map((agent) => createAgentInstance(agent))
       .filter(Boolean);
-    await Promise.all(
+    const installResults = await Promise.all(
       agentsToInstall.map(async (agent) => {
         try {
           await agent.install(skill.id, skillDir);
+          return { agentId: agent.id, ok: true };
         } catch (error) {
-          return false;
+          return { agentId: agent.id, ok: false };
         }
-        return true;
-      })
+      }),
     );
+    const markdownMetadata = await readSkillMarkdownMetadata(skillDir);
+    for (const result of installResults) {
+      if (!result.ok) continue;
+      await upsertSkillInstallRecord({
+        skillId: skill.id,
+        agentId: result.agentId,
+        version: markdownMetadata?.version || null,
+        description: markdownMetadata?.description || null,
+      });
+    }
     return { ok: true };
+  });
+
+  ipcMain.handle('load-skill-install-records', async (_event, filters) => {
+    return listSkillInstallRecords(filters);
+  });
+
+  ipcMain.handle('get-db-info', async () => {
+    return getDatabaseInfo();
   });
 
   ipcMain.handle('save-skill-file', async (_event, payload) => {
@@ -438,7 +598,7 @@ app.on('ready', () => {
         }
         const skills = await loadSkillsFromPath(resolvedPath);
         return { agentId: agent.id, agentName: agent.name, skills };
-      })
+      }),
     );
     return results;
   });
@@ -451,20 +611,35 @@ app.on('ready', () => {
       items.map(async (item) => {
         const sourcePath = resolveAgentSkillPathFromAgent(item);
         if (!sourcePath) {
-          return { agentId: item.agentId, skillId: item.skillId, ok: false, reason: 'source-missing' };
+          return {
+            agentId: item.agentId,
+            skillId: item.skillId,
+            ok: false,
+            reason: 'source-missing',
+          };
         }
         const sourceDir = path.join(sourcePath, item.skillId);
         if (!(await pathExists(sourceDir))) {
-          return { agentId: item.agentId, skillId: item.skillId, ok: false, reason: 'skill-missing' };
+          return {
+            agentId: item.agentId,
+            skillId: item.skillId,
+            ok: false,
+            reason: 'skill-missing',
+          };
         }
         const targetDir = path.join(installPath, item.skillId);
         try {
           await fs.cp(sourceDir, targetDir, { recursive: true, force: true });
           return { agentId: item.agentId, skillId: item.skillId, ok: true };
         } catch (error) {
-          return { agentId: item.agentId, skillId: item.skillId, ok: false, reason: 'copy-failed' };
+          return {
+            agentId: item.agentId,
+            skillId: item.skillId,
+            ok: false,
+            reason: 'copy-failed',
+          };
         }
-      })
+      }),
     );
     return results;
   });
@@ -484,7 +659,7 @@ app.on('ready', () => {
       list.map(async (name) => ({
         name,
         installed: await isAgentInstalled(name),
-      }))
+      })),
     );
     return results;
   });
