@@ -20,15 +20,73 @@ const stripYamlQuotes = (value) => {
   return trimmed;
 };
 
+const parseYamlScalarBlock = (lines, startIndex, baseIndent, style) => {
+  const blockLines = [];
+  let contentIndent = null;
+  let nextIndex = startIndex + 1;
+
+  for (; nextIndex < lines.length; nextIndex += 1) {
+    const line = lines[nextIndex];
+    if (!line.trim()) {
+      blockLines.push('');
+      continue;
+    }
+
+    const indent = line.match(/^\s*/)?.[0].length || 0;
+    if (indent <= baseIndent) break;
+    contentIndent = contentIndent === null ? indent : Math.min(contentIndent, indent);
+    blockLines.push(line);
+  }
+
+  const normalizedLines = blockLines.map((line) => (
+    line.trim() && contentIndent !== null ? line.slice(contentIndent) : ''
+  ));
+  const value = style === '>'
+    ? normalizedLines.map((line) => line.trim()).filter(Boolean).join(' ')
+    : normalizedLines.join('\n');
+
+  return {
+    value: value.trim(),
+    nextIndex,
+  };
+};
+
+const parseSimpleYamlMetadata = (yamlContent) => {
+  const metadata = {};
+  const lines = yamlContent.split(/\r?\n/);
+
+  for (let index = 0; index < lines.length;) {
+    const line = lines[index];
+    const match = line.match(/^(\s*)([A-Za-z0-9_-]+)\s*:\s*(.*?)\s*$/);
+    if (!match) {
+      index += 1;
+      continue;
+    }
+
+    const [, indentText, key, rawValue] = match;
+    const normalizedKey = key.toLowerCase();
+    const value = rawValue.trim();
+
+    if (value === '|' || value === '>') {
+      const block = parseYamlScalarBlock(lines, index, indentText.length, value);
+      metadata[normalizedKey] = block.value;
+      index = block.nextIndex;
+      continue;
+    }
+
+    metadata[normalizedKey] = stripYamlQuotes(value);
+    index += 1;
+  }
+
+  return metadata;
+};
+
 const parseSkillMarkdownMetadata = (content) => {
   const metadata = {};
   if (!content) return metadata;
   const frontmatter = content.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/);
   if (frontmatter) {
-    frontmatter[1].split(/\r?\n/).forEach((line) => {
-      const match = line.match(/^\s*([A-Za-z0-9_-]+)\s*:\s*(.*?)\s*$/);
-      if (match) metadata[match[1].toLowerCase()] = stripYamlQuotes(match[2]);
-    });
+    Object.assign(metadata, parseSimpleYamlMetadata(frontmatter[1]));
   }
   if (!metadata.name) {
     const heading = content.match(/^#\s+(.+?)\s*$/m);

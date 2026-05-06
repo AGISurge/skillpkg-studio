@@ -55,6 +55,29 @@ describe('electron skill services', () => {
     });
   });
 
+  test('parses block scalar descriptions from SKILL.md frontmatter', () => {
+    const metadata = parseSkillMarkdownMetadata([
+      '---',
+      'name: khazix-writer',
+      'description: |',
+      '  数字生命卡兹克（Khazix）的公众号长文写作skill。',
+      '  当用户需要撰写公众号文章、写稿子、续写文章、根据素材产出长文时使用。',
+      'version: 0.1.0',
+      '---',
+      '',
+      '# Khazix Writer',
+    ].join('\n'));
+
+    expect(metadata).toEqual({
+      name: 'khazix-writer',
+      description: [
+        '数字生命卡兹克（Khazix）的公众号长文写作skill。',
+        '当用户需要撰写公众号文章、写稿子、续写文章、根据素材产出长文时使用。',
+      ].join('\n'),
+      version: '0.1.0',
+    });
+  });
+
   test('marks agent skills as managed only when symlink targets the library', async () => {
     const libraryRoot = path.join(tmpDir, 'library');
     const agentRoot = path.join(tmpDir, 'agent');
