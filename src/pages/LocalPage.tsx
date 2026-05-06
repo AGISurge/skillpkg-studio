@@ -3,6 +3,11 @@ import { FolderOpenRegular, LinkRegular } from '@fluentui/react-icons';
 import { useAppContext, useToolbar } from '../AppContext';
 import SkillsPage from './SkillsPage';
 
+const getDefaultSkillFilePath = (skill: { files: Array<{ path: string }> }) =>
+  skill.files.find((file) => file.path === 'SKILL.md')?.path ||
+  skill.files[0]?.path ||
+  '';
+
 /**
  * 本地技能页封装，复用 SkillsPage。
  */
@@ -67,7 +72,7 @@ const LocalPage = () => {
     if (!localSkills.length) return;
     if (localSkills.some((skill) => skill.id === selectedLibrarySkillId)) return;
     setSelectedLibrarySkillId(localSkills[0].id);
-    setSelectedFilePath(localSkills[0].files[0]?.path || '');
+    setSelectedFilePath(getDefaultSkillFilePath(localSkills[0]));
   }, [localSkills, selectedLibrarySkillId, setSelectedFilePath, setSelectedLibrarySkillId]);
 
   return (
@@ -80,7 +85,7 @@ const LocalPage = () => {
       favorites={favorites}
       onSelectSkill={(skill) => {
         setSelectedLibrarySkillId(skill.id);
-        setSelectedFilePath(skill.files[0]?.path || '');
+        setSelectedFilePath(getDefaultSkillFilePath(skill));
       }}
       onToggleFavorite={toggleFavorite}
       onReinstall={openInstallDialog}
@@ -90,7 +95,7 @@ const LocalPage = () => {
       editing={editing}
       draftValue={fileKey ? fileDrafts[fileKey] : undefined}
       onToggleEdit={() => setEditing((prev) => !prev)}
-      onSave={handleSaveFile}
+      onSave={() => handleSaveFile(selectedSkill, selectedFile)}
       onChangeDraft={updateDraft}
       title="本地技能库"
       subtitle="统一存放于本地路径"

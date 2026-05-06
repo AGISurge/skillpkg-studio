@@ -131,7 +131,6 @@ const Sidebar = ({
               >
                 <span className="dot" />
                 <span>{agent.name}</span>
-                <span>数量</span>
                 <span className="count">{agentSkillCounts[agent.id] || 0}</span>
               </NavLink>
             ))}

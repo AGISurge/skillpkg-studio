@@ -11,7 +11,7 @@ const AgentsPage = () => {
   const { agentId } = useParams();
   const {
     agents,
-    localSkills,
+    agentSkillsByAgent,
     selectedAgentId,
     selectedLibrarySkillId,
     selectedFilePath,
@@ -50,8 +50,8 @@ const AgentsPage = () => {
     [currentAgentId, installedByAgent]
   );
   const agentSkills = useMemo(
-    () => localSkills.filter((skill) => installedSkillIds.has(skill.id)),
-    [installedSkillIds, localSkills]
+    () => agentSkillsByAgent[currentAgentId] || [],
+    [agentSkillsByAgent, currentAgentId]
   );
   const selectedSkill =
     agentSkills.find((skill) => skill.id === selectedLibrarySkillId) ||
@@ -68,7 +68,11 @@ const AgentsPage = () => {
     if (!agentSkills.length) return;
     if (agentSkills.some((skill) => skill.id === selectedLibrarySkillId)) return;
     setSelectedLibrarySkillId(agentSkills[0].id);
-    setSelectedFilePath(agentSkills[0].files[0]?.path || '');
+    setSelectedFilePath(
+      agentSkills[0].files.find((file) => file.path === 'SKILL.md')?.path ||
+        agentSkills[0].files[0]?.path ||
+        '',
+    );
   }, [agentSkills, selectedLibrarySkillId, setSelectedFilePath, setSelectedLibrarySkillId]);
 
   return (
@@ -82,7 +86,11 @@ const AgentsPage = () => {
       installedSkillIds={installedSkillIds}
       onSelectSkill={(skill) => {
         setSelectedLibrarySkillId(skill.id);
-        setSelectedFilePath(skill.files[0]?.path || '');
+        setSelectedFilePath(
+          skill.files.find((file) => file.path === 'SKILL.md')?.path ||
+            skill.files[0]?.path ||
+            '',
+        );
       }}
       onToggleFavorite={toggleFavorite}
       onInstallToggle={handleInstallToggle}
@@ -93,10 +101,10 @@ const AgentsPage = () => {
       editing={editing}
       draftValue={fileKey ? fileDrafts[fileKey] : undefined}
       onToggleEdit={() => setEditing((prev) => !prev)}
-      onSave={handleSaveFile}
+      onSave={() => handleSaveFile(selectedSkill, selectedFile)}
       onChangeDraft={updateDraft}
-      title="本地技能库"
-      subtitle={`当前 Agent：${currentAgentName}`}
+      title={`${currentAgentName} Skills`}
+      subtitle="真实扫描：SkillPKG 托管与 Agent 自有 Skill"
       mode="agents"
     />
   );

@@ -723,9 +723,14 @@ body[data-theme='light'] {
   color: var(--text-soft);
 }
 
-.source-tag.linked {
+.source-tag.managed {
   background: var(--success-bg);
   color: var(--success-text);
+}
+
+.source-tag.agent {
+  background: var(--tag-bg);
+  color: var(--text-soft);
 }
 
 .status {

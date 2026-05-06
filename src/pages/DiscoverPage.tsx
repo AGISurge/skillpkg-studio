@@ -4,6 +4,11 @@ import { ArrowDownloadRegular } from '@fluentui/react-icons';
 import { getMarkdownContent } from '../utils/skillUtils';
 import { useAppContext } from '../AppContext';
 
+const getDefaultSkillFilePath = (skill: { files: Array<{ path: string }> }) =>
+  skill.files.find((file) => file.path === 'SKILL.md')?.path ||
+  skill.files[0]?.path ||
+  '';
+
 /**
  * 发现技能列表与详情预览。
  */
@@ -44,7 +49,7 @@ const DiscoverPage = () => {
               className={`skill-card ${selectedSkill?.id === skill.id ? 'active' : ''}`}
               onClick={() => {
                 setSelectedDiscoverSkillId(skill.id);
-                setSelectedFilePath(skill.files[0]?.path || '');
+                setSelectedFilePath(getDefaultSkillFilePath(skill));
               }}
             >
               <div className="skill-card-header">

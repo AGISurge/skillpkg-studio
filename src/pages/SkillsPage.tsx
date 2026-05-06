@@ -26,7 +26,7 @@ type SkillsPageProps = {
   installedSkillIds?: Set<string>;
   onSelectSkill: (skill: Skill) => void;
   onToggleFavorite: (skillId: string) => void;
-  onInstallToggle?: (skillId: string) => void;
+  onInstallToggle?: (skill: Skill) => void;
   onReinstall?: (skill: Skill) => void;
   onSelectFile: (path: string) => void;
   expandedFolders: Set<string>;
@@ -77,6 +77,7 @@ const SkillsPage = ({
         <div className="skill-list">
           {skills.map((skill) => {
             const isInstalled = installedSkillIds?.has(skill.id);
+            const isAgentOwned = mode === 'agents' && skill.source === 'agent';
             return (
               <button
                 type="button"
@@ -109,17 +110,17 @@ const SkillsPage = ({
                   <span>{skill.author}</span>
                   {mode === 'agents' && (
                     <>
-                      <span className={`source-tag ${skill.source === 'linked' ? 'linked' : 'local'}`}>
-                        {skill.source === 'linked' ? '统一路径' : '本地'}
+                      <span className={`source-tag ${skill.source === 'managed' ? 'managed' : 'agent'}`}>
+                        {skill.source === 'managed' ? 'SkillPKG 托管' : 'Agent 自有'}
                       </span>
                       <span className={`status ${isInstalled ? 'on' : 'off'}`}>
                         {isInstalled ? (
                           <>
-                            <CheckmarkCircleRegular className="icon" /> 已安装
+                            <CheckmarkCircleRegular className="icon" /> 托管
                           </>
                         ) : (
                           <>
-                            <DismissCircleRegular className="icon" /> 未安装
+                            <DismissCircleRegular className="icon" /> 自有
                           </>
                         )}
                       </span>
@@ -130,13 +131,14 @@ const SkillsPage = ({
                   <button
                     type="button"
                     className={`btn ${isInstalled ? 'ghost' : 'primary'}`}
+                    disabled={isAgentOwned}
                     onClick={(event) => {
                       event.stopPropagation();
-                      onInstallToggle(skill.id);
+                      onInstallToggle(skill);
                     }}
                   >
                     <SettingsRegular className="icon" />
-                    {isInstalled ? '卸载' : '安装'}
+                    {isAgentOwned ? '自有 Skill' : '卸载托管链接'}
                   </button>
                 )}
               </button>

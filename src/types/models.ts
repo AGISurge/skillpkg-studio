@@ -18,9 +18,14 @@ export type Skill = {
   tags: string[];
   files: SkillFile[];
   /**
-   * 技能来源标识：本地目录或统一路径软连接。
+   * 技能来源标识：统一库、SkillPKG 托管链接或 Agent 自有目录。
    */
-  source?: 'local' | 'linked';
+  source?: 'library' | 'managed' | 'agent';
+  agentId?: string;
+  rootPath?: string;
+  realPath?: string;
+  linkTarget?: string | null;
+  managed?: boolean;
 };
 
 /**
@@ -31,4 +36,22 @@ export type Agent = {
   name: string;
   pathMac: string;
   pathWindows: string;
+  installed?: boolean;
+  reason?: string;
+  skillPath?: string | null;
+};
+
+export type AgentDetectionResult = {
+  id: string;
+  name: string;
+  installed: boolean;
+  reason?: string;
+  skillPath?: string | null;
+};
+
+export type AgentSkillsResult = {
+  agentId: string;
+  agentName: string;
+  skillPath?: string | null;
+  skills: Skill[];
 };

@@ -2,6 +2,11 @@ import { useEffect, useMemo } from 'react';
 import { useAppContext } from '../AppContext';
 import SkillsPage from './SkillsPage';
 
+const getDefaultSkillFilePath = (skill: { files: Array<{ path: string }> }) =>
+  skill.files.find((file) => file.path === 'SKILL.md')?.path ||
+  skill.files[0]?.path ||
+  '';
+
 /**
  * 收藏页封装，复用 SkillsPage。
  */
@@ -42,7 +47,7 @@ const FavoritesPage = () => {
     if (!favoriteSkills.length) return;
     if (favoriteSkills.some((skill) => skill.id === selectedLibrarySkillId)) return;
     setSelectedLibrarySkillId(favoriteSkills[0].id);
-    setSelectedFilePath(favoriteSkills[0].files[0]?.path || '');
+    setSelectedFilePath(getDefaultSkillFilePath(favoriteSkills[0]));
   }, [favoriteSkills, selectedLibrarySkillId, setSelectedFilePath, setSelectedLibrarySkillId]);
 
   return (
@@ -55,7 +60,7 @@ const FavoritesPage = () => {
       favorites={favorites}
       onSelectSkill={(skill) => {
         setSelectedLibrarySkillId(skill.id);
-        setSelectedFilePath(skill.files[0]?.path || '');
+        setSelectedFilePath(getDefaultSkillFilePath(skill));
       }}
       onToggleFavorite={toggleFavorite}
       onSelectFile={handleFileSelect}
@@ -64,7 +69,7 @@ const FavoritesPage = () => {
       editing={editing}
       draftValue={fileKey ? fileDrafts[fileKey] : undefined}
       onToggleEdit={() => setEditing((prev) => !prev)}
-      onSave={handleSaveFile}
+      onSave={() => handleSaveFile(selectedSkill, selectedFile)}
       onChangeDraft={updateDraft}
       title="收藏技能"
       subtitle="已收藏的技能清单"

@@ -1,4 +1,4 @@
-import type { Skill } from './models';
+import type { AgentDetectionResult, AgentSkillsResult, Skill } from './models';
 
 declare global {
   interface Window {
@@ -44,20 +44,27 @@ declare global {
        */
       detectAgents: (
         names: string | readonly string[],
-      ) => Promise<{ name: string; installed: boolean }[]>;
+      ) => Promise<AgentDetectionResult[]>;
       /**
        * 扫描各 Agent 下的技能列表。
        */
-      loadAgentSkills: (
+      loadAgentSkills: (payload: {
         agents: Array<{
           id: string;
           name: string;
           pathMac: string;
           pathWindows: string;
-        }>,
-      ) => Promise<
-        Array<{ agentId: string; agentName: string; skills: Skill[] }>
-      >;
+        }>;
+        installPath?: string;
+      }) => Promise<AgentSkillsResult[]>;
+      /**
+       * 删除指定 Agent 下的 SkillPKG 托管软链接。
+       */
+      uninstallAgentSkill: (payload: {
+        agentId: string;
+        skillId: string;
+        installPath?: string;
+      }) => Promise<{ ok: boolean; reason?: string; removed?: boolean }>;
       /**
        * 将技能从 Agent 目录迁移到统一路径。
        */
@@ -85,6 +92,7 @@ declare global {
         skillId: string;
         filePath: string;
         content: string;
+        rootPath?: string;
       }) => Promise<boolean>;
       /**
        * 获取已安装技能记录。
@@ -113,7 +121,15 @@ declare global {
       /**
        * 获取每个 Agent 已安装技能数量统计。
        */
-      getAgentSkillCounts: () => Promise<Record<string, number>>;
+      getAgentSkillCounts: (payload?: {
+        agents?: Array<{
+          id: string;
+          name: string;
+          pathMac: string;
+          pathWindows: string;
+        }>;
+        installPath?: string;
+      }) => Promise<Record<string, number>>;
     };
   }
 }

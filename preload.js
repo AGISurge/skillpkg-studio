@@ -7,12 +7,15 @@ contextBridge.exposeInMainWorld('skillpkg', {
   installSkill: (payload) => ipcRenderer.invoke('install-skill', payload),
   // 检查指定的 Agent 是否安装
   detectAgents: (names) => ipcRenderer.invoke('detect-agents', names),
-  loadAgentSkills: (agents) => ipcRenderer.invoke('load-agent-skills', agents),
+  loadAgentSkills: (payload) => ipcRenderer.invoke('load-agent-skills', payload),
+  uninstallAgentSkill: (payload) =>
+    ipcRenderer.invoke('uninstall-agent-skill', payload),
   migrateSkills: (payload) => ipcRenderer.invoke('migrate-skills', payload),
   openSkillPath: (payload) => ipcRenderer.invoke('open-skill-path', payload),
   saveSkillFile: (payload) => ipcRenderer.invoke('save-skill-file', payload),
   loadSkillInstallRecords: (filters) =>
     ipcRenderer.invoke('load-skill-install-records', filters),
   getDbInfo: () => ipcRenderer.invoke('get-db-info'),
-  getAgentSkillCounts: () => ipcRenderer.invoke('get-agent-skill-counts'),
+  getAgentSkillCounts: (payload) =>
+    ipcRenderer.invoke('get-agent-skill-counts', payload),
 });

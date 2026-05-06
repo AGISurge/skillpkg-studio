@@ -1,10 +1,4 @@
-import type { Skill } from '../types/models';
-
-export type AgentSkillsResult = {
-  agentId: string;
-  agentName: string;
-  skills: Skill[];
-};
+import type { AgentSkillsResult } from '../types/models';
 
 export type MigrationSkillEntry = {
   id: string;

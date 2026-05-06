@@ -75,7 +75,10 @@ export const buildTree = (files: SkillFile[]): TreeNode => {
 export const validateSkill = (skill: Skill | null): boolean => {
   if (!skill || !skill.name || !skill.version) return false;
   if (!Array.isArray(skill.files) || skill.files.length === 0) return false;
-  return skill.files.every((file) => file.path && typeof file.content === 'string');
+  return (
+    skill.files.some((file) => file.path === 'SKILL.md') &&
+    skill.files.every((file) => file.path && typeof file.content === 'string')
+  );
 };
 
 /**
