@@ -63,8 +63,7 @@ const SkillsPage = ({
 }: SkillsPageProps) => {
   return (
     <section className="panel-grid fade-in">
-      <div className="list">
-        <div className="skill-list">
+      <div className="skill-list">
           {skills.map((skill) => {
             const isInstalled = installedSkillIds?.has(skill.id);
             const isAgentOwned = mode === 'agents' && skill.source === 'agent';
@@ -135,7 +134,6 @@ const SkillsPage = ({
           })}
           {skills.length === 0 && <div className="empty-state">当前列表为空。</div>}
         </div>
-      </div>
       <div className="panel detail">
         {selectedSkill ? (
           <>
