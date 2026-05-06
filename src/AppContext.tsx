@@ -92,6 +92,7 @@ type AppContextValue = {
   agentSkillCounts: Record<string, number>;
   installedByAgent: Record<string, Set<string>>;
   agentSkillsByAgent: Record<string, Skill[]>;
+  pendingSkillIds: Set<string>;
   fileInputRef: React.RefObject<HTMLInputElement | null>;
   setTheme: (theme: ThemeMode) => void;
   setApiKey: (apiKey: string) => void;
@@ -156,6 +157,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [agentSkillsByAgent, setAgentSkillsByAgent] = useState<
     Record<string, Skill[]>
   >({});
+  const [pendingSkillIds, setPendingSkillIds] = useState<Set<string>>(new Set());
 
   const [installedByAgent, setInstalledByAgent] = useState<
     Record<string, Set<string>>
@@ -479,36 +481,81 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       setNotice('未找到当前 Agent 配置。');
       return;
     }
-    const [result] = await window.skillpkg.migrateSkills({
-      installPath,
-      overwrite: Boolean(options.overwrite),
-      useExisting: Boolean(options.useExisting),
-      items: [
-        {
-          agentId: targetAgent.id,
-          skillId: skill.id,
-          pathMac: targetAgent.pathMac,
-          pathWindows: targetAgent.pathWindows,
-          rootPath: skill.rootPath,
-        },
-      ],
-    });
-    if (!result?.ok && result?.reason === 'exists') {
-      setHostingConflictSkill(skill);
-      return;
+    setPendingSkillIds((prev) => new Set(prev).add(skill.id));
+    try {
+      const [result] = await window.skillpkg.migrateSkills({
+        installPath,
+        overwrite: Boolean(options.overwrite),
+        useExisting: Boolean(options.useExisting),
+        items: [
+          {
+            agentId: targetAgent.id,
+            skillId: skill.id,
+            pathMac: targetAgent.pathMac,
+            pathWindows: targetAgent.pathWindows,
+            rootPath: skill.rootPath,
+          },
+        ],
+      });
+      if (!result?.ok && result?.reason === 'exists') {
+        setHostingConflictSkill(skill);
+        return;
+      }
+      if (!result?.ok) {
+        setNotice('托管失败，请检查 Agent 技能目录和统一路径权限。');
+        return;
+      }
+      setHostingConflictSkill(null);
+      await loadLocalSkills(installPath);
+      await syncInstalledByAgent(agents, installPath);
+      setNotice(options.useExisting ? '已改用当前托管 Skill。' : '已托管当前 Skill。');
+    } finally {
+      setPendingSkillIds((prev) => {
+        const next = new Set(prev);
+        next.delete(skill.id);
+        return next;
+      });
     }
-    if (!result?.ok) {
-      setNotice('托管失败，请检查 Agent 技能目录和统一路径权限。');
-      return;
-    }
-    setHostingConflictSkill(null);
-    await loadLocalSkills(installPath);
-    await syncInstalledByAgent(agents, installPath);
-    setNotice(options.useExisting ? '已改用当前托管 Skill。' : '已托管当前 Skill。');
   };
 
   const handleInstallToggle = async (skill: Skill) => {
+    if (skill.managed) {
+      await unhostAgentSkill(skill);
+      return;
+    }
     await hostAgentSkill(skill);
+  };
+
+  const unhostAgentSkill = async (skill: Skill) => {
+    if (!installPath) {
+      setNotice('请先设置统一路径。');
+      return;
+    }
+    if (!window?.skillpkg?.unhostAgentSkill) {
+      setNotice('当前环境不支持取消托管。');
+      return;
+    }
+    const targetAgentId = skill.agentId || selectedAgentId;
+    setPendingSkillIds((prev) => new Set(prev).add(skill.id));
+    try {
+      const result = await window.skillpkg.unhostAgentSkill({
+        agentId: targetAgentId,
+        skillId: skill.id,
+        installPath,
+      });
+      if (!result.ok) {
+        setNotice('取消托管失败：该 Skill 不是有效的托管链接。');
+        return;
+      }
+      await syncInstalledByAgent(agents, installPath);
+      setNotice('已取消托管，并复制到当前 Agent 的 Skill 目录。');
+    } finally {
+      setPendingSkillIds((prev) => {
+        const next = new Set(prev);
+        next.delete(skill.id);
+        return next;
+      });
+    }
   };
 
   const resolveHostingConflict = async (action: 'use-managed' | 'overwrite') => {
@@ -674,6 +721,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     agentSkillCounts,
     installedByAgent,
     agentSkillsByAgent,
+    pendingSkillIds,
     fileInputRef,
     setTheme,
     setApiKey,

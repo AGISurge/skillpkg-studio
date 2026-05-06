@@ -66,6 +66,14 @@ declare global {
         installPath?: string;
       }) => Promise<{ ok: boolean; reason?: string; removed?: boolean }>;
       /**
+       * 将指定 Agent 下的托管软链接替换为本地副本。
+       */
+      unhostAgentSkill: (payload: {
+        agentId: string;
+        skillId: string;
+        installPath?: string;
+      }) => Promise<{ ok: boolean; reason?: string; removed?: boolean }>;
+      /**
        * 将技能从 Agent 目录迁移到统一路径。
        */
       migrateSkills: (payload: {

@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld('skillpkg', {
   loadAgentSkills: (payload) => ipcRenderer.invoke('load-agent-skills', payload),
   uninstallAgentSkill: (payload) =>
     ipcRenderer.invoke('uninstall-agent-skill', payload),
+  unhostAgentSkill: (payload) => ipcRenderer.invoke('unhost-agent-skill', payload),
   migrateSkills: (payload) => ipcRenderer.invoke('migrate-skills', payload),
   openSkillPath: (payload) => ipcRenderer.invoke('open-skill-path', payload),
   saveSkillFile: (payload) => ipcRenderer.invoke('save-skill-file', payload),

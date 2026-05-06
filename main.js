@@ -14,6 +14,7 @@ const {
   ensureAgentSkillLink,
   listInstalledAgents,
   loadAgentSkills,
+  unhostAgentSkillLink,
   uninstallAgentSkillLink,
 } = require('./electron/agentService');
 const {
@@ -137,6 +138,15 @@ const listSkillInstallRecords = (filters) => {
   return rows;
 };
 
+const deleteSkillInstallRecord = async ({ skillId, agentId }) => {
+  if (!db || dbInitError) return;
+  db.run('DELETE FROM skill_agent_link WHERE skillId = ? AND agentId = ?;', [
+    skillId,
+    agentId,
+  ]);
+  await saveDatabase();
+};
+
 const getSkillMarkdownMetadata = async (skillDir) => {
   const content = await fs
     .readFile(path.join(skillDir, SKILL_MARKDOWN_FILENAME), 'utf-8')
@@ -240,7 +250,9 @@ const migrateAgentSkillToLibrary = async ({
   }
   const targetDir = path.join(installPath, item.skillId);
   const targetExists = await pathExists(targetDir);
-  if (targetExists && !overwrite && !useExisting) {
+  const targetLstat = targetExists ? await fs.lstat(targetDir).catch(() => null) : null;
+  const targetIsSymlink = Boolean(targetLstat?.isSymbolicLink());
+  if (targetExists && !targetIsSymlink && !overwrite && !useExisting) {
     return {
       agentId: item.agentId,
       skillId: item.skillId,
@@ -248,7 +260,7 @@ const migrateAgentSkillToLibrary = async ({
       reason: 'exists',
     };
   }
-  if (useExisting) {
+  if (useExisting && !targetIsSymlink) {
     if (!await hasSkillMarkdown(targetDir)) {
       return {
         agentId: item.agentId,
@@ -362,6 +374,20 @@ const registerIpcHandlers = () => {
       skillId,
       installPath,
     });
+  });
+
+  ipcMain.handle('unhost-agent-skill', async (_event, payload) => {
+    const { agentId, skillId, installPath } = payload || {};
+    if (!agentId || !skillId) return { ok: false, reason: 'invalid' };
+    const result = await unhostAgentSkillLink({
+      agent: getAgentConfig(agentId),
+      skillId,
+      installPath,
+    });
+    if (result.ok) {
+      await deleteSkillInstallRecord({ skillId, agentId });
+    }
+    return result;
   });
 
   ipcMain.handle('load-skill-install-records', async (_event, filters) =>

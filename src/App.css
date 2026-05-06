@@ -547,6 +547,19 @@ body[data-theme='light'] {
   color: var(--success-text);
 }
 
+.btn.mini.loading {
+  pointer-events: none;
+}
+
+.mini-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 999px;
+  animation: spin 0.7s linear infinite;
+}
+
 .btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
@@ -1170,6 +1183,12 @@ body[data-theme='light'] {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
   }
 }
 

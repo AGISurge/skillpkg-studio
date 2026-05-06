@@ -21,6 +21,7 @@ type SkillsPageProps = {
   favorites: Set<string>;
   mode: 'local' | 'favorites' | 'agents';
   installedSkillIds?: Set<string>;
+  pendingSkillIds?: Set<string>;
   onSelectSkill: (skill: Skill) => void;
   onToggleFavorite: (skillId: string) => void;
   onInstallToggle?: (skill: Skill) => void;
@@ -47,6 +48,7 @@ const SkillsPage = ({
   favorites,
   mode,
   installedSkillIds,
+  pendingSkillIds,
   onSelectSkill,
   onToggleFavorite,
   onInstallToggle,
@@ -70,7 +72,8 @@ const SkillsPage = ({
     <section className="panel-grid fade-in">
       <div className="skill-list">
         {skills.map((skill) => {
-          const isInstalled = installedSkillIds?.has(skill.id);
+          const isManaged = Boolean(skill.managed || installedSkillIds?.has(skill.id));
+          const isPending = Boolean(pendingSkillIds?.has(skill.id));
           return (
             <div
               key={skill.id}
@@ -105,15 +108,16 @@ const SkillsPage = ({
                 <div className="skill-card-footer" onClick={(event) => event.stopPropagation()}>
                   <button
                     type="button"
-                    className={`btn mini ${isInstalled ? 'managed' : 'primary'}`}
-                    disabled={isInstalled}
+                    className={`btn mini ${isManaged ? 'managed' : 'primary'} ${isPending ? 'loading' : ''}`}
+                    disabled={isPending}
+                    aria-busy={isPending}
                     onClick={(event) => {
                       event.stopPropagation();
-                      if (!isInstalled) onInstallToggle(skill);
+                      if (!isPending) onInstallToggle(skill);
                     }}
                   >
-                    <SettingsRegular className="icon" />
-                    {isInstalled ? '已托管' : '托管'}
+                    {isPending ? <span className="mini-spinner" aria-hidden="true" /> : <SettingsRegular className="icon" />}
+                    {isPending ? '处理中' : isManaged ? '取消托管' : '托管'}
                   </button>
                 </div>
               )}

@@ -24,6 +24,7 @@ const AgentsPage = () => {
     editing,
     fileDrafts,
     installedByAgent,
+    pendingSkillIds,
     setSelectedAgentId,
     setSelectedLibrarySkillId,
     setSelectedFilePath,
@@ -107,6 +108,7 @@ const AgentsPage = () => {
       selectedFilePath={selectedFilePath}
       favorites={favorites}
       installedSkillIds={installedSkillIds}
+      pendingSkillIds={pendingSkillIds}
       onSelectSkill={handleSelectSkill}
       onToggleFavorite={toggleFavorite}
       onInstallToggle={handleInstallToggle}

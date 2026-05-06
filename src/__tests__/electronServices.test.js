@@ -6,6 +6,7 @@ const {
   loadSkillsFromPath,
   parseSkillMarkdownMetadata,
 } = require('../../electron/skillScanner');
+const { unhostAgentSkillLink } = require('../../electron/agentService');
 const { resolveAgentSkillPath } = require('../../electron/agentCatalog');
 
 describe('electron skill services', () => {
@@ -101,6 +102,40 @@ describe('electron skill services', () => {
     ]);
   });
 
+  test('marks double symlinks through the managed library as managed', async () => {
+    const libraryRoot = path.join(tmpDir, 'library');
+    const agentRoot = path.join(tmpDir, 'agent');
+    const originalSkill = path.join(agentRoot, 'originals', 'browse');
+    const libraryLink = path.join(libraryRoot, 'browse');
+    const agentLink = path.join(agentRoot, 'browse');
+    await fs.mkdir(originalSkill, { recursive: true });
+    await fs.mkdir(libraryRoot, { recursive: true });
+    await fs.writeFile(path.join(originalSkill, 'SKILL.md'), '# Browse');
+    await fs.symlink(originalSkill, libraryLink, 'dir');
+    await fs.symlink(libraryLink, agentLink, 'dir');
+
+    const [skill] = await loadSkillsFromPath(agentRoot, {
+      mode: 'agent',
+      agentId: 'claude',
+      installPath: libraryRoot,
+    });
+
+    const originalSkillRealPath = await fs.realpath(originalSkill);
+    expect({
+      id: skill.id,
+      source: skill.source,
+      managed: skill.managed,
+      linkTarget: skill.linkTarget,
+      realPath: skill.realPath,
+    }).toEqual({
+      id: 'browse',
+      source: 'managed',
+      managed: true,
+      linkTarget: libraryLink,
+      realPath: originalSkillRealPath,
+    });
+  });
+
   test('loads only SKILL.md content for agent skill scans', async () => {
     const agentRoot = path.join(tmpDir, 'agent');
     const skillRoot = path.join(agentRoot, 'large-skill');
@@ -118,6 +153,36 @@ describe('electron skill services', () => {
       { path: 'SKILL.md', content: '# Large Skill', contentLoaded: true },
       { path: 'assets/large.txt', content: '', contentLoaded: false },
     ]);
+  });
+
+  test('unhosts a managed skill by replacing the symlink with a local copy', async () => {
+    const libraryRoot = path.join(tmpDir, 'library');
+    const agentRoot = path.join(tmpDir, 'agent');
+    const managedSkill = path.join(libraryRoot, 'managed');
+    const agentLink = path.join(agentRoot, 'managed');
+    await fs.mkdir(managedSkill, { recursive: true });
+    await fs.mkdir(agentRoot, { recursive: true });
+    await fs.writeFile(path.join(managedSkill, 'SKILL.md'), '# Managed');
+    await fs.writeFile(path.join(managedSkill, 'notes.txt'), 'library-copy');
+    await fs.symlink(managedSkill, agentLink, 'dir');
+
+    const result = await unhostAgentSkillLink({
+      agent: {
+        id: 'test-agent',
+        name: 'Test Agent',
+        pathMac: agentRoot,
+        pathWindows: agentRoot,
+      },
+      skillId: 'managed',
+      installPath: libraryRoot,
+    });
+
+    expect(result).toEqual({ ok: true, removed: true });
+    const localStats = await fs.lstat(agentLink);
+    expect(localStats.isSymbolicLink()).toBe(false);
+    expect(localStats.isDirectory()).toBe(true);
+    await expect(fs.readFile(path.join(agentLink, 'notes.txt'), 'utf-8')).resolves.toBe('library-copy');
+    await expect(fs.readFile(path.join(managedSkill, 'notes.txt'), 'utf-8')).resolves.toBe('library-copy');
   });
 
   test('resolves macOS agent skill paths', () => {

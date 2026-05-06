@@ -1,5 +1,6 @@
 const path = require('path');
 const fs = require('fs/promises');
+const os = require('os');
 const {
   isPathInside,
   normalizeRealPath,
@@ -179,32 +180,65 @@ const readSkillFromDir = async (skillDir, skillId, options = {}) => {
   };
 };
 
-const getDirectoryTargetInfo = async (entryPath, installRootRealPath) => {
+const getDefaultManagedRoots = () => [
+  path.join(os.homedir(), '.skillpkg', 'skills'),
+  path.join(os.homedir(), 'skillpkg', 'skills'),
+];
+
+const getManagedRootPaths = async (installPath) => {
+  const roots = [
+    installPath,
+    ...getDefaultManagedRoots(),
+  ].filter(Boolean);
+  const uniqueRoots = Array.from(new Set(roots.map((root) => path.normalize(root))));
+  const resolvedRoots = await Promise.all(
+    uniqueRoots.map((root) => normalizeRealPath(root).catch(() => null)),
+  );
+  return Array.from(new Set([...uniqueRoots, ...resolvedRoots.filter(Boolean)]));
+};
+
+const isPathInsideManagedRoot = (targetPath, managedRootPaths) =>
+  managedRootPaths.some((rootPath) => isPathInside(targetPath, rootPath));
+
+const getSymlinkTargetPath = async (entryPath) => {
+  const target = await fs.readlink(entryPath).catch(() => null);
+  if (!target) return null;
+  const absoluteTarget = path.isAbsolute(target)
+    ? target
+    : path.resolve(path.dirname(entryPath), target);
+  return path.normalize(absoluteTarget);
+};
+
+const getDirectoryTargetInfo = async (entryPath, managedRootPaths) => {
   const lstat = await fs.lstat(entryPath);
   const isLinked = lstat.isSymbolicLink();
   const stat = isLinked ? await fs.stat(entryPath).catch(() => null) : lstat;
   if (!stat?.isDirectory()) return null;
+  const symlinkTargetPath = isLinked ? await getSymlinkTargetPath(entryPath) : null;
   const realPath = await normalizeRealPath(entryPath).catch(() => entryPath);
-  const managed =
-    Boolean(isLinked && installRootRealPath && isPathInside(realPath, installRootRealPath));
+  const managed = Boolean(
+    isLinked &&
+    (
+      symlinkTargetPath && isPathInsideManagedRoot(symlinkTargetPath, managedRootPaths) ||
+      isPathInsideManagedRoot(realPath, managedRootPaths)
+    ),
+  );
   return {
     isLinked,
     managed,
     realPath,
-    linkTarget: isLinked ? realPath : null,
+    linkTarget: symlinkTargetPath || (isLinked ? realPath : null),
   };
 };
 
 const loadSkillsFromPath = async (skillRoot, options = {}) => {
   if (!skillRoot || !await pathExists(skillRoot)) return [];
-  const installRootRealPath = options.installPath
-    ? await normalizeRealPath(options.installPath).catch(() => null)
-    : null;
+  const managedRootPaths = await getManagedRootPaths(options.installPath);
   const entries = await fs.readdir(skillRoot, { withFileTypes: true }).catch(() => []);
   const skills = [];
   for (const entry of entries) {
     const entryPath = path.join(skillRoot, entry.name);
-    const targetInfo = await getDirectoryTargetInfo(entryPath, installRootRealPath).catch(() => null);
+    const targetInfo = await getDirectoryTargetInfo(entryPath, managedRootPaths).catch(() => null);
     if (!targetInfo) continue;
     const source =
       options.mode === 'agent'
