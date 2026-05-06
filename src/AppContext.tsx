@@ -84,6 +84,7 @@ type AppContextValue = {
   dialogSkill: Skill | null;
   dialogAgents: Set<string>;
   installConflict: boolean;
+  hostingConflictSkill: Skill | null;
   editing: boolean;
   fileDrafts: Record<string, string>;
   theme: ThemeMode;
@@ -106,6 +107,8 @@ type AppContextValue = {
   openSkillLocation: () => Promise<void>;
   handleImportZip: (event: ChangeEvent<HTMLInputElement>) => void;
   handleInstallToggle: (skill: Skill) => Promise<void>;
+  resolveHostingConflict: (action: 'use-managed' | 'overwrite') => Promise<void>;
+  cancelHostingConflict: () => void;
   handleFileSelect: (path: string) => void;
   loadSkillFileContent: (skill: Skill | null, filePath: string) => Promise<void>;
   updateDraft: (value: string) => void;
@@ -142,6 +145,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [dialogSkill, setDialogSkill] = useState<Skill | null>(null);
   const [dialogAgents, setDialogAgents] = useState<Set<string>>(new Set());
   const [installConflict, setInstallConflict] = useState(false);
+  const [hostingConflictSkill, setHostingConflictSkill] = useState<Skill | null>(null);
   const [editing, setEditing] = useState(false);
   const [fileDrafts, setFileDrafts] = useState<Record<string, string>>({});
   const [theme, setTheme] = useState<ThemeMode>(getInitialTheme);
@@ -456,26 +460,67 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     event.target.value = '';
   };
 
-  const handleInstallToggle = async (skill: Skill) => {
-    if (!skill.managed) {
-      setNotice('Agent 自有 Skill 不由 SkillPKG 卸载。');
+  const hostAgentSkill = async (
+    skill: Skill,
+    options: { overwrite?: boolean; useExisting?: boolean } = {},
+  ) => {
+    if (skill.managed) return;
+    if (!installPath) {
+      setNotice('请先设置统一路径。');
       return;
     }
-    if (!window?.skillpkg?.uninstallAgentSkill) {
-      setNotice('当前环境不支持卸载 Agent Skill。');
+    if (!window?.skillpkg?.migrateSkills) {
+      setNotice('当前环境不支持托管 Agent Skill。');
       return;
     }
-    const result = await window.skillpkg.uninstallAgentSkill({
-      agentId: selectedAgentId,
-      skillId: skill.id,
+    const targetAgentId = skill.agentId || selectedAgentId;
+    const targetAgent = agents.find((agent) => agent.id === targetAgentId);
+    if (!targetAgent) {
+      setNotice('未找到当前 Agent 配置。');
+      return;
+    }
+    const [result] = await window.skillpkg.migrateSkills({
       installPath,
+      overwrite: Boolean(options.overwrite),
+      useExisting: Boolean(options.useExisting),
+      items: [
+        {
+          agentId: targetAgent.id,
+          skillId: skill.id,
+          pathMac: targetAgent.pathMac,
+          pathWindows: targetAgent.pathWindows,
+          rootPath: skill.rootPath,
+        },
+      ],
     });
-    if (!result.ok) {
-      setNotice('卸载失败：该 Skill 不是 SkillPKG 托管链接。');
+    if (!result?.ok && result?.reason === 'exists') {
+      setHostingConflictSkill(skill);
       return;
     }
+    if (!result?.ok) {
+      setNotice('托管失败，请检查 Agent 技能目录和统一路径权限。');
+      return;
+    }
+    setHostingConflictSkill(null);
+    await loadLocalSkills(installPath);
     await syncInstalledByAgent(agents, installPath);
-    setNotice('已删除当前 Agent 的 SkillPKG 托管链接。');
+    setNotice(options.useExisting ? '已改用当前托管 Skill。' : '已托管当前 Skill。');
+  };
+
+  const handleInstallToggle = async (skill: Skill) => {
+    await hostAgentSkill(skill);
+  };
+
+  const resolveHostingConflict = async (action: 'use-managed' | 'overwrite') => {
+    if (!hostingConflictSkill) return;
+    await hostAgentSkill(hostingConflictSkill, {
+      overwrite: action === 'overwrite',
+      useExisting: action === 'use-managed',
+    });
+  };
+
+  const cancelHostingConflict = () => {
+    setHostingConflictSkill(null);
   };
 
   const handleFileSelect = (path: string) => {
@@ -621,6 +666,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     dialogSkill,
     dialogAgents,
     installConflict,
+    hostingConflictSkill,
     editing,
     fileDrafts,
     theme,
@@ -643,6 +689,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     openSkillLocation,
     handleImportZip,
     handleInstallToggle,
+    resolveHostingConflict,
+    cancelHostingConflict,
     handleFileSelect,
     loadSkillFileContent,
     updateDraft,

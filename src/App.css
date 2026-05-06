@@ -528,6 +528,25 @@ body[data-theme='light'] {
   border-color: var(--border-subtle);
 }
 
+.btn.mini {
+  min-height: 26px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  gap: 5px;
+}
+
+.btn.mini .icon {
+  width: 14px;
+  height: 14px;
+}
+
+.btn.mini.managed {
+  background: var(--success-bg);
+  border-color: transparent;
+  color: var(--success-text);
+}
+
 .btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
@@ -664,6 +683,7 @@ body[data-theme='light'] {
   cursor: pointer;
   color: inherit;
   transition: all 0.2s ease;
+  width: 100%;
 }
 
 .skill-card.active,
@@ -714,6 +734,12 @@ body[data-theme='light'] {
   font-size: 11px;
   color: var(--text-muted);
   gap: 10px;
+}
+
+.skill-card-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 10px;
 }
 
 .source-tag {

@@ -70,11 +70,14 @@ declare global {
        */
       migrateSkills: (payload: {
         installPath: string;
+        overwrite?: boolean;
+        useExisting?: boolean;
         items: Array<{
           agentId: string;
           skillId: string;
           pathMac: string;
           pathWindows: string;
+          rootPath?: string;
         }>;
       }) => Promise<
         Array<{

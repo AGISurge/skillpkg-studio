@@ -4,6 +4,7 @@ import { AppProvider, ToolbarProvider, useAppContext } from './AppContext';
 import { routePaths } from './routes';
 import AppLayout from './components/AppLayout';
 import InstallDialog from './components/InstallDialog';
+import HostConflictDialog from './components/HostConflictDialog';
 import DiscoverPage from './pages/DiscoverPage';
 import LocalPage from './pages/LocalPage';
 import FavoritesPage from './pages/FavoritesPage';
@@ -17,37 +18,48 @@ const AppDialogs = () => {
     agents,
     dialogAgents,
     installConflict,
+    hostingConflictSkill,
     setDialogAgents,
     setInstallConflict,
     setDialogOpen,
     confirmInstall,
+    resolveHostingConflict,
+    cancelHostingConflict,
     openSkillLocation,
   } = useAppContext();
 
   return (
-    <InstallDialog
-      open={dialogOpen}
-      skill={dialogSkill}
-      agents={agents}
-      selectedAgents={dialogAgents}
-      onToggleAgent={(id) => {
-        setDialogAgents((prev) => {
-          const next = new Set(prev);
-          if (next.has(id)) next.delete(id);
-          else next.add(id);
-          return next;
-        });
-      }}
-      conflict={installConflict}
-      onOverwrite={() => confirmInstall(true)}
-      onKeep={() => {
-        setInstallConflict(false);
-        setDialogOpen(false);
-      }}
-      onOpenSkillPath={openSkillLocation}
-      onClose={() => setDialogOpen(false)}
-      onConfirm={() => confirmInstall(false)}
-    />
+    <>
+      <InstallDialog
+        open={dialogOpen}
+        skill={dialogSkill}
+        agents={agents}
+        selectedAgents={dialogAgents}
+        onToggleAgent={(id) => {
+          setDialogAgents((prev) => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+          });
+        }}
+        conflict={installConflict}
+        onOverwrite={() => confirmInstall(true)}
+        onKeep={() => {
+          setInstallConflict(false);
+          setDialogOpen(false);
+        }}
+        onOpenSkillPath={openSkillLocation}
+        onClose={() => setDialogOpen(false)}
+        onConfirm={() => confirmInstall(false)}
+      />
+      <HostConflictDialog
+        skill={hostingConflictSkill}
+        onUseManaged={() => resolveHostingConflict('use-managed')}
+        onOverwrite={() => resolveHostingConflict('overwrite')}
+        onClose={cancelHostingConflict}
+      />
+    </>
   );
 };
 

@@ -1,11 +1,10 @@
 import {
   ArrowDownloadRegular,
-  CheckmarkCircleRegular,
-  DismissCircleRegular,
   SettingsRegular,
   StarFilled,
   StarRegular,
 } from '@fluentui/react-icons';
+import type { KeyboardEvent } from 'react';
 import type { Skill, SkillFile } from '../types/models';
 import SkillTree from '../components/SkillTree';
 import SkillViewer from '../components/SkillViewer';
@@ -61,79 +60,68 @@ const SkillsPage = ({
   onSave,
   onChangeDraft,
 }: SkillsPageProps) => {
+  const handleCardKeyDown = (event: KeyboardEvent<HTMLDivElement>, skill: Skill) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    onSelectSkill(skill);
+  };
+
   return (
     <section className="panel-grid fade-in">
       <div className="skill-list">
-          {skills.map((skill) => {
-            const isInstalled = installedSkillIds?.has(skill.id);
-            const isAgentOwned = mode === 'agents' && skill.source === 'agent';
-            return (
-              <button
-                type="button"
-                key={skill.id}
-                className={`skill-card ${selectedSkillId === skill.id ? 'active' : ''}`}
-                onClick={() => onSelectSkill(skill)}
-              >
-                <div className="skill-card-header">
-                  <div>
-                    <div className="skill-title">{skill.name}</div>
-                    <div className="skill-version">v{skill.version}</div>
-                  </div>
-                  <button
-                    type="button"
-                    className="icon-btn"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onToggleFavorite(skill.id);
-                    }}
-                  >
-                    {favorites.has(skill.id) ? (
-                      <StarFilled className="icon" />
-                    ) : (
-                      <StarRegular className="icon" />
-                    )}
-                  </button>
+        {skills.map((skill) => {
+          const isInstalled = installedSkillIds?.has(skill.id);
+          return (
+            <div
+              key={skill.id}
+              className={`skill-card ${selectedSkillId === skill.id ? 'active' : ''}`}
+              role="button"
+              tabIndex={0}
+              onClick={() => onSelectSkill(skill)}
+              onKeyDown={(event) => handleCardKeyDown(event, skill)}
+            >
+              <div className="skill-card-header">
+                <div>
+                  <div className="skill-title">{skill.name}</div>
+                  <div className="skill-version">v{skill.version}</div>
                 </div>
-                <p>{skill.description}</p>
-                <div className="skill-meta">
-                  {mode === 'agents' && (
-                    <>
-                      <span className={`source-tag ${skill.source === 'managed' ? 'managed' : 'agent'}`}>
-                        {skill.source === 'managed' ? 'SkillPKG 托管' : 'Agent 自有'}
-                      </span>
-                      <span className={`status ${isInstalled ? 'on' : 'off'}`}>
-                        {isInstalled ? (
-                          <>
-                            <CheckmarkCircleRegular className="icon" /> 托管
-                          </>
-                        ) : (
-                          <>
-                            <DismissCircleRegular className="icon" /> 自有
-                          </>
-                        )}
-                      </span>
-                    </>
+                <button
+                  type="button"
+                  className="icon-btn"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onToggleFavorite(skill.id);
+                  }}
+                >
+                  {favorites.has(skill.id) ? (
+                    <StarFilled className="icon" />
+                  ) : (
+                    <StarRegular className="icon" />
                   )}
-                </div>
-                {mode === 'agents' && onInstallToggle && (
+                </button>
+              </div>
+              <p>{skill.description}</p>
+              {mode === 'agents' && onInstallToggle && (
+                <div className="skill-card-footer" onClick={(event) => event.stopPropagation()}>
                   <button
                     type="button"
-                    className={`btn ${isInstalled ? 'ghost' : 'primary'}`}
-                    disabled={isAgentOwned}
+                    className={`btn mini ${isInstalled ? 'managed' : 'primary'}`}
+                    disabled={isInstalled}
                     onClick={(event) => {
                       event.stopPropagation();
-                      onInstallToggle(skill);
+                      if (!isInstalled) onInstallToggle(skill);
                     }}
                   >
                     <SettingsRegular className="icon" />
-                    {isAgentOwned ? '自有 Skill' : '卸载托管链接'}
+                    {isInstalled ? '已托管' : '托管'}
                   </button>
-                )}
-              </button>
-            );
-          })}
-          {skills.length === 0 && <div className="empty-state">当前列表为空。</div>}
-        </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+        {skills.length === 0 && <div className="empty-state">当前列表为空。</div>}
+      </div>
       <div className="panel detail">
         {selectedSkill ? (
           <>
