@@ -160,6 +160,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     cursor: new Set(),
   }));
 
+  const selectAgentId = useCallback((agentId: string) => {
+    setSelectedAgentId((current) => (current === agentId ? current : agentId));
+  }, []);
+
   const selectedSkill = useMemo(() => {
     const skills = [...discoverSkills, ...localSkills];
     return (
@@ -247,12 +251,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     try {
       const nextAgents = await resolveInstalledAgents();
       setAgents(nextAgents);
-      if (
-        nextAgents.length &&
-        !nextAgents.some((agent) => agent.id === selectedAgentId)
-      ) {
-        setSelectedAgentId(nextAgents[0].id);
-      }
+      setSelectedAgentId((current) => (
+        nextAgents.length && !nextAgents.some((agent) => agent.id === current)
+          ? nextAgents[0].id
+          : current
+      ));
       await syncInstalledByAgent(nextAgents, installPath);
     } finally {
       const elapsed = Date.now() - start;
@@ -264,7 +267,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       }
       setRefreshingAgents(false);
     }
-  }, [installPath, resolveInstalledAgents, selectedAgentId, syncInstalledByAgent]);
+  }, [installPath, resolveInstalledAgents, syncInstalledByAgent]);
 
   const loadLocalSkills = useCallback(async (path: string) => {
     if (!path) return;
@@ -322,19 +325,18 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       const nextAgents = await resolveInstalledAgents();
       if (!active) return;
       setAgents(nextAgents);
-      if (
-        nextAgents.length &&
-        !nextAgents.some((agent) => agent.id === selectedAgentId)
-      ) {
-        setSelectedAgentId(nextAgents[0].id);
-      }
+      setSelectedAgentId((current) => (
+        nextAgents.length && !nextAgents.some((agent) => agent.id === current)
+          ? nextAgents[0].id
+          : current
+      ));
       await syncInstalledByAgent(nextAgents, installPath);
     };
     loadAgents();
     return () => {
       active = false;
     };
-  }, [installPath, resolveInstalledAgents, selectedAgentId, syncInstalledByAgent]);
+  }, [installPath, resolveInstalledAgents, syncInstalledByAgent]);
 
   useEffect(() => {
     if (!document?.body) return;
@@ -595,7 +597,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setTheme,
     setApiKey,
     setAgentsExpanded,
-    setSelectedAgentId,
+    setSelectedAgentId: selectAgentId,
     setSelectedDiscoverSkillId,
     setSelectedLibrarySkillId,
     setSelectedFilePath,

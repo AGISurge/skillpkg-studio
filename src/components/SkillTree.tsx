@@ -4,6 +4,7 @@ import {
   DocumentRegular,
   FolderRegular,
 } from '@fluentui/react-icons';
+import { useMemo } from 'react';
 import type { SkillFile } from '../types/models';
 import { buildTree } from '../utils/skillUtils';
 
@@ -28,7 +29,7 @@ const SkillTree = ({
   onToggleFolder,
   onSelectFile,
 }: SkillTreeProps) => {
-  const tree = buildTree(files);
+  const tree = useMemo(() => buildTree(files), [files]);
 
   /**
    * 递归渲染目录树。

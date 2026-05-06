@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   PanelLeftContractRegular,
@@ -18,6 +18,9 @@ const getActiveSection = (path: string) => {
   return "discover";
 };
 
+const getDefaultSkillFilePath = (files: Array<{ path: string }>) =>
+  files.find((file) => file.path === "SKILL.md")?.path || files[0]?.path || "";
+
 const AppLayout = () => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -28,9 +31,8 @@ const AppLayout = () => {
     installedByAgent,
     agentsExpanded,
     setAgentsExpanded,
-    localSkills,
+    agentSkillsByAgent,
     notice,
-    installPath,
     refreshingAgents,
     refreshAgents,
     setSelectedAgentId,
@@ -44,19 +46,24 @@ const AppLayout = () => {
   const [sidebarFloating, setSidebarFloating] = useState(false);
 
   const activeSection = getActiveSection(location.pathname);
-  const isSettingsPage = activeSection === "settings";
   const currentRoute = menuRoutes.find((item) => item.id === activeSection);
 
-  const handleSelectAgent = (agentId: string) => {
+  const handleSelectAgent = useCallback((agentId: string) => {
     setSelectedAgentId(agentId);
-    const installed = installedByAgent[agentId] || new Set();
-    const agentSkills = localSkills.filter((skill) => installed.has(skill.id));
-    if (agentSkills[0]) {
-      setSelectedLibrarySkillId(agentSkills[0].id);
-      setSelectedFilePath(agentSkills[0].files[0]?.path || "");
+    const agentSkills = agentSkillsByAgent[agentId] || [];
+    const firstSkill = agentSkills[0];
+    if (firstSkill) {
+      setSelectedLibrarySkillId(firstSkill.id);
+      setSelectedFilePath(getDefaultSkillFilePath(firstSkill.files));
     }
     navigate(`/agents/${agentId}`);
-  };
+  }, [
+    agentSkillsByAgent,
+    navigate,
+    setSelectedAgentId,
+    setSelectedFilePath,
+    setSelectedLibrarySkillId,
+  ]);
 
   useEffect(() => {
     if (!window.matchMedia) return;

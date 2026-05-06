@@ -1,8 +1,11 @@
 import { CodeRegular, EditRegular, SaveRegular } from '@fluentui/react-icons';
+import { useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import rehypeHighlight from 'rehype-highlight';
 import type { SkillFile } from '../types/models';
 import { getMarkdownContent } from '../utils/skillUtils';
+
+const markdownRehypePlugins = [rehypeHighlight];
 
 /**
  * 技能内容查看器参数。
@@ -28,8 +31,9 @@ const SkillViewer = ({
   onChangeDraft,
 }: SkillViewerProps) => {
   const displayedContent = file ? draftValue ?? file.content : '';
-  const markdownContent = getMarkdownContent(
-    file ? { ...file, content: displayedContent } : null
+  const markdownContent = useMemo(
+    () => getMarkdownContent(file ? { ...file, content: displayedContent } : null),
+    [displayedContent, file],
   );
 
   return (
@@ -59,7 +63,7 @@ const SkillViewer = ({
             onChange={(event) => onChangeDraft(event.target.value)}
           />
         ) : (
-          <ReactMarkdown rehypePlugins={[rehypeHighlight]}>{markdownContent}</ReactMarkdown>
+          <ReactMarkdown rehypePlugins={markdownRehypePlugins}>{markdownContent}</ReactMarkdown>
         )}
       </div>
     </>
