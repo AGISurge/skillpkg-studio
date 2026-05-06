@@ -32,6 +32,7 @@ const AgentsPage = () => {
     handleInstallToggle,
     openInstallDialog,
     handleFileSelect,
+    loadSkillFileContent,
     handleToggleFolder,
     handleSaveFile,
     updateDraft,
@@ -80,12 +81,22 @@ const AgentsPage = () => {
     });
   }, [setSelectedFilePath, setSelectedLibrarySkillId, startSkillTransition]);
 
+  const handleSelectFile = useCallback((path: string) => {
+    handleFileSelect(path);
+    void loadSkillFileContent(selectedSkill, path);
+  }, [handleFileSelect, loadSkillFileContent, selectedSkill]);
+
   useEffect(() => {
     if (!agentSkills.length) return;
     if (agentSkills.some((skill) => skill.id === selectedLibrarySkillId)) return;
     setSelectedLibrarySkillId(agentSkills[0].id);
     setSelectedFilePath(getDefaultSkillFilePath(agentSkills[0].files));
   }, [agentSkills, selectedLibrarySkillId, setSelectedFilePath, setSelectedLibrarySkillId]);
+
+  useEffect(() => {
+    if (!selectedSkill || !selectedFile) return;
+    void loadSkillFileContent(selectedSkill, selectedFile.path);
+  }, [loadSkillFileContent, selectedFile, selectedSkill]);
 
   return (
     <SkillsPage
@@ -100,7 +111,7 @@ const AgentsPage = () => {
       onToggleFavorite={toggleFavorite}
       onInstallToggle={handleInstallToggle}
       onReinstall={openInstallDialog}
-      onSelectFile={handleFileSelect}
+      onSelectFile={handleSelectFile}
       expandedFolders={expandedFolders}
       onToggleFolder={handleToggleFolder}
       editing={editing}

@@ -101,6 +101,25 @@ describe('electron skill services', () => {
     ]);
   });
 
+  test('loads only SKILL.md content for agent skill scans', async () => {
+    const agentRoot = path.join(tmpDir, 'agent');
+    const skillRoot = path.join(agentRoot, 'large-skill');
+    await fs.mkdir(path.join(skillRoot, 'assets'), { recursive: true });
+    await fs.writeFile(path.join(skillRoot, 'SKILL.md'), '# Large Skill');
+    await fs.writeFile(path.join(skillRoot, 'assets', 'large.txt'), 'large-content');
+
+    const [skill] = await loadSkillsFromPath(agentRoot, {
+      mode: 'agent',
+      agentId: 'claude',
+      installPath: path.join(tmpDir, 'library'),
+    });
+
+    expect(skill.files).toEqual([
+      { path: 'SKILL.md', content: '# Large Skill', contentLoaded: true },
+      { path: 'assets/large.txt', content: '', contentLoaded: false },
+    ]);
+  });
+
   test('resolves macOS agent skill paths', () => {
     expect(resolveAgentSkillPath('claude')).toBe(path.join(os.homedir(), '.claude', 'skills'));
     expect(resolveAgentSkillPath('codex')).toBe(path.join(os.homedir(), '.codex', 'skills'));

@@ -4,6 +4,7 @@
 export type SkillFile = {
   path: string;
   content: string;
+  contentLoaded?: boolean;
 };
 
 /**

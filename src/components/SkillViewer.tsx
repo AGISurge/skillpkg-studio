@@ -1,4 +1,5 @@
 import { CodeRegular, EditRegular, SaveRegular } from '@fluentui/react-icons';
+import { memo } from 'react';
 import { useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import rehypeHighlight from 'rehype-highlight';
@@ -30,6 +31,7 @@ const SkillViewer = ({
   onSave,
   onChangeDraft,
 }: SkillViewerProps) => {
+  const loadingContent = file?.contentLoaded === false;
   const displayedContent = file ? draftValue ?? file.content : '';
   const markdownContent = useMemo(
     () => getMarkdownContent(file ? { ...file, content: displayedContent } : null),
@@ -45,11 +47,21 @@ const SkillViewer = ({
             {file?.path || '未选择文件'}
           </div>
           <div className="viewer-actions">
-            <button type="button" className="btn ghost" onClick={onToggleEdit}>
+            <button
+              type="button"
+              className="btn ghost"
+              onClick={onToggleEdit}
+              disabled={loadingContent}
+            >
               <EditRegular className="icon" />
               {editing ? '预览' : '编辑'}
             </button>
-            <button type="button" className="btn primary" onClick={onSave} disabled={!editing}>
+            <button
+              type="button"
+              className="btn primary"
+              onClick={onSave}
+              disabled={!editing || loadingContent}
+            >
               <SaveRegular className="icon" />
               保存
             </button>
@@ -57,7 +69,9 @@ const SkillViewer = ({
         </div>
       </div>
       <div className="viewer-content">
-        {editing ? (
+        {loadingContent ? (
+          <div className="empty-state">正在加载文件内容...</div>
+        ) : editing ? (
           <textarea
             value={displayedContent}
             onChange={(event) => onChangeDraft(event.target.value)}
@@ -70,4 +84,4 @@ const SkillViewer = ({
   );
 };
 
-export default SkillViewer;
+export default memo(SkillViewer);

@@ -112,25 +112,35 @@ const hasSkillMarkdown = async (skillDir) => {
   }
 };
 
-const collectFiles = async (baseDir, currentDir = baseDir) => {
+const shouldLoadFileContent = (relativePath, mode) => {
+  if (mode === 'all') return true;
+  if (mode === 'skill-md-only') return relativePath === SKILL_MARKDOWN_FILENAME;
+  return false;
+};
+
+const collectFiles = async (baseDir, currentDir = baseDir, options = {}) => {
+  const contentMode = options.contentMode || 'all';
   const entries = await fs.readdir(currentDir, { withFileTypes: true });
   const results = [];
   for (const entry of entries) {
     const fullPath = path.join(currentDir, entry.name);
     if (entry.isSymbolicLink()) continue;
     if (entry.isDirectory()) {
-      results.push(...await collectFiles(baseDir, fullPath));
+      results.push(...await collectFiles(baseDir, fullPath, options));
       continue;
     }
     if (!entry.isFile()) continue;
     const relativePath = path.relative(baseDir, fullPath).split(path.sep).join('/');
     let content = '';
-    try {
-      content = await fs.readFile(fullPath, 'utf-8');
-    } catch (error) {
-      content = '';
+    const contentLoaded = shouldLoadFileContent(relativePath, contentMode);
+    if (contentLoaded) {
+      try {
+        content = await fs.readFile(fullPath, 'utf-8');
+      } catch (error) {
+        content = '';
+      }
     }
-    results.push({ path: relativePath, content });
+    results.push({ path: relativePath, content, contentLoaded });
   }
   return results.sort((a, b) => {
     if (a.path === SKILL_MARKDOWN_FILENAME) return -1;
@@ -146,7 +156,9 @@ const readSkillFromDir = async (skillDir, skillId, options = {}) => {
   const skillMdPath = path.join(skillDir, SKILL_MARKDOWN_FILENAME);
   const skillMarkdown = await fs.readFile(skillMdPath, 'utf-8').catch(() => '');
   const markdownMetadata = parseSkillMarkdownMetadata(skillMarkdown);
-  const files = await collectFiles(skillDir);
+  const files = await collectFiles(skillDir, skillDir, {
+    contentMode: options.fileContentMode || 'all',
+  });
   return {
     id: skillId,
     name: markdownMetadata.name || legacyMetadata?.name || skillId,
@@ -204,6 +216,7 @@ const loadSkillsFromPath = async (skillRoot, options = {}) => {
       managed: targetInfo.managed,
       realPath: targetInfo.realPath,
       linkTarget: targetInfo.linkTarget,
+      fileContentMode: options.fileContentMode || (options.mode === 'agent' ? 'skill-md-only' : 'all'),
     });
     if (skill) skills.push(skill);
   }

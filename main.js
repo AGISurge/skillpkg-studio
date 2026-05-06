@@ -278,6 +278,22 @@ const registerIpcHandlers = () => {
     return true;
   });
 
+  ipcMain.handle('load-skill-file', async (_event, payload) => {
+    const { rootPath, filePath } = payload || {};
+    if (!rootPath || !filePath) return { ok: false, reason: 'invalid' };
+    const targetPath = path.normalize(path.join(rootPath, ...filePath.split('/')));
+    const relative = path.relative(rootPath, targetPath);
+    if (relative.startsWith('..') || path.isAbsolute(relative)) {
+      return { ok: false, reason: 'invalid-path' };
+    }
+    try {
+      const content = await fs.readFile(targetPath, 'utf-8');
+      return { ok: true, content };
+    } catch (error) {
+      return { ok: false, reason: 'read-failed' };
+    }
+  });
+
   ipcMain.handle('load-agent-skills', async (_event, payload) => {
     const legacyAgents = Array.isArray(payload) ? payload : null;
     const agents = legacyAgents || payload?.agents || [];

@@ -95,6 +95,13 @@ declare global {
         rootPath?: string;
       }) => Promise<boolean>;
       /**
+       * 按需读取技能文件内容。
+       */
+      loadSkillFile: (payload: {
+        rootPath: string;
+        filePath: string;
+      }) => Promise<{ ok: boolean; content?: string; reason?: string }>;
+      /**
        * 获取已安装技能记录。
        */
       loadSkillInstallRecords: (filters?: {

@@ -107,6 +107,7 @@ type AppContextValue = {
   handleImportZip: (event: ChangeEvent<HTMLInputElement>) => void;
   handleInstallToggle: (skill: Skill) => Promise<void>;
   handleFileSelect: (path: string) => void;
+  loadSkillFileContent: (skill: Skill | null, filePath: string) => Promise<void>;
   updateDraft: (value: string) => void;
   handleSaveFile: (skill?: Skill | null, file?: SkillFile | null) => Promise<void>;
   handleSelectInstallPath: () => Promise<void>;
@@ -482,6 +483,40 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setEditing(false);
   };
 
+  const loadSkillFileContent = useCallback(async (skill: Skill | null, filePath: string) => {
+    if (!skill?.rootPath || !filePath || !window?.skillpkg?.loadSkillFile) return;
+    const currentFile = skill.files.find((file) => file.path === filePath);
+    if (!currentFile || currentFile.contentLoaded !== false) return;
+    const result = await window.skillpkg.loadSkillFile({
+      rootPath: skill.rootPath,
+      filePath,
+    });
+    if (!result.ok) {
+      setNotice('读取文件内容失败。');
+      return;
+    }
+    const updateSkill = (target: Skill) => {
+      if (target.id !== skill.id || target.rootPath !== skill.rootPath) return target;
+      return {
+        ...target,
+        files: target.files.map((file) =>
+          file.path === filePath
+            ? { ...file, content: result.content || '', contentLoaded: true }
+            : file,
+        ),
+      };
+    };
+    if (skill.agentId) {
+      setAgentSkillsByAgent((prev) => ({
+        ...prev,
+        [skill.agentId as string]: (prev[skill.agentId as string] || []).map(updateSkill),
+      }));
+      return;
+    }
+    setLocalSkills((prev) => prev.map(updateSkill));
+    setDiscoverSkills((prev) => prev.map(updateSkill));
+  }, []);
+
   const updateDraft = (value: string) => {
     if (!selectedLibrarySkillId || !selectedFilePath) return;
     const key = `${selectedLibrarySkillId}::${selectedFilePath}`;
@@ -514,7 +549,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           ...skill,
           files: skill.files.map((file) =>
             file.path === targetFile.path
-              ? { ...file, content: draft }
+              ? { ...file, content: draft, contentLoaded: true }
               : file,
           ),
         };
@@ -528,7 +563,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           return {
             ...skill,
             files: skill.files.map((file) =>
-              file.path === targetFile.path ? { ...file, content: draft } : file,
+              file.path === targetFile.path ? { ...file, content: draft, contentLoaded: true } : file,
             ),
           };
         }),
@@ -609,6 +644,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     handleImportZip,
     handleInstallToggle,
     handleFileSelect,
+    loadSkillFileContent,
     updateDraft,
     handleSaveFile,
     handleSelectInstallPath,

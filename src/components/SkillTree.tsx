@@ -4,7 +4,7 @@ import {
   DocumentRegular,
   FolderRegular,
 } from '@fluentui/react-icons';
-import { useMemo } from 'react';
+import { memo, useMemo } from 'react';
 import type { SkillFile } from '../types/models';
 import { buildTree } from '../utils/skillUtils';
 
@@ -82,4 +82,4 @@ const SkillTree = ({
   return <>{renderTree(tree)}</>;
 };
 
-export default SkillTree;
+export default memo(SkillTree);
