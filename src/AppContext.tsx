@@ -440,7 +440,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       name: file.name.replace(/\.zip$/i, ''),
       version: '0.1.0',
       description: '导入的 SkillPkg，等待完善描述。',
-      author: 'Local Import',
+      author: '',
       tags: ['imported'],
       files: [
         {

@@ -1,21 +1,21 @@
-import { useEffect, useState } from 'react';
-import { Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { useEffect, useState } from "react";
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   PanelLeftContractRegular,
   PanelLeftExpandRegular,
-} from '@fluentui/react-icons';
-import Sidebar from './Sidebar';
-import { menuRoutes } from '../routes';
-import { useAppContext, useToolbarContent } from '../AppContext';
+} from "@fluentui/react-icons";
+import Sidebar from "./Sidebar";
+import { menuRoutes } from "../routes";
+import { useAppContext, useToolbarContent } from "../AppContext";
 
 const SIDEBAR_FLOATING_WIDTH = 900;
 
 const getActiveSection = (path: string) => {
-  if (path.startsWith('/agents')) return 'agents';
-  if (path.startsWith('/favorites')) return 'favorites';
-  if (path.startsWith('/local')) return 'local';
-  if (path.startsWith('/settings')) return 'settings';
-  return 'discover';
+  if (path.startsWith("/agents")) return "agents";
+  if (path.startsWith("/favorites")) return "favorites";
+  if (path.startsWith("/local")) return "local";
+  if (path.startsWith("/settings")) return "settings";
+  return "discover";
 };
 
 const AppLayout = () => {
@@ -44,7 +44,7 @@ const AppLayout = () => {
   const [sidebarFloating, setSidebarFloating] = useState(false);
 
   const activeSection = getActiveSection(location.pathname);
-  const isSettingsPage = activeSection === 'settings';
+  const isSettingsPage = activeSection === "settings";
   const currentRoute = menuRoutes.find((item) => item.id === activeSection);
 
   const handleSelectAgent = (agentId: string) => {
@@ -53,7 +53,7 @@ const AppLayout = () => {
     const agentSkills = localSkills.filter((skill) => installed.has(skill.id));
     if (agentSkills[0]) {
       setSelectedLibrarySkillId(agentSkills[0].id);
-      setSelectedFilePath(agentSkills[0].files[0]?.path || '');
+      setSelectedFilePath(agentSkills[0].files[0]?.path || "");
     }
     navigate(`/agents/${agentId}`);
   };
@@ -70,13 +70,13 @@ const AppLayout = () => {
     syncSidebarMode(mediaQuery.matches);
     const handleChange = (event: MediaQueryListEvent) =>
       syncSidebarMode(event.matches);
-    mediaQuery.addEventListener('change', handleChange);
-    return () => mediaQuery.removeEventListener('change', handleChange);
+    mediaQuery.addEventListener("change", handleChange);
+    return () => mediaQuery.removeEventListener("change", handleChange);
   }, []);
 
   return (
     <div
-      className={`app-shell ${sidebarOpen ? '' : 'sidebar-collapsed'} ${sidebarFloating ? 'sidebar-floating-mode' : ''}`}
+      className={`app-shell ${sidebarOpen ? "" : "sidebar-collapsed"} ${sidebarFloating ? "sidebar-floating-mode" : ""}`}
     >
       {sidebarOpen ? (
         <>
@@ -111,8 +111,8 @@ const AppLayout = () => {
             <button
               type="button"
               className="opacity-50 hover:opacity-100 transition-opacity rounded focus-visible:ring focus-visible:ring-primary"
-              aria-label={sidebarOpen ? '收起侧栏' : '展开侧栏'}
-              title={sidebarOpen ? '收起侧栏' : '展开侧栏'}
+              aria-label={sidebarOpen ? "收起侧栏" : "展开侧栏"}
+              title={sidebarOpen ? "收起侧栏" : "展开侧栏"}
               onClick={() => setSidebarOpen((prev) => !prev)}
             >
               {sidebarOpen ? (
@@ -129,13 +129,6 @@ const AppLayout = () => {
         </header>
 
         {notice ? <div className="notice">{notice}</div> : null}
-        {installPath && !isSettingsPage ? (
-          <div className="path-info">
-            <span className="label">统一路径</span>
-            <span className="value">{installPath}</span>
-          </div>
-        ) : null}
-
         <Outlet />
       </main>
     </div>

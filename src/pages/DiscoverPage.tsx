@@ -83,14 +83,6 @@ const DiscoverPage = () => {
             </div>
             <div className="detail-meta">
               <div>
-                <span className="label">作者</span>
-                <span>{selectedSkill.author}</span>
-              </div>
-              <div>
-                <span className="label">标签</span>
-                <span>{selectedSkill.tags.join(', ')}</span>
-              </div>
-              <div>
                 <span className="label">版本</span>
                 <span>{selectedSkill.version}</span>
               </div>

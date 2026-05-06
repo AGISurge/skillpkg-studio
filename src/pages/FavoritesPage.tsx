@@ -71,8 +71,6 @@ const FavoritesPage = () => {
       onToggleEdit={() => setEditing((prev) => !prev)}
       onSave={() => handleSaveFile(selectedSkill, selectedFile)}
       onChangeDraft={updateDraft}
-      title="收藏技能"
-      subtitle="已收藏的技能清单"
       mode="favorites"
     />
   );

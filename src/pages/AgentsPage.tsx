@@ -103,8 +103,6 @@ const AgentsPage = () => {
       onToggleEdit={() => setEditing((prev) => !prev)}
       onSave={() => handleSaveFile(selectedSkill, selectedFile)}
       onChangeDraft={updateDraft}
-      title={`${currentAgentName} Skills`}
-      subtitle="真实扫描：SkillPKG 托管与 Agent 自有 Skill"
       mode="agents"
     />
   );

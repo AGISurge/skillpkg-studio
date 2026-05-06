@@ -14,8 +14,6 @@ import SkillViewer from '../components/SkillViewer';
  * 技能列表与详情页参数。
  */
 type SkillsPageProps = {
-  title: string;
-  subtitle: string;
   skills: Skill[];
   selectedSkillId: string;
   selectedSkill: Skill | null;
@@ -42,8 +40,6 @@ type SkillsPageProps = {
  * 通用技能页面（本机/收藏/Agents 复用）。
  */
 const SkillsPage = ({
-  title,
-  subtitle,
   skills,
   selectedSkillId,
   selectedSkill,
@@ -67,13 +63,7 @@ const SkillsPage = ({
 }: SkillsPageProps) => {
   return (
     <section className="panel-grid fade-in">
-      <div className="panel list">
-        <div className="panel-header">
-          <div>
-            <div className="panel-title">{title}</div>
-            <div className="panel-subtitle">{subtitle}</div>
-          </div>
-        </div>
+      <div className="list">
         <div className="skill-list">
           {skills.map((skill) => {
             const isInstalled = installedSkillIds?.has(skill.id);
@@ -107,7 +97,6 @@ const SkillsPage = ({
                 </div>
                 <p>{skill.description}</p>
                 <div className="skill-meta">
-                  <span>{skill.author}</span>
                   {mode === 'agents' && (
                     <>
                       <span className={`source-tag ${skill.source === 'managed' ? 'managed' : 'agent'}`}>

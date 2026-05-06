@@ -97,8 +97,6 @@ const LocalPage = () => {
       onToggleEdit={() => setEditing((prev) => !prev)}
       onSave={() => handleSaveFile(selectedSkill, selectedFile)}
       onChangeDraft={updateDraft}
-      title="本地技能库"
-      subtitle="统一存放于本地路径"
       mode="local"
     />
   );
