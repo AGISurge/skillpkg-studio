@@ -41,6 +41,7 @@ body {
   --popover-bg: rgba(15, 18, 28, 0.92);
   --dialog-bg: #111522;
   --dialog-backdrop: rgba(6, 8, 12, 0.7);
+  --content-bg: rgba(10, 12, 18, 0.7);
   --code-bg: rgba(10, 12, 18, 0.7);
   --code-bg-strong: rgba(6, 8, 12, 0.85);
   --code-text: #e7ecf3;
@@ -81,6 +82,7 @@ body[data-theme='light'] {
   --popover-bg: #ffffff;
   --dialog-bg: #ffffff;
   --dialog-backdrop: rgba(15, 23, 42, 0.36);
+  --content-bg: #f9f9f9;
   --code-bg: #ffffff;
   --code-bg-strong: #f3f6fb;
   --code-text: #1f2937;
@@ -121,6 +123,7 @@ body[data-theme='light'] {
     --popover-bg: #ffffff;
     --dialog-bg: #ffffff;
     --dialog-backdrop: rgba(15, 23, 42, 0.36);
+    --content-bg: #f9f9f9;
     --code-bg: #ffffff;
     --code-bg-strong: #f3f6fb;
     --code-text: #1f2937;
@@ -681,11 +684,81 @@ body[data-theme='light'] {
 .skill-list {
   display: flex;
   flex-direction: column;
+  gap: 14px;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  padding: 0 4px 0 0;
+}
+
+.skill-search {
+  flex: 0 0 auto;
+  min-height: 44px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  background: var(--surface-bg-strong);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 8px;
+  padding: 0 12px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.skill-search .icon {
+  width: 16px;
+  height: 16px;
+  color: var(--text-muted);
+  flex: 0 0 auto;
+}
+
+.skill-search input {
+  min-width: 0;
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: inherit;
+  font-size: 13px;
+}
+
+.skill-search input::placeholder {
+  color: var(--text-faint);
+}
+
+.skill-search-clear {
+  width: 26px;
+  height: 26px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.skill-search-clear:hover {
+  background: var(--surface-bg-hover);
+  border-color: var(--border-subtle);
+}
+
+.skill-list-items {
+  display: flex;
+  flex-direction: column;
   gap: 12px;
   flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
-  padding:0 8x;
+  padding: 0 8px;
+}
+
+.skill-search-highlight {
+  border-radius: 4px;
+  background: rgba(79, 209, 197, 0.28);
+  color: var(--app-text-strong);
+  padding: 0 2px;
 }
 
 .skill-card {
@@ -876,6 +949,8 @@ body[data-theme='light'] {
   margin: 16px 0;
   border-collapse: collapse;
   font-size: 13px;
+  border-radius:4px;
+ 
 }
 
 .preview th,
@@ -954,7 +1029,6 @@ body[data-theme='light'] {
   min-height: 0;
   min-width: 0;
   overflow: hidden;
-}
 
 .viewer-header {
   display: flex;
@@ -1003,6 +1077,8 @@ body[data-theme='light'] {
   min-height: 0;
   min-width: 0;
   flex: 1 1 auto;
+  background:#f9f9f9;
+}
 }
 .viewer-content p {
   @apply my-6;

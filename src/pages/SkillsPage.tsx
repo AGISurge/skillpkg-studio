@@ -1,14 +1,52 @@
 import {
   ArrowDownloadRegular,
+  DismissRegular,
+  SearchRegular,
   SettingsRegular,
   StarFilled,
   StarRegular,
 } from "@fluentui/react-icons";
-import type { KeyboardEvent } from "react";
+import { useEffect, useMemo, useState } from "react";
+import type { KeyboardEvent, ReactNode } from "react";
 import type { Skill, SkillFile } from "../types/models";
 import SkillTree from "../components/SkillTree";
 import SkillViewer from "../components/SkillViewer";
 import { Button } from "@/components/ui/button";
+
+const SEARCH_DEBOUNCE_MS = 220;
+
+const includesSearch = (value: string, normalizedQuery: string) =>
+  value.toLocaleLowerCase().includes(normalizedQuery);
+
+const highlightSearchMatch = (value: string, query: string): ReactNode => {
+  const normalizedQuery = query.trim().toLocaleLowerCase();
+  if (!normalizedQuery) return value;
+
+  const normalizedValue = value.toLocaleLowerCase();
+  const parts: ReactNode[] = [];
+  let cursor = 0;
+  let matchIndex = normalizedValue.indexOf(normalizedQuery, cursor);
+
+  while (matchIndex !== -1) {
+    if (matchIndex > cursor) {
+      parts.push(value.slice(cursor, matchIndex));
+    }
+    const matchEnd = matchIndex + normalizedQuery.length;
+    parts.push(
+      <mark className="skill-search-highlight" key={`${matchIndex}-${matchEnd}`}>
+        {value.slice(matchIndex, matchEnd)}
+      </mark>,
+    );
+    cursor = matchEnd;
+    matchIndex = normalizedValue.indexOf(normalizedQuery, cursor);
+  }
+
+  if (cursor < value.length) {
+    parts.push(value.slice(cursor));
+  }
+
+  return parts;
+};
 
 /**
  * 技能列表与详情页参数。
@@ -65,6 +103,27 @@ const SkillsPage = ({
   onCancelEdit,
   onChangeDraft,
 }: SkillsPageProps) => {
+  const [searchValue, setSearchValue] = useState("");
+  const [debouncedSearchValue, setDebouncedSearchValue] = useState("");
+  const searchable = mode === "local" || mode === "agents";
+  const normalizedSearchValue = debouncedSearchValue.trim().toLocaleLowerCase();
+  const visibleSkills = useMemo(() => {
+    if (!searchable || !normalizedSearchValue) return skills;
+    return skills.filter(
+      (skill) =>
+        includesSearch(skill.name, normalizedSearchValue) ||
+        includesSearch(skill.description, normalizedSearchValue),
+    );
+  }, [normalizedSearchValue, searchable, skills]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setDebouncedSearchValue(searchValue);
+    }, SEARCH_DEBOUNCE_MS);
+
+    return () => window.clearTimeout(timer);
+  }, [searchValue]);
+
   const handleCardKeyDown = (
     event: KeyboardEvent<HTMLDivElement>,
     skill: Skill,
@@ -77,71 +136,102 @@ const SkillsPage = ({
   return (
     <section className="panel-grid fade-in">
       <div className="skill-list">
-        {skills.map((skill) => {
-          const isManaged = Boolean(
-            skill.managed || installedSkillIds?.has(skill.id),
-          );
-          const isPending = Boolean(pendingSkillIds?.has(skill.id));
-          return (
-            <div
-              key={skill.id}
-              className={`skill-card ${selectedSkillId === skill.id ? "active" : ""}`}
-              role="button"
-              tabIndex={0}
-              onClick={() => onSelectSkill(skill)}
-              onKeyDown={(event) => handleCardKeyDown(event, skill)}
-            >
-              <div className="skill-card-header">
-                <div>
-                  <div className="skill-title">{skill.name}</div>
-                  <div className="skill-version">v{skill.version}</div>
-                </div>
-                <button
-                  type="button"
-                  className="icon-btn"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onToggleFavorite(skill.id);
-                  }}
-                >
-                  {favorites.has(skill.id) ? (
-                    <StarFilled className="icon" />
-                  ) : (
-                    <StarRegular className="icon" />
-                  )}
-                </button>
-              </div>
-              <p>{skill.description}</p>
-              {mode === "agents" && onInstallToggle && (
-                <div
-                  className="skill-card-footer"
-                  onClick={(event) => event.stopPropagation()}
-                >
+        {searchable && (
+          <div className="skill-search">
+            <SearchRegular className="icon" />
+            <input
+              type="search"
+              value={searchValue}
+              aria-label="搜索 Skill"
+              placeholder="搜索 name 或 description"
+              onChange={(event) => setSearchValue(event.target.value)}
+            />
+            {searchValue && (
+              <button
+                type="button"
+                className="skill-search-clear"
+                aria-label="清空搜索"
+                onClick={() => {
+                  setSearchValue("");
+                  setDebouncedSearchValue("");
+                }}
+              >
+                <DismissRegular className="icon" />
+              </button>
+            )}
+          </div>
+        )}
+        <div className="skill-list-items">
+          {visibleSkills.map((skill) => {
+            const isManaged = Boolean(
+              skill.managed || installedSkillIds?.has(skill.id),
+            );
+            const isPending = Boolean(pendingSkillIds?.has(skill.id));
+            return (
+              <div
+                key={skill.id}
+                className={`skill-card ${selectedSkillId === skill.id ? "active" : ""}`}
+                role="button"
+                tabIndex={0}
+                onClick={() => onSelectSkill(skill)}
+                onKeyDown={(event) => handleCardKeyDown(event, skill)}
+              >
+                <div className="skill-card-header">
+                  <div>
+                    <div className="skill-title">
+                      {highlightSearchMatch(skill.name, debouncedSearchValue)}
+                    </div>
+                    <div className="skill-version">v{skill.version}</div>
+                  </div>
                   <button
                     type="button"
-                    className={`btn mini ${isManaged ? "managed" : "primary"} ${isPending ? "loading" : ""}`}
-                    disabled={isPending}
-                    aria-busy={isPending}
+                    className="icon-btn"
                     onClick={(event) => {
                       event.stopPropagation();
-                      if (!isPending) onInstallToggle(skill);
+                      onToggleFavorite(skill.id);
                     }}
                   >
-                    {isPending ? (
-                      <span className="mini-spinner" aria-hidden="true" />
+                    {favorites.has(skill.id) ? (
+                      <StarFilled className="icon" />
                     ) : (
-                      <SettingsRegular className="icon" />
+                      <StarRegular className="icon" />
                     )}
-                    {isPending ? "处理中" : isManaged ? "取消托管" : "托管"}
                   </button>
                 </div>
-              )}
+                <p>{highlightSearchMatch(skill.description, debouncedSearchValue)}</p>
+                {mode === "agents" && onInstallToggle && (
+                  <div
+                    className="skill-card-footer"
+                    onClick={(event) => event.stopPropagation()}
+                  >
+                    <button
+                      type="button"
+                      className={`btn mini ${isManaged ? "managed" : "primary"} ${isPending ? "loading" : ""}`}
+                      disabled={isPending}
+                      aria-busy={isPending}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        if (!isPending) onInstallToggle(skill);
+                      }}
+                    >
+                      {isPending ? (
+                        <span className="mini-spinner" aria-hidden="true" />
+                      ) : (
+                        <SettingsRegular className="icon" />
+                      )}
+                      {isPending ? "处理中" : isManaged ? "取消托管" : "托管"}
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+          {visibleSkills.length === 0 && (
+            <div className="empty-state">
+              {skills.length === 0 ? "当前列表为空。" : "未找到匹配的 Skill。"}
             </div>
-          );
-        })}
-        {skills.length === 0 && (
-          <div className="empty-state">当前列表为空。</div>
-        )}
+          )}
+        </div>
       </div>
       <div className="panel detail">
         {selectedSkill ? (
