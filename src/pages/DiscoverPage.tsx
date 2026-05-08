@@ -1,8 +1,12 @@
 import ReactMarkdown from 'react-markdown';
 import rehypeHighlight from 'rehype-highlight';
+import remarkGfm from 'remark-gfm';
 import { ArrowDownloadRegular } from '@fluentui/react-icons';
 import { getMarkdownContent } from '../utils/skillUtils';
 import { useAppContext } from '../AppContext';
+
+const markdownRehypePlugins = [rehypeHighlight];
+const markdownRemarkPlugins = [remarkGfm];
 
 const getDefaultSkillFilePath = (skill: { files: Array<{ path: string }> }) =>
   skill.files.find((file) => file.path === 'SKILL.md')?.path ||
@@ -90,7 +94,12 @@ const DiscoverPage = () => {
             <div className="detail-section">
               <div className="section-title">内容预览</div>
               <div className="preview">
-                <ReactMarkdown rehypePlugins={[rehypeHighlight]}>{markdownContent}</ReactMarkdown>
+                <ReactMarkdown
+                  remarkPlugins={markdownRemarkPlugins}
+                  rehypePlugins={markdownRehypePlugins}
+                >
+                  {markdownContent}
+                </ReactMarkdown>
               </div>
             </div>
           </>

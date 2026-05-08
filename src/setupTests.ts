@@ -14,6 +14,11 @@ jest.mock('rehype-highlight', () => ({
   default: () => null,
 }));
 
+jest.mock('remark-gfm', () => ({
+  __esModule: true,
+  default: () => null,
+}));
+
 // 过滤 React Router 未来版本提示，避免测试输出噪声。
 const originalWarn = console.warn;
 console.warn = (...args: unknown[]) => {

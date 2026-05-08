@@ -8,11 +8,13 @@ import { memo } from "react";
 import { useMemo } from "react";
 import ReactMarkdown from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
+import remarkGfm from "remark-gfm";
 import type { SkillFile } from "../types/models";
 import { getMarkdownContent } from "../utils/skillUtils";
 import { Button } from "./ui/button";
 
 const markdownRehypePlugins = [rehypeHighlight];
+const markdownRemarkPlugins = [remarkGfm];
 
 /**
  * 技能内容查看器参数。
@@ -103,7 +105,11 @@ const SkillViewer = ({
             onChange={(event) => onChangeDraft(event.target.value)}
           />
         ) : (
-          <ReactMarkdown rehypePlugins={markdownRehypePlugins} className="leading-relaxed">
+          <ReactMarkdown
+            remarkPlugins={markdownRemarkPlugins}
+            rehypePlugins={markdownRehypePlugins}
+            className="leading-relaxed"
+          >
             {markdownContent}
           </ReactMarkdown>
         )}
