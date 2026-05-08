@@ -684,25 +684,25 @@ body[data-theme='light'] {
 .skill-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
   flex: 1 1 auto;
   min-height: 0;
-  overflow: auto;
-  padding: 0 8px;
+  overflow: hidden;
+  padding: 0 4px 0 0;
 }
 
 .skill-search {
-  position: sticky;
-  top: 0;
-  z-index: 2;
-  min-height: 42px;
+  flex: 0 0 auto;
+  min-height: 44px;
   border: 1px solid var(--border-subtle);
-  border-radius: 12px;
-  background: var(--panel-bg);
+  border-radius: 14px;
+  background: var(--surface-bg-strong);
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 0 10px;
+  margin: 0 8px;
+  padding: 0 12px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 
 .skill-search .icon {
@@ -742,6 +742,16 @@ body[data-theme='light'] {
 .skill-search-clear:hover {
   background: var(--surface-bg-hover);
   border-color: var(--border-subtle);
+}
+
+.skill-list-items {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 0 8px;
 }
 
 .skill-search-highlight {
@@ -935,10 +945,11 @@ body[data-theme='light'] {
 
 .preview table,
 .viewer-content table {
-  width: max-content;
-  min-width: 100%;
+  width: 100%;
+  max-width: 100%;
   margin: 16px 0;
   border-collapse: collapse;
+  table-layout: fixed;
   font-size: 13px;
   border-radius:4px;
   overflow:hidden;
@@ -951,6 +962,21 @@ body[data-theme='light'] {
   padding: 8px 10px;
   border: 1px solid var(--border-soft);
   vertical-align: top;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.preview th > code,
+.preview td > code,
+.preview th :not(pre) > code,
+.preview td :not(pre) > code,
+.viewer-content th > code,
+.viewer-content td > code,
+.viewer-content th :not(pre) > code,
+.viewer-content td :not(pre) > code {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
   word-break: break-word;
 }
 
