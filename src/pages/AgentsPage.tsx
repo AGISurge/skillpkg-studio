@@ -41,12 +41,26 @@ const AgentsPage = () => {
   } = useAppContext();
 
   useEffect(() => {
-    if (agentId && agents.some((agent) => agent.id === agentId)) {
-      setSelectedAgentId(agentId);
+    const firstAgentId = agents[0]?.id || '';
+    const agentExists = Boolean(
+      agentId && agents.some((agent) => agent.id === agentId),
+    );
+
+    if (agentId) {
+      if (agentExists) {
+        setSelectedAgentId(agentId);
+        return;
+      }
+      setSelectedAgentId(firstAgentId);
+      navigate(firstAgentId ? `/agents/${firstAgentId}` : '/agents', {
+        replace: true,
+      });
       return;
     }
-    if (!agentId && agents[0]) {
-      navigate(`/agents/${agents[0].id}`, { replace: true });
+
+    if (firstAgentId) {
+      setSelectedAgentId(firstAgentId);
+      navigate(`/agents/${firstAgentId}`, { replace: true });
     }
   }, [agentId, agents, navigate, setSelectedAgentId]);
 

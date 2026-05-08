@@ -1007,6 +1007,9 @@ body[data-theme='light'] {
 .viewer-content p {
   @apply my-6;
 }
+.viewer-content hr{
+  margin-bottom: 16px;
+}
 
 .viewer-content textarea {
   display: block;

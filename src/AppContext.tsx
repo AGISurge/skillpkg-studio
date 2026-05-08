@@ -6,6 +6,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useTransition,
 } from 'react';
 import type { ChangeEvent, ReactNode } from 'react';
 import type {
@@ -65,6 +66,18 @@ const getInitialTheme = (): ThemeMode => {
   }
   return 'system';
 };
+
+const waitForNextPaint = () =>
+  new Promise<void>((resolve) => {
+    if (
+      typeof window === 'undefined' ||
+      typeof window.requestAnimationFrame !== 'function'
+    ) {
+      setTimeout(resolve, 0);
+      return;
+    }
+    window.requestAnimationFrame(() => resolve());
+  });
 
 type AppContextValue = {
   agents: Agent[];
@@ -127,6 +140,8 @@ const AppContext = createContext<AppContextValue | null>(null);
 
 export const AppProvider = ({ children }: { children: ReactNode }) => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const refreshRequestRef = useRef(0);
+  const [, startAgentTransition] = useTransition();
 
   const [agents, setAgents] = useState<Agent[]>([]);
   const [discoverSkills, setDiscoverSkills] = useState<Skill[]>([]);
@@ -213,59 +228,98 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       }));
   }, []);
 
-  const syncInstalledByAgent = useCallback(async (agentList: Agent[], path: string) => {
+  const syncInstalledByAgent = useCallback(async (
+    agentList: Agent[],
+    path: string,
+    options: {
+      replace?: boolean;
+      isCurrent?: () => boolean;
+    } = {},
+  ) => {
     if (!window?.skillpkg?.loadAgentSkills) return;
     const results = (await window.skillpkg.loadAgentSkills(
       { agents: agentList, installPath: path },
     )) as AgentSkillsResult[];
-    setInstalledByAgent((prev) => {
-      const next: Record<string, Set<string>> = { ...prev };
-      agentList.forEach((agent) => {
-        next[agent.id] = new Set();
-      });
-      results.forEach((result) => {
-        next[result.agentId] = new Set(
-          result.skills
-            .filter((skill) => skill.managed)
-            .map((skill) => skill.id),
-        );
-      });
-      return next;
+    if (options.isCurrent && !options.isCurrent()) return;
+
+    const nextInstalledByAgent: Record<string, Set<string>> = {};
+    const nextAgentSkillsByAgent: Record<string, Skill[]> = {};
+    const nextAgentSkillCounts = results.reduce<Record<string, number>>((acc, result) => {
+      acc[result.agentId] = result.skills.length;
+      return acc;
+    }, {});
+
+    agentList.forEach((agent) => {
+      nextInstalledByAgent[agent.id] = new Set();
+      nextAgentSkillsByAgent[agent.id] = [];
     });
-    setAgentSkillsByAgent((prev) => {
-      const next: Record<string, Skill[]> = { ...prev };
-      agentList.forEach((agent) => {
-        next[agent.id] = [];
-      });
-      results.forEach((result) => {
-        next[result.agentId] = result.skills;
-      });
-      return next;
+    results.forEach((result) => {
+      nextInstalledByAgent[result.agentId] = new Set(
+        result.skills
+          .filter((skill) => skill.managed)
+          .map((skill) => skill.id),
+      );
+      nextAgentSkillsByAgent[result.agentId] = result.skills;
     });
-    setAgentSkillCounts(
-      results.reduce<Record<string, number>>((acc, result) => {
-        acc[result.agentId] = result.skills.length;
-        return acc;
-      }, {}),
-    );
-  }, []);
+
+    startAgentTransition(() => {
+      setInstalledByAgent((prev) => (
+        options.replace
+          ? nextInstalledByAgent
+          : { ...prev, ...nextInstalledByAgent }
+      ));
+      setAgentSkillsByAgent((prev) => (
+        options.replace
+          ? nextAgentSkillsByAgent
+          : { ...prev, ...nextAgentSkillsByAgent }
+      ));
+      setAgentSkillCounts((prev) => {
+        if (options.replace) return nextAgentSkillCounts;
+        const next = { ...prev };
+        agentList.forEach((agent) => {
+          next[agent.id] = nextAgentSkillCounts[agent.id] || 0;
+        });
+        results.forEach((result) => {
+          next[result.agentId] = result.skills.length;
+        });
+        return next;
+      });
+    });
+  }, [startAgentTransition]);
 
   const refreshAgents = useCallback(async () => {
+    const requestId = refreshRequestRef.current + 1;
+    refreshRequestRef.current = requestId;
     setRefreshingAgents(true);
     const start = Date.now();
-    await new Promise<void>((resolve) =>
-      requestAnimationFrame(() => resolve()),
-    );
+    await waitForNextPaint();
+
     try {
       const nextAgents = await resolveInstalledAgents();
-      setAgents(nextAgents);
-      setSelectedAgentId((current) => (
-        nextAgents.length && !nextAgents.some((agent) => agent.id === current)
-          ? nextAgents[0].id
-          : current
-      ));
-      await syncInstalledByAgent(nextAgents, installPath);
+      if (refreshRequestRef.current !== requestId) return;
+
+      const nextAgentIds = new Set(nextAgents.map((agent) => agent.id));
+      startAgentTransition(() => {
+        setAgents(nextAgents);
+        setDialogAgents((current) => {
+          const next = new Set(
+            [...current].filter((agentId) => nextAgentIds.has(agentId)),
+          );
+          return next.size === current.size ? current : next;
+        });
+        setSelectedAgentId((current) => {
+          if (current && nextAgentIds.has(current)) return current;
+          return nextAgents[0]?.id || '';
+        });
+      });
+
+      await syncInstalledByAgent(nextAgents, installPath, {
+        replace: true,
+        isCurrent: () => refreshRequestRef.current === requestId,
+      });
     } finally {
+      if (refreshRequestRef.current !== requestId) return;
+
       const elapsed = Date.now() - start;
       const minDuration = 400;
       if (elapsed < minDuration) {
@@ -273,9 +327,16 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           setTimeout(resolve, minDuration - elapsed),
         );
       }
-      setRefreshingAgents(false);
+      if (refreshRequestRef.current === requestId) {
+        setRefreshingAgents(false);
+      }
     }
-  }, [installPath, resolveInstalledAgents, syncInstalledByAgent]);
+  }, [
+    installPath,
+    resolveInstalledAgents,
+    startAgentTransition,
+    syncInstalledByAgent,
+  ]);
 
   const loadLocalSkills = useCallback(async (path: string) => {
     if (!path) return;
@@ -328,23 +389,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     if (!installPath) return;
-    let active = true;
-    const loadAgents = async () => {
-      const nextAgents = await resolveInstalledAgents();
-      if (!active) return;
-      setAgents(nextAgents);
-      setSelectedAgentId((current) => (
-        nextAgents.length && !nextAgents.some((agent) => agent.id === current)
-          ? nextAgents[0].id
-          : current
-      ));
-      await syncInstalledByAgent(nextAgents, installPath);
-    };
-    loadAgents();
-    return () => {
-      active = false;
-    };
-  }, [installPath, resolveInstalledAgents, syncInstalledByAgent]);
+    void refreshAgents();
+  }, [installPath, refreshAgents]);
 
   useEffect(() => {
     if (!document?.body) return;
