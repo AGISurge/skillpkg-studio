@@ -26,6 +26,7 @@ const FavoritesPage = () => {
     handleFileSelect,
     handleToggleFolder,
     handleSaveFile,
+    handleCancelEdit,
     updateDraft,
   } = useAppContext();
 
@@ -68,8 +69,9 @@ const FavoritesPage = () => {
       onToggleFolder={handleToggleFolder}
       editing={editing}
       draftValue={fileKey ? fileDrafts[fileKey] : undefined}
-      onToggleEdit={() => setEditing((prev) => !prev)}
+      onStartEdit={() => setEditing(() => true)}
       onSave={() => handleSaveFile(selectedSkill, selectedFile)}
+      onCancelEdit={() => handleCancelEdit(selectedSkill, selectedFile)}
       onChangeDraft={updateDraft}
       mode="favorites"
     />

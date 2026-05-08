@@ -114,6 +114,7 @@ type AppContextValue = {
   loadSkillFileContent: (skill: Skill | null, filePath: string) => Promise<void>;
   updateDraft: (value: string) => void;
   handleSaveFile: (skill?: Skill | null, file?: SkillFile | null) => Promise<void>;
+  handleCancelEdit: (skill?: Skill | null, file?: SkillFile | null) => void;
   handleSelectInstallPath: () => Promise<void>;
   handleToggleFolder: (path: string) => void;
   refreshAgents: () => Promise<void>;
@@ -615,6 +616,29 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setFileDrafts((prev) => ({ ...prev, [key]: value }));
   };
 
+  const handleCancelEdit = (
+    targetSkill: Skill | null = selectedSkill,
+    targetFile: SkillFile | null = selectedFile,
+  ) => {
+    if (!targetSkill || !targetFile) {
+      setEditing(false);
+      return;
+    }
+    const key = `${targetSkill.id}::${targetFile.path}`;
+    const draft = fileDrafts[key];
+    const hasChanges = draft !== undefined && draft !== targetFile.content;
+    if (hasChanges && !window.confirm('当前文件有未保存修改，确定要取消编辑吗？')) {
+      return;
+    }
+    setFileDrafts((prev) => {
+      if (prev[key] === undefined) return prev;
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+    setEditing(false);
+  };
+
   const handleSaveFile = async (
     targetSkill: Skill | null = selectedSkill,
     targetFile: SkillFile | null = selectedFile,
@@ -743,6 +767,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     loadSkillFileContent,
     updateDraft,
     handleSaveFile,
+    handleCancelEdit,
     handleSelectInstallPath,
     handleToggleFolder,
     refreshAgents,

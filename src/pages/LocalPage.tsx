@@ -29,6 +29,7 @@ const LocalPage = () => {
     handleFileSelect,
     handleToggleFolder,
     handleSaveFile,
+    handleCancelEdit,
     handleImportZip,
     handleSelectInstallPath,
     updateDraft,
@@ -94,8 +95,9 @@ const LocalPage = () => {
       onToggleFolder={handleToggleFolder}
       editing={editing}
       draftValue={fileKey ? fileDrafts[fileKey] : undefined}
-      onToggleEdit={() => setEditing((prev) => !prev)}
+      onStartEdit={() => setEditing(() => true)}
       onSave={() => handleSaveFile(selectedSkill, selectedFile)}
+      onCancelEdit={() => handleCancelEdit(selectedSkill, selectedFile)}
       onChangeDraft={updateDraft}
       mode="local"
     />

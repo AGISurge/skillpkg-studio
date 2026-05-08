@@ -32,8 +32,9 @@ type SkillsPageProps = {
   onToggleFolder: (path: string) => void;
   editing: boolean;
   draftValue: string | undefined;
-  onToggleEdit: () => void;
+  onStartEdit: () => void;
   onSave: () => void;
+  onCancelEdit: () => void;
   onChangeDraft: (value: string) => void;
 };
 
@@ -59,8 +60,9 @@ const SkillsPage = ({
   onToggleFolder,
   editing,
   draftValue,
-  onToggleEdit,
+  onStartEdit,
   onSave,
+  onCancelEdit,
   onChangeDraft,
 }: SkillsPageProps) => {
   const handleCardKeyDown = (
@@ -194,8 +196,9 @@ const SkillsPage = ({
                   file={selectedFile}
                   editing={editing}
                   draftValue={draftValue}
-                  onToggleEdit={onToggleEdit}
+                  onStartEdit={onStartEdit}
                   onSave={onSave}
+                  onCancel={onCancelEdit}
                   onChangeDraft={onChangeDraft}
                 />
               </div>

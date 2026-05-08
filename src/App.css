@@ -962,6 +962,9 @@ body[data-theme='light'] {
   min-width: 0;
   flex: 1 1 auto;
 }
+.viewer-content p {
+  @apply my-6;
+}
 
 .viewer-content textarea {
   width: 100%;
