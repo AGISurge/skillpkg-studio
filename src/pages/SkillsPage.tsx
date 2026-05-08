@@ -3,11 +3,12 @@ import {
   SettingsRegular,
   StarFilled,
   StarRegular,
-} from '@fluentui/react-icons';
-import type { KeyboardEvent } from 'react';
-import type { Skill, SkillFile } from '../types/models';
-import SkillTree from '../components/SkillTree';
-import SkillViewer from '../components/SkillViewer';
+} from "@fluentui/react-icons";
+import type { KeyboardEvent } from "react";
+import type { Skill, SkillFile } from "../types/models";
+import SkillTree from "../components/SkillTree";
+import SkillViewer from "../components/SkillViewer";
+import { Button } from "@/components/ui/button";
 
 /**
  * 技能列表与详情页参数。
@@ -19,7 +20,7 @@ type SkillsPageProps = {
   selectedFile: SkillFile | null;
   selectedFilePath: string;
   favorites: Set<string>;
-  mode: 'local' | 'favorites' | 'agents';
+  mode: "local" | "favorites" | "agents";
   installedSkillIds?: Set<string>;
   pendingSkillIds?: Set<string>;
   onSelectSkill: (skill: Skill) => void;
@@ -62,8 +63,11 @@ const SkillsPage = ({
   onSave,
   onChangeDraft,
 }: SkillsPageProps) => {
-  const handleCardKeyDown = (event: KeyboardEvent<HTMLDivElement>, skill: Skill) => {
-    if (event.key !== 'Enter' && event.key !== ' ') return;
+  const handleCardKeyDown = (
+    event: KeyboardEvent<HTMLDivElement>,
+    skill: Skill,
+  ) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
     event.preventDefault();
     onSelectSkill(skill);
   };
@@ -72,12 +76,14 @@ const SkillsPage = ({
     <section className="panel-grid fade-in">
       <div className="skill-list">
         {skills.map((skill) => {
-          const isManaged = Boolean(skill.managed || installedSkillIds?.has(skill.id));
+          const isManaged = Boolean(
+            skill.managed || installedSkillIds?.has(skill.id),
+          );
           const isPending = Boolean(pendingSkillIds?.has(skill.id));
           return (
             <div
               key={skill.id}
-              className={`skill-card ${selectedSkillId === skill.id ? 'active' : ''}`}
+              className={`skill-card ${selectedSkillId === skill.id ? "active" : ""}`}
               role="button"
               tabIndex={0}
               onClick={() => onSelectSkill(skill)}
@@ -104,11 +110,14 @@ const SkillsPage = ({
                 </button>
               </div>
               <p>{skill.description}</p>
-              {mode === 'agents' && onInstallToggle && (
-                <div className="skill-card-footer" onClick={(event) => event.stopPropagation()}>
+              {mode === "agents" && onInstallToggle && (
+                <div
+                  className="skill-card-footer"
+                  onClick={(event) => event.stopPropagation()}
+                >
                   <button
                     type="button"
-                    className={`btn mini ${isManaged ? 'managed' : 'primary'} ${isPending ? 'loading' : ''}`}
+                    className={`btn mini ${isManaged ? "managed" : "primary"} ${isPending ? "loading" : ""}`}
                     disabled={isPending}
                     aria-busy={isPending}
                     onClick={(event) => {
@@ -116,47 +125,61 @@ const SkillsPage = ({
                       if (!isPending) onInstallToggle(skill);
                     }}
                   >
-                    {isPending ? <span className="mini-spinner" aria-hidden="true" /> : <SettingsRegular className="icon" />}
-                    {isPending ? '处理中' : isManaged ? '取消托管' : '托管'}
+                    {isPending ? (
+                      <span className="mini-spinner" aria-hidden="true" />
+                    ) : (
+                      <SettingsRegular className="icon" />
+                    )}
+                    {isPending ? "处理中" : isManaged ? "取消托管" : "托管"}
                   </button>
                 </div>
               )}
             </div>
           );
         })}
-        {skills.length === 0 && <div className="empty-state">当前列表为空。</div>}
+        {skills.length === 0 && (
+          <div className="empty-state">当前列表为空。</div>
+        )}
       </div>
       <div className="panel detail">
         {selectedSkill ? (
           <>
             <div className="detail-header">
               <div>
-                <div className="detail-title">{selectedSkill.name}</div>
-                <div className="detail-subtitle">{selectedSkill.description}</div>
-              </div>
-              <div className="detail-actions">
-                <button
-                  type="button"
-                  className="btn ghost"
-                  onClick={() => onToggleFavorite(selectedSkill.id)}
-                >
-                  {favorites.has(selectedSkill.id) ? (
-                    <StarFilled className="icon" />
-                  ) : (
-                    <StarRegular className="icon" />
-                  )}
-                  收藏
-                </button>
-                {onReinstall && mode !== 'favorites' && (
-                  <button type="button" className="btn ghost" onClick={() => onReinstall(selectedSkill)}>
-                    <ArrowDownloadRegular className="icon" />
-                    重新安装
-                  </button>
-                )}
+                <div className="flex justify-between items-center">
+                  <div className="detail-title">{selectedSkill.name}</div>
+                  <div className="detail-actions">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => onToggleFavorite(selectedSkill.id)}
+                    >
+                      {favorites.has(selectedSkill.id) ? (
+                        <StarFilled className="icon" />
+                      ) : (
+                        <StarRegular className="icon" />
+                      )}
+                    </Button>
+                    {onReinstall && mode !== "favorites" && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => onReinstall(selectedSkill)}
+                      >
+                        <ArrowDownloadRegular className="icon" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+                <div className="detail-subtitle">
+                  {selectedSkill.description}
+                </div>
               </div>
             </div>
-            <div className="detail-body">
-              <div className="tree">
+            <div className="detail-body border-t">
+              <div className="tree pt-4">
                 <div className="section-title">目录</div>
                 <SkillTree
                   files={selectedSkill.files}
@@ -166,7 +189,7 @@ const SkillsPage = ({
                   onSelectFile={onSelectFile}
                 />
               </div>
-              <div className="viewer">
+              <div className="viewer pt-4">
                 <SkillViewer
                   file={selectedFile}
                   editing={editing}
