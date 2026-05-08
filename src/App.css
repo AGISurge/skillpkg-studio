@@ -981,6 +981,11 @@ body[data-theme='light'] {
   white-space: nowrap;
 }
 
+.viewer-file-meta {
+  color: var(--text-faint);
+  font-size: 11px;
+}
+
 .viewer-actions {
   display: flex;
   gap: 10px;
@@ -1017,6 +1022,19 @@ body[data-theme='light'] {
   outline: none;
   resize: none;
   overflow: auto;
+}
+
+.image-preview {
+  display: grid;
+  place-items: center;
+  min-height: 100%;
+}
+
+.image-preview img {
+  max-width: 100%;
+  max-height: 70vh;
+  object-fit: contain;
+  border-radius: 8px;
 }
 
 .dialog-backdrop {

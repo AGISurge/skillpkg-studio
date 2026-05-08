@@ -111,7 +111,14 @@ declare global {
       loadSkillFile: (payload: {
         rootPath: string;
         filePath: string;
-      }) => Promise<{ ok: boolean; content?: string; reason?: string }>;
+      }) => Promise<{
+        ok: boolean;
+        content?: string;
+        reason?: string;
+        size?: number;
+        kind?: 'text' | 'image' | 'binary';
+        mimeType?: string;
+      }>;
       /**
        * 获取已安装技能记录。
        */

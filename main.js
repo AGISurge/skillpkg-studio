@@ -9,6 +9,7 @@ const {
   pathExists,
   removeIfExists,
 } = require('./electron/pathUtils');
+const { getFilePolicy } = require('./electron/filePolicy');
 const { getAgentConfig, resolveAgentSkillPath } = require('./electron/agentCatalog');
 const {
   ensureAgentSkillLink,
@@ -400,7 +401,11 @@ const registerIpcHandlers = () => {
     if (!filePath) return false;
     const basePath = rootPath || (installPath && skillId ? path.join(installPath, skillId) : null);
     if (!basePath) return false;
-    const targetPath = path.join(basePath, ...filePath.split('/'));
+    const targetPath = path.normalize(path.join(basePath, ...filePath.split('/')));
+    const relative = path.relative(basePath, targetPath);
+    if (relative.startsWith('..') || path.isAbsolute(relative)) return false;
+    const policy = getFilePolicy(filePath, Buffer.byteLength(content || '', 'utf-8'));
+    if (!policy.canEdit) return false;
     await ensureDir(path.dirname(targetPath));
     await fs.writeFile(targetPath, content || '');
     return true;
@@ -415,8 +420,35 @@ const registerIpcHandlers = () => {
       return { ok: false, reason: 'invalid-path' };
     }
     try {
+      const stat = await fs.stat(targetPath);
+      const policy = getFilePolicy(filePath, stat.size);
+      if (!policy.canLoad) {
+        return {
+          ok: false,
+          reason: policy.reason,
+          size: stat.size,
+          kind: policy.kind,
+          mimeType: policy.mimeType,
+        };
+      }
+      if (policy.kind === 'image') {
+        const buffer = await fs.readFile(targetPath);
+        return {
+          ok: true,
+          content: `data:${policy.mimeType};base64,${buffer.toString('base64')}`,
+          size: stat.size,
+          kind: policy.kind,
+          mimeType: policy.mimeType,
+        };
+      }
       const content = await fs.readFile(targetPath, 'utf-8');
-      return { ok: true, content };
+      return {
+        ok: true,
+        content,
+        size: stat.size,
+        kind: policy.kind,
+        mimeType: policy.mimeType,
+      };
     } catch (error) {
       return { ok: false, reason: 'read-failed' };
     }

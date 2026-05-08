@@ -6,6 +6,7 @@ const {
   loadSkillsFromPath,
   parseSkillMarkdownMetadata,
 } = require('../../electron/skillScanner');
+const { getFilePolicy } = require('../../electron/filePolicy');
 const { unhostAgentSkillLink } = require('../../electron/agentService');
 const { resolveAgentSkillPath } = require('../../electron/agentCatalog');
 
@@ -150,9 +151,55 @@ describe('electron skill services', () => {
     });
 
     expect(skill.files).toEqual([
-      { path: 'SKILL.md', content: '# Large Skill', contentLoaded: true },
-      { path: 'assets/large.txt', content: '', contentLoaded: false },
+      expect.objectContaining({
+        path: 'SKILL.md',
+        content: '# Large Skill',
+        contentLoaded: true,
+        kind: 'text',
+      }),
+      expect.objectContaining({
+        path: 'assets/large.txt',
+        content: '',
+        contentLoaded: false,
+        kind: 'text',
+      }),
     ]);
+  });
+
+  test('classifies previewable images, editable text, and blocked binary files', async () => {
+    const policyRoot = path.join(tmpDir, 'policy');
+    const skillRoot = path.join(policyRoot, 'mixed');
+    await fs.mkdir(skillRoot, { recursive: true });
+    await fs.writeFile(path.join(skillRoot, 'SKILL.md'), '# Mixed');
+    await fs.writeFile(path.join(skillRoot, 'notes.txt'), 'editable');
+    await fs.writeFile(path.join(skillRoot, 'logo.png'), Buffer.from([0x89, 0x50, 0x4e, 0x47]));
+    await fs.writeFile(path.join(skillRoot, 'archive.zip'), Buffer.from([0x50, 0x4b, 0x03, 0x04]));
+
+    const [skill] = await loadSkillsFromPath(policyRoot);
+
+    expect(skill.files.find((file) => file.path === 'notes.txt')).toEqual(
+      expect.objectContaining({
+        content: 'editable',
+        contentLoaded: true,
+        kind: 'text',
+      }),
+    );
+    expect(skill.files.find((file) => file.path === 'logo.png')).toEqual(
+      expect.objectContaining({
+        contentLoaded: true,
+        kind: 'image',
+        mimeType: 'image/png',
+      }),
+    );
+    expect(skill.files.find((file) => file.path === 'archive.zip')).toEqual(
+      expect.objectContaining({
+        content: '',
+        contentLoaded: true,
+        kind: 'binary',
+        loadReason: 'unsupported-file-type',
+      }),
+    );
+    expect(getFilePolicy('large.bin', 128).canLoad).toBe(false);
   });
 
   test('unhosts a managed skill by replacing the symlink with a local copy', async () => {

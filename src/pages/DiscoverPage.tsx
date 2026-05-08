@@ -2,7 +2,7 @@ import ReactMarkdown from 'react-markdown';
 import rehypeHighlight from 'rehype-highlight';
 import remarkGfm from 'remark-gfm';
 import { ArrowDownloadRegular } from '@fluentui/react-icons';
-import { getMarkdownContent } from '../utils/skillUtils';
+import { getFilePolicy, getFilePolicyMessage, getMarkdownContent } from '../utils/skillUtils';
 import { useAppContext } from '../AppContext';
 
 const markdownRehypePlugins = [rehypeHighlight];
@@ -35,6 +35,7 @@ const DiscoverPage = () => {
     selectedSkill?.files[0] ||
     null;
   const markdownContent = getMarkdownContent(selectedFile);
+  const filePolicy = getFilePolicy(selectedFile);
 
   return (
     <section className="panel-grid fade-in">
@@ -94,12 +95,20 @@ const DiscoverPage = () => {
             <div className="detail-section">
               <div className="section-title">内容预览</div>
               <div className="preview">
-                <ReactMarkdown
-                  remarkPlugins={markdownRemarkPlugins}
-                  rehypePlugins={markdownRehypePlugins}
-                >
-                  {markdownContent}
-                </ReactMarkdown>
+                {!selectedFile || !filePolicy.canPreview || selectedFile.loadReason ? (
+                  <div className="empty-state">{getFilePolicyMessage(selectedFile)}</div>
+                ) : filePolicy.kind === 'image' && selectedFile.content ? (
+                  <div className="image-preview">
+                    <img src={selectedFile.content} alt={selectedFile.path} />
+                  </div>
+                ) : (
+                  <ReactMarkdown
+                    remarkPlugins={markdownRemarkPlugins}
+                    rehypePlugins={markdownRehypePlugins}
+                  >
+                    {markdownContent}
+                  </ReactMarkdown>
+                )}
               </div>
             </div>
           </>

@@ -7,6 +7,7 @@ const {
   pathExists,
   readJsonIfExists,
 } = require('./pathUtils');
+const { getFilePolicy } = require('./filePolicy');
 
 const SKILL_MARKDOWN_FILENAME = 'SKILL.md';
 
@@ -132,16 +133,32 @@ const collectFiles = async (baseDir, currentDir = baseDir, options = {}) => {
     }
     if (!entry.isFile()) continue;
     const relativePath = path.relative(baseDir, fullPath).split(path.sep).join('/');
+    const stat = await fs.stat(fullPath).catch(() => null);
+    const size = stat?.size || 0;
+    const policy = getFilePolicy(relativePath, size);
     let content = '';
-    const contentLoaded = shouldLoadFileContent(relativePath, contentMode);
+    const contentLoaded = shouldLoadFileContent(relativePath, contentMode) && policy.canLoad;
     if (contentLoaded) {
       try {
-        content = await fs.readFile(fullPath, 'utf-8');
+        if (policy.kind === 'image') {
+          const buffer = await fs.readFile(fullPath);
+          content = `data:${policy.mimeType};base64,${buffer.toString('base64')}`;
+        } else {
+          content = await fs.readFile(fullPath, 'utf-8');
+        }
       } catch (error) {
         content = '';
       }
     }
-    results.push({ path: relativePath, content, contentLoaded });
+    results.push({
+      path: relativePath,
+      content,
+      contentLoaded: contentLoaded || !policy.canLoad,
+      size,
+      kind: policy.kind,
+      mimeType: policy.mimeType,
+      loadReason: policy.canLoad ? null : policy.reason,
+    });
   }
   return results.sort((a, b) => {
     if (a.path === SKILL_MARKDOWN_FILENAME) return -1;

@@ -5,6 +5,10 @@ export type SkillFile = {
   path: string;
   content: string;
   contentLoaded?: boolean;
+  size?: number;
+  kind?: 'text' | 'image' | 'binary';
+  mimeType?: string;
+  loadReason?: string | null;
 };
 
 /**

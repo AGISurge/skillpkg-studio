@@ -15,7 +15,7 @@ import type {
   Skill,
   SkillFile,
 } from './types/models';
-import { validateSkill } from './utils/skillUtils';
+import { getFilePolicy, validateSkill } from './utils/skillUtils';
 import { AGENT_CATALOG, AGENT_TOOL_IDS } from './config/agents';
 import type { AgentId } from './config/agents';
 import { DISCOVER_MOCK_PATH } from './config/discover';
@@ -584,17 +584,21 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       rootPath: skill.rootPath,
       filePath,
     });
-    if (!result.ok) {
-      setNotice('读取文件内容失败。');
-      return;
-    }
     const updateSkill = (target: Skill) => {
       if (target.id !== skill.id || target.rootPath !== skill.rootPath) return target;
       return {
         ...target,
         files: target.files.map((file) =>
           file.path === filePath
-            ? { ...file, content: result.content || '', contentLoaded: true }
+            ? {
+                ...file,
+                content: result.ok ? result.content || '' : '',
+                contentLoaded: true,
+                size: result.size ?? file.size,
+                kind: result.kind ?? file.kind,
+                mimeType: result.mimeType ?? file.mimeType,
+                loadReason: result.ok ? null : result.reason || 'read-failed',
+              }
             : file,
         ),
       };
@@ -608,6 +612,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
     setLocalSkills((prev) => prev.map(updateSkill));
     setDiscoverSkills((prev) => prev.map(updateSkill));
+    if (!result.ok) {
+      setNotice('此文件无法加载预览。');
+    }
   }, []);
 
   const updateDraft = (value: string) => {
@@ -647,17 +654,30 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const key = `${targetSkill.id}::${targetFile.path}`;
     const draft = fileDrafts[key];
     if (draft === undefined) return;
+    const draftFile = {
+      ...targetFile,
+      content: draft,
+      size: new Blob([draft]).size,
+    };
+    if (!getFilePolicy(draftFile).canEdit) {
+      setNotice('此文件类型或大小不支持编辑。');
+      return;
+    }
     if (!installPath || !window?.skillpkg?.saveSkillFile) {
       setNotice('请先设置统一路径。');
       return;
     }
-    await window.skillpkg.saveSkillFile({
+    const saved = await window.skillpkg.saveSkillFile({
       installPath,
       skillId: targetSkill.id,
       filePath: targetFile.path,
       content: draft,
       rootPath: targetSkill.rootPath,
     });
+    if (!saved) {
+      setNotice('保存失败：此文件类型或大小不支持编辑。');
+      return;
+    }
     setLocalSkills((prev) =>
       prev.map((skill) => {
         if (skill.id !== targetSkill.id) return skill;
@@ -665,7 +685,14 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           ...skill,
           files: skill.files.map((file) =>
             file.path === targetFile.path
-              ? { ...file, content: draft, contentLoaded: true }
+              ? {
+                  ...file,
+                  content: draft,
+                  contentLoaded: true,
+                  size: new Blob([draft]).size,
+                  kind: 'text',
+                  loadReason: null,
+                }
               : file,
           ),
         };
@@ -679,7 +706,16 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           return {
             ...skill,
             files: skill.files.map((file) =>
-              file.path === targetFile.path ? { ...file, content: draft, contentLoaded: true } : file,
+              file.path === targetFile.path
+                ? {
+                    ...file,
+                    content: draft,
+                    contentLoaded: true,
+                    size: new Blob([draft]).size,
+                    kind: 'text',
+                    loadReason: null,
+                  }
+                : file,
             ),
           };
         }),
