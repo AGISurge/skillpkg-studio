@@ -146,12 +146,14 @@ body[data-theme='light'] {
   }
 }
 
+
 .font-sans-serif{
   font-family: 'Barlow'
 }
 .font-mono{
   font-family: 'JetBrains Mono'
 }
+
 
 .app-shell {
   display: grid;
@@ -609,7 +611,7 @@ body[data-theme='light'] {
 }
 
 .path-info .value {
-  font-family: "Source Code Pro", monospace;
+  font-family: "Barlow", sans-serif;
   word-break: break-all;
 }
 
@@ -934,6 +936,9 @@ body[data-theme='light'] {
 .preview pre,
 .hljs {
   background: var(--code-bg-strong);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 13px;
+  line-height: 1.8;
   color: var(--code-text);
 }
 
