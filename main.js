@@ -27,7 +27,8 @@ const {
 
 const createWindow = () => {
   const win = new BrowserWindow({
-    width: 800,
+    width: 1280,
+    minWidth: 1280,
     height: 600,
     webPreferences: {
       nodeIntegration: false,

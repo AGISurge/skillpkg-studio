@@ -157,7 +157,7 @@ body[data-theme='light'] {
 
 .app-shell {
   display: grid;
-  grid-template-columns: 240px 1fr;
+  grid-template-columns: 210px 1fr;
   min-height: 100vh;
   height: 100vh;
   background: var(--app-bg);
@@ -184,7 +184,7 @@ body[data-theme='light'] {
 .sidebar.floating {
   position: fixed;
   inset: 0 auto 0 0;
-  width: 240px;
+  width: 210px;
   box-shadow: 18px 0 42px rgba(0, 0, 0, 0.18);
 }
 
@@ -458,7 +458,7 @@ body[data-theme='light'] {
 }
 
 .content {
-  padding: 14px 36px 32px;
+  padding: 15px;
   display: flex;
   flex-direction: column;
   gap: 22px;
@@ -617,8 +617,8 @@ body[data-theme='light'] {
 
 .panel-grid {
   display: grid;
-  grid-template-columns: 360px 1fr;
-  gap: 20px;
+  grid-template-columns: 290px 1fr;
+  gap: 8px;
   min-height: 0;
   flex: 1 1 auto;
 }
@@ -627,7 +627,7 @@ body[data-theme='light'] {
   background: var(--panel-bg);
   border: 1px solid var(--border-subtle);
   border-radius: 20px;
-  padding: 20px;
+  padding: 15px;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -645,18 +645,6 @@ body[data-theme='light'] {
   justify-content: space-between;
   align-items: center;
   gap: 16px;
-}
-
-.panel-title {
-  font-size: 18px;
-  font-weight: 600;
-  font-family: "Space Grotesk", sans-serif;
-}
-
-.panel-subtitle {
-  font-size: 12px;
-  color: var(--text-muted);
-  margin-top: 4px;
 }
 
 .panel-actions {
