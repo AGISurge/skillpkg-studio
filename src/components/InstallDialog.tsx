@@ -16,6 +16,7 @@ type InstallDialogProps = {
   onOpenSkillPath: () => void;
   onClose: () => void;
   onConfirm: () => void;
+  submitting?: boolean;
 };
 
 /**
@@ -33,6 +34,7 @@ const InstallDialog = ({
   onOpenSkillPath,
   onClose,
   onConfirm,
+  submitting = false,
 }: InstallDialogProps) => {
   if (!open || !skill) return null;
   return (
@@ -43,7 +45,7 @@ const InstallDialog = ({
             <div className="dialog-title">确认安装</div>
             <div className="dialog-subtitle">{skill.name} 将安装到以下 Agents</div>
           </div>
-          <button type="button" className="icon-btn" onClick={onClose}>
+          <button type="button" className="icon-btn" onClick={onClose} disabled={submitting}>
             <DismissCircleRegular className="icon" />
           </button>
         </div>
@@ -54,6 +56,7 @@ const InstallDialog = ({
                 type="checkbox"
                 checked={selectedAgents.has(agent.id)}
                 onChange={() => onToggleAgent(agent.id)}
+                disabled={submitting}
               />
               <div>
                 <div className="option-title">{agent.name}</div>
@@ -70,25 +73,25 @@ const InstallDialog = ({
           ) : null}
         </div>
         <div className="dialog-footer">
-          <button type="button" className="btn ghost" onClick={onOpenSkillPath}>
+          <button type="button" className="btn ghost" onClick={onOpenSkillPath} disabled={submitting}>
             查看位置
           </button>
           {conflict ? (
-            <button type="button" className="btn ghost" onClick={onKeep}>
+            <button type="button" className="btn ghost" onClick={onKeep} disabled={submitting}>
               保留现有
             </button>
           ) : null}
-          <button type="button" className="btn ghost" onClick={onClose}>
+          <button type="button" className="btn ghost" onClick={onClose} disabled={submitting}>
             取消
           </button>
           {conflict ? (
-            <button type="button" className="btn primary" onClick={onOverwrite}>
-              <CheckmarkCircleRegular className="icon" />
+            <button type="button" className="btn primary" onClick={onOverwrite} disabled={submitting}>
+              {submitting ? <span className="mini-spinner" aria-hidden="true" /> : <CheckmarkCircleRegular className="icon" />}
               覆盖安装
             </button>
           ) : (
-            <button type="button" className="btn primary" onClick={onConfirm}>
-              <CheckmarkCircleRegular className="icon" />
+            <button type="button" className="btn primary" onClick={onConfirm} disabled={submitting || !selectedAgents.size}>
+              {submitting ? <span className="mini-spinner" aria-hidden="true" /> : <CheckmarkCircleRegular className="icon" />}
               确认安装
             </button>
           )}

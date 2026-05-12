@@ -5,6 +5,7 @@ import { routePaths } from './routes';
 import AppLayout from './components/AppLayout';
 import InstallDialog from './components/InstallDialog';
 import HostConflictDialog from './components/HostConflictDialog';
+import ImportSourceDialog from './components/ImportSourceDialog';
 import DiscoverPage from './pages/DiscoverPage';
 import LocalPage from './pages/LocalPage';
 import FavoritesPage from './pages/FavoritesPage';
@@ -18,11 +19,23 @@ const AppDialogs = () => {
     agents,
     dialogAgents,
     installConflict,
+    installSubmitting,
     hostingConflictSkill,
+    apiKey,
+    importStatus,
+    importDialogOpen,
+    importDialogKind,
+    importDialogValue,
+    importCandidates,
+    selectedImportCandidateId,
     setDialogAgents,
     setInstallConflict,
     setDialogOpen,
     confirmInstall,
+    closeImportDialog,
+    setImportDialogValue,
+    setSelectedImportCandidateId,
+    confirmImportSkill,
     resolveHostingConflict,
     cancelHostingConflict,
     openSkillLocation,
@@ -52,6 +65,20 @@ const AppDialogs = () => {
         onOpenSkillPath={openSkillLocation}
         onClose={() => setDialogOpen(false)}
         onConfirm={() => confirmInstall(false)}
+        submitting={installSubmitting}
+      />
+      <ImportSourceDialog
+        open={importDialogOpen}
+        kind={importDialogKind}
+        status={importStatus}
+        value={importDialogValue}
+        candidates={importCandidates}
+        selectedCandidateId={selectedImportCandidateId}
+        apiKeyRequired={importDialogKind === 'skillpkg' && !apiKey.trim()}
+        onChangeValue={setImportDialogValue}
+        onSelectCandidate={setSelectedImportCandidateId}
+        onConfirm={confirmImportSkill}
+        onClose={closeImportDialog}
       />
       <HostConflictDialog
         skill={hostingConflictSkill}

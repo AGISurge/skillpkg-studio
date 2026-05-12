@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from 'react';
-import { FolderOpenRegular, LinkRegular } from '@fluentui/react-icons';
 import { useAppContext, useToolbar } from '../AppContext';
+import ImportSkillDropdown from '../components/ImportSkillDropdown';
 import SkillsPage from './SkillsPage';
 
 const getDefaultSkillFilePath = (skill: { files: Array<{ path: string }> }) =>
@@ -20,42 +20,25 @@ const LocalPage = () => {
     expandedFolders,
     editing,
     fileDrafts,
-    fileInputRef,
+    importStatus,
     setSelectedLibrarySkillId,
     setSelectedFilePath,
     setEditing,
     toggleFavorite,
     openInstallDialog,
+    openImportSkill,
     handleFileSelect,
     handleToggleFolder,
     handleSaveFile,
     handleCancelEdit,
-    handleImportZip,
-    handleSelectInstallPath,
     updateDraft,
   } = useAppContext();
 
   const toolbar = useMemo(
     () => (
-      <>
-        <button type="button" className="btn ghost" onClick={() => fileInputRef.current?.click()}>
-          <FolderOpenRegular className="icon" />
-          导入 Zip
-        </button>
-        <button type="button" className="btn primary" onClick={handleSelectInstallPath}>
-          <LinkRegular className="icon" />
-          统一路径
-        </button>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".zip"
-          className="hidden"
-          onChange={handleImportZip}
-        />
-      </>
+      <ImportSkillDropdown status={importStatus} onSelect={openImportSkill} />
     ),
-    [fileInputRef, handleImportZip, handleSelectInstallPath],
+    [importStatus, openImportSkill],
   );
   useToolbar(toolbar);
 

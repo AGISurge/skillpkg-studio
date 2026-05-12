@@ -24,6 +24,7 @@ const {
   loadSkillsFromPath,
   parseSkillMarkdownMetadata,
 } = require('./electron/skillScanner');
+const { importSkillSource } = require('./electron/importService');
 
 const createWindow = () => {
   const win = new BrowserWindow({
@@ -44,6 +45,9 @@ const createWindow = () => {
 
 const getDefaultInstallPath = () =>
   path.join(os.homedir(), '.skillpkg', 'skills');
+
+const getImportTempRoot = () =>
+  path.join(app.getPath('temp'), 'skillpkg-studio', 'imports');
 
 let db = null;
 let dbInitError = null;
@@ -320,6 +324,26 @@ const registerIpcHandlers = () => {
     if (result.canceled) return null;
     return result.filePaths?.[0] || null;
   });
+
+  ipcMain.handle('select-import-zip', async () => {
+    const result = await dialog.showOpenDialog({
+      properties: ['openFile'],
+      filters: [{ name: 'Zip archives', extensions: ['zip'] }],
+    });
+    if (result.canceled) return null;
+    return result.filePaths?.[0] || null;
+  });
+
+  ipcMain.handle('scan-import-candidates', async (_event, payload) => {
+    const { scanImportCandidates } = require('./electron/importService');
+    return scanImportCandidates(payload || {});
+  });
+
+  ipcMain.handle('import-skill-source', async (_event, payload) =>
+    importSkillSource({
+      ...(payload || {}),
+      tempRoot: getImportTempRoot(),
+    }));
 
   ipcMain.handle('get-agent-skill-counts', async (_event, payload) => {
     const { agents, installPath } = payload || {};

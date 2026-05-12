@@ -3,6 +3,10 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('skillpkg', {
   getDefaultInstallPath: () => ipcRenderer.invoke('get-default-install-path'),
   selectInstallPath: () => ipcRenderer.invoke('select-install-path'),
+  selectImportZip: () => ipcRenderer.invoke('select-import-zip'),
+  importSkillSource: (payload) => ipcRenderer.invoke('import-skill-source', payload),
+  scanImportCandidates: (payload) =>
+    ipcRenderer.invoke('scan-import-candidates', payload),
   loadSkills: (installPath) => ipcRenderer.invoke('load-skills', installPath),
   installSkill: (payload) => ipcRenderer.invoke('install-skill', payload),
   // 检查指定的 Agent 是否安装

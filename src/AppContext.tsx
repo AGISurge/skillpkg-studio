@@ -8,7 +8,7 @@ import {
   useState,
   useTransition,
 } from 'react';
-import type { ChangeEvent, ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import type {
   Agent,
   AgentDetectionResult,
@@ -22,6 +22,25 @@ import type { AgentId } from './config/agents';
 import { DISCOVER_MOCK_PATH } from './config/discover';
 
 export type ThemeMode = 'system' | 'light' | 'dark';
+export type ImportSkillSourceKind = 'zip' | 'git' | 'skills-sh' | 'skillpkg';
+export type ImportSkillStatus =
+  | 'idle'
+  | 'picking'
+  | 'resolving'
+  | 'downloading'
+  | 'scanning'
+  | 'ready'
+  | 'installing'
+  | 'error';
+
+export type ImportSkillCandidate = {
+  id: string;
+  skillId: string;
+  name: string;
+  description: string;
+  version: string;
+  relativePath: string;
+};
 
 // --- Toolbar context: pages register their own toolbar actions ---
 
@@ -53,6 +72,7 @@ export const useToolbar = (content: ReactNode) => {
 export const useToolbarContent = () => useContext(ToolbarContext);
 
 const THEME_STORAGE_KEY = 'skillpkg.theme';
+const API_KEY_STORAGE_KEY = 'skillpkg.apiKey';
 
 const getDefaultSkillFilePath = (skill: Skill): string =>
   skill.files.find((file) => file.path === 'SKILL.md')?.path ||
@@ -66,6 +86,9 @@ const getInitialTheme = (): ThemeMode => {
   }
   return 'system';
 };
+
+const getInitialApiKey = (): string =>
+  window?.localStorage?.getItem(API_KEY_STORAGE_KEY) || '';
 
 const waitForNextPaint = () =>
   new Promise<void>((resolve) => {
@@ -97,7 +120,15 @@ type AppContextValue = {
   dialogSkill: Skill | null;
   dialogAgents: Set<string>;
   installConflict: boolean;
+  installSubmitting: boolean;
   hostingConflictSkill: Skill | null;
+  importStatus: ImportSkillStatus;
+  importDialogOpen: boolean;
+  importDialogKind: ImportSkillSourceKind | null;
+  importDialogValue: string;
+  importCandidates: ImportSkillCandidate[];
+  selectedImportCandidateId: string;
+  importSessionId: string;
   editing: boolean;
   fileDrafts: Record<string, string>;
   theme: ThemeMode;
@@ -119,7 +150,11 @@ type AppContextValue = {
   openInstallDialog: (skill: Skill) => void;
   confirmInstall: (overwrite?: boolean) => Promise<void>;
   openSkillLocation: () => Promise<void>;
-  handleImportZip: (event: ChangeEvent<HTMLInputElement>) => void;
+  openImportSkill: (kind: ImportSkillSourceKind) => Promise<void> | void;
+  closeImportDialog: () => void;
+  setImportDialogValue: (value: string) => void;
+  setSelectedImportCandidateId: (id: string) => void;
+  confirmImportSkill: () => Promise<void>;
   handleInstallToggle: (skill: Skill) => Promise<void>;
   resolveHostingConflict: (action: 'use-managed' | 'overwrite') => Promise<void>;
   cancelHostingConflict: () => void;
@@ -155,14 +190,22 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     new Set(),
   );
   const [agentsExpanded, setAgentsExpanded] = useState(true);
-  const [apiKey, setApiKey] = useState('');
+  const [apiKey, setApiKeyState] = useState(getInitialApiKey);
   const [notice, setNotice] = useState('');
   const [installPath, setInstallPath] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogSkill, setDialogSkill] = useState<Skill | null>(null);
   const [dialogAgents, setDialogAgents] = useState<Set<string>>(new Set());
   const [installConflict, setInstallConflict] = useState(false);
+  const [installSubmitting, setInstallSubmitting] = useState(false);
   const [hostingConflictSkill, setHostingConflictSkill] = useState<Skill | null>(null);
+  const [importStatus, setImportStatus] = useState<ImportSkillStatus>('idle');
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [importDialogKind, setImportDialogKind] = useState<ImportSkillSourceKind | null>(null);
+  const [importDialogValue, setImportDialogValue] = useState('');
+  const [importCandidates, setImportCandidates] = useState<ImportSkillCandidate[]>([]);
+  const [selectedImportCandidateId, setSelectedImportCandidateId] = useState('');
+  const [importSessionId, setImportSessionId] = useState('');
   const [editing, setEditing] = useState(false);
   const [fileDrafts, setFileDrafts] = useState<Record<string, string>>({});
   const [theme, setTheme] = useState<ThemeMode>(getInitialTheme);
@@ -209,6 +252,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       null
     );
   }, [selectedFilePath, selectedSkill]);
+
+  const setApiKey = useCallback((nextApiKey: string) => {
+    setApiKeyState(nextApiKey);
+    window?.localStorage?.setItem(API_KEY_STORAGE_KEY, nextApiKey);
+  }, []);
 
   const resolveInstalledAgents = useCallback(async (): Promise<Agent[]> => {
     if (!window?.skillpkg?.detectAgents) return [];
@@ -429,6 +477,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   const confirmInstall = async (overwrite = false) => {
     if (!dialogSkill) return;
+    if (installSubmitting) return;
     if (!installPath) {
       setNotice('请先设置统一路径。');
       return;
@@ -442,28 +491,36 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
     const selectedAgents = agents.filter((agent) => dialogAgents.has(agent.id));
-    const result = await window.skillpkg.installSkill({
-      installPath,
-      skill: dialogSkill,
-      agents: selectedAgents,
-      overwrite,
-    });
-    if (!result.ok && result.reason === 'exists') {
-      setInstallConflict(true);
-      return;
+    setInstallSubmitting(true);
+    setImportStatus('installing');
+    try {
+      const result = await window.skillpkg.installSkill({
+        installPath,
+        skill: dialogSkill,
+        agents: selectedAgents,
+        overwrite,
+      });
+      if (!result.ok && result.reason === 'exists') {
+        setInstallConflict(true);
+        return;
+      }
+      if (!result.ok && result.reason === 'agent-skill-conflict') {
+        setNotice('目标 Agent 已存在同名自有 Skill，未覆盖。');
+        return;
+      }
+      if (!result.ok) {
+        setNotice('安装失败，请检查 Agent 技能目录权限。');
+        return;
+      }
+      await loadLocalSkills(installPath);
+      await syncInstalledByAgent(selectedAgents, installPath);
+      setNotice(`已为 ${dialogAgents.size} 个 Agent 安装 ${dialogSkill.name}。`);
+      setDialogOpen(false);
+      setImportStatus('idle');
+    } finally {
+      setInstallSubmitting(false);
+      setImportStatus((current) => (current === 'installing' ? 'idle' : current));
     }
-    if (!result.ok && result.reason === 'agent-skill-conflict') {
-      setNotice('目标 Agent 已存在同名自有 Skill，未覆盖。');
-      return;
-    }
-    if (!result.ok) {
-      setNotice('安装失败，请检查 Agent 技能目录权限。');
-      return;
-    }
-    await loadLocalSkills(installPath);
-    await syncInstalledByAgent(selectedAgents, installPath);
-    setNotice(`已为 ${dialogAgents.size} 个 Agent 安装 ${dialogSkill.name}。`);
-    setDialogOpen(false);
   };
 
   const openSkillLocation = async () => {
@@ -484,29 +541,168 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const handleImportZip = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    const id = file.name
-      .replace(/\.zip$/i, '')
-      .toLowerCase()
-      .replace(/\s+/g, '-');
-    const importedSkill: Skill = {
-      id,
-      name: file.name.replace(/\.zip$/i, ''),
-      version: '0.1.0',
-      description: '导入的 SkillPkg，等待完善描述。',
-      author: '',
-      tags: ['imported'],
-      files: [
-        {
-          path: 'SKILL.md',
-          content: `---\nname: ${file.name.replace(/\.zip$/i, '')}\ndescription: 这是从 zip 导入的 skill。\nversion: 0.1.0\n---\n\n# ${file.name.replace(/\.zip$/i, '')}\n\n这是从 zip 导入的 skill。`,
-        },
-      ],
+  const mapImportReason = (reason?: string) => {
+    const messages: Record<string, string> = {
+      'api-key-required': '请先在设置页配置 SkillPKG API Key。',
+      'api-not-configured': 'skillpkg.com API 尚未接入，接口提供后即可启用。',
+      'candidate-missing': '未找到选择的 Skill 候选。',
+      'exists': '统一路径中已存在同名无效目录，请先处理后再导入。',
+      'extract-failed': 'Zip 解压失败，请确认文件完整。',
+      'git-clone-failed': 'Git 仓库拉取失败，请检查地址或网络。',
+      'install-path-missing': '请先设置统一路径。',
+      'invalid-git-url': '请输入有效的 Git 仓库地址。',
+      'invalid-path': '导入路径无效。',
+      'invalid-skill': '候选目录不是有效 Skill。',
+      'invalid-skills-sh-url': '请输入有效的 skills.sh URL。',
+      'no-skill-found': '未找到有效 SKILL.md。',
+      'session-expired': '导入候选已过期，请重新导入。',
+      'skills-sh-fetch-failed': '无法读取 skills.sh 页面，请稍后重试。',
+      'skills-sh-installation-missing': '未能从 skills.sh 页面解析安装信息。',
+      'source-missing': '未找到导入来源。',
+      'unsupported-source': '暂不支持该导入方式。',
     };
-    openInstallDialog(importedSkill);
-    event.target.value = '';
+    return messages[reason || ''] || '导入失败，请检查来源。';
+  };
+
+  const resetImportSelection = () => {
+    setImportCandidates([]);
+    setSelectedImportCandidateId('');
+    setImportSessionId('');
+  };
+
+  const completeImportedSkill = async (skill: Skill | null | undefined, reused?: boolean) => {
+    if (!skill) {
+      setNotice('导入失败：未返回有效 Skill。');
+      setImportStatus('error');
+      return;
+    }
+    await loadLocalSkills(installPath);
+    setSelectedLibrarySkillId(skill.id);
+    setSelectedFilePath(getDefaultSkillFilePath(skill));
+    setImportDialogOpen(false);
+    resetImportSelection();
+    setImportStatus('ready');
+    setNotice(reused ? `已使用统一库中现有 ${skill.name}。` : `已导入 ${skill.name}，请确认安装到 Agents。`);
+    openInstallDialog(skill);
+  };
+
+  const runImportSkillSource = async (payload: {
+    kind: 'zip' | 'git' | 'skills-sh' | 'skillpkg' | 'session';
+    installPath?: string;
+    zipPath?: string;
+    url?: string;
+    apiKey?: string;
+    sessionId?: string;
+    candidateId?: string;
+  }) => {
+    if (!window?.skillpkg?.importSkillSource) {
+      setNotice('当前环境不支持导入 Skill。');
+      setImportStatus('error');
+      return;
+    }
+    setImportStatus(
+      payload.kind === 'zip'
+        ? 'scanning'
+        : payload.kind === 'session'
+          ? 'resolving'
+          : 'downloading',
+    );
+    await waitForNextPaint();
+    const result = await window.skillpkg.importSkillSource(payload);
+    if (result.ok) {
+      await completeImportedSkill(result.skill, result.reused);
+      return;
+    }
+    if (result.reason === 'multiple-candidates' && result.candidates?.length && result.sessionId) {
+      setImportCandidates(result.candidates);
+      setSelectedImportCandidateId(result.candidates[0].id);
+      setImportSessionId(result.sessionId);
+      setImportDialogValue('');
+      setImportDialogOpen(true);
+      setImportStatus('ready');
+      return;
+    }
+    setNotice(mapImportReason(result.reason));
+    setImportStatus('error');
+  };
+
+  const closeImportDialog = () => {
+    if (importStatus === 'downloading' || importStatus === 'scanning' || importStatus === 'resolving') {
+      return;
+    }
+    setImportDialogOpen(false);
+    setImportDialogValue('');
+    resetImportSelection();
+  };
+
+  const openImportSkill = async (kind: ImportSkillSourceKind) => {
+    if (importStatus === 'downloading' || importStatus === 'scanning' || importStatus === 'resolving') {
+      return;
+    }
+    if (!installPath && kind !== 'skillpkg') {
+      setNotice('请先设置统一路径。');
+      return;
+    }
+
+    setImportDialogKind(kind);
+    setImportDialogValue('');
+    resetImportSelection();
+
+    if (kind === 'zip') {
+      if (!window?.skillpkg?.selectImportZip) {
+        setNotice('当前环境不支持选择 Zip 文件。');
+        return;
+      }
+      setImportStatus('picking');
+      const zipPath = await window.skillpkg.selectImportZip();
+      if (!zipPath) {
+        setImportStatus('idle');
+        return;
+      }
+      await runImportSkillSource({ kind: 'zip', installPath, zipPath });
+      return;
+    }
+
+    if (kind === 'skillpkg' && !apiKey.trim()) {
+      setImportDialogOpen(true);
+      setImportStatus('idle');
+      return;
+    }
+
+    setImportDialogOpen(true);
+    setImportStatus('idle');
+  };
+
+  const confirmImportSkill = async () => {
+    if (importCandidates.length) {
+      if (!selectedImportCandidateId) {
+        setNotice('请选择一个 Skill。');
+        return;
+      }
+      await runImportSkillSource({
+        kind: 'session',
+        installPath,
+        candidateId: selectedImportCandidateId,
+        sessionId: importSessionId,
+      });
+      return;
+    }
+    const value = importDialogValue.trim();
+    if (!value) {
+      setNotice('请输入导入地址。');
+      return;
+    }
+    if (importDialogKind === 'git') {
+      await runImportSkillSource({ kind: 'git', installPath, url: value });
+      return;
+    }
+    if (importDialogKind === 'skills-sh') {
+      await runImportSkillSource({ kind: 'skills-sh', installPath, url: value });
+      return;
+    }
+    if (importDialogKind === 'skillpkg') {
+      await runImportSkillSource({ kind: 'skillpkg', installPath, url: value, apiKey });
+    }
   };
 
   const hostAgentSkill = async (
@@ -819,7 +1015,15 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     dialogSkill,
     dialogAgents,
     installConflict,
+    installSubmitting,
     hostingConflictSkill,
+    importStatus,
+    importDialogOpen,
+    importDialogKind,
+    importDialogValue,
+    importCandidates,
+    selectedImportCandidateId,
+    importSessionId,
     editing,
     fileDrafts,
     theme,
@@ -841,7 +1045,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     openInstallDialog,
     confirmInstall,
     openSkillLocation,
-    handleImportZip,
+    openImportSkill,
+    closeImportDialog,
+    setImportDialogValue,
+    setSelectedImportCandidateId,
+    confirmImportSkill,
     handleInstallToggle,
     resolveHostingConflict,
     cancelHostingConflict,

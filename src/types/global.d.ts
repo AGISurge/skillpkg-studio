@@ -15,6 +15,54 @@ declare global {
        */
       selectInstallPath: () => Promise<string | null>;
       /**
+       * 选择用于导入的 zip 文件。
+       */
+      selectImportZip: () => Promise<string | null>;
+      /**
+       * 从外部来源导入 Skill 到统一库。
+       */
+      importSkillSource: (payload: {
+        kind: 'zip' | 'git' | 'skills-sh' | 'skillpkg' | 'session';
+        installPath?: string;
+        zipPath?: string;
+        url?: string;
+        apiKey?: string;
+        sessionId?: string;
+        candidateId?: string;
+      }) => Promise<{
+        ok: boolean;
+        reason?: string;
+        sessionId?: string;
+        reused?: boolean;
+        candidates?: Array<{
+          id: string;
+          skillId: string;
+          name: string;
+          description: string;
+          version: string;
+          relativePath: string;
+        }>;
+        skill?: Skill | null;
+      }>;
+      /**
+       * 扫描导入目录中的候选 Skill。
+       */
+      scanImportCandidates: (payload: {
+        rootPath: string;
+        preferredId?: string;
+      }) => Promise<{
+        ok: boolean;
+        reason?: string;
+        candidates: Array<{
+          id: string;
+          skillId: string;
+          name: string;
+          description: string;
+          version: string;
+          relativePath: string;
+        }>;
+      }>;
+      /**
        * 从指定路径加载技能列表。
        */
       loadSkills: (installPath: string) => Promise<Skill[]>;
