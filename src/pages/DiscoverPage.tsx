@@ -81,7 +81,7 @@ const DiscoverPage = () => {
                 <div className="detail-title">{selectedSkill.name}</div>
                 <div className="detail-subtitle">{selectedSkill.description}</div>
               </div>
-              <button type="button" className="btn primary" onClick={() => openInstallDialog(selectedSkill)}>
+              <button type="button" className="btn primary" onClick={() => openInstallDialog(selectedSkill, 'discover')}>
                 <ArrowDownloadRegular className="icon" />
                 安装到本机
               </button>

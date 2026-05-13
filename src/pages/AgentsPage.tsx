@@ -127,7 +127,7 @@ const AgentsPage = () => {
       onSelectSkill={handleSelectSkill}
       onToggleFavorite={toggleFavorite}
       onInstallToggle={handleInstallToggle}
-      onReinstall={openInstallDialog}
+      onReinstall={(skill) => openInstallDialog(skill, 'agents')}
       onSelectFile={handleSelectFile}
       expandedFolders={expandedFolders}
       onToggleFolder={handleToggleFolder}

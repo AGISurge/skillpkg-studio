@@ -42,6 +42,14 @@ export type ImportSkillCandidate = {
   relativePath: string;
 };
 
+export type NoticeScope = 'discover' | 'local' | 'favorites' | 'agents' | 'settings' | 'global';
+
+export type PageNotice = {
+  id: number;
+  text: string;
+  scope: NoticeScope;
+};
+
 // --- Toolbar context: pages register their own toolbar actions ---
 
 const ToolbarContext = createContext<ReactNode>(null);
@@ -73,6 +81,7 @@ export const useToolbarContent = () => useContext(ToolbarContext);
 
 const THEME_STORAGE_KEY = 'skillpkg.theme';
 const API_KEY_STORAGE_KEY = 'skillpkg.apiKey';
+const NOTICE_DURATION_MS = 3000;
 
 const getDefaultSkillFilePath = (skill: Skill): string =>
   skill.files.find((file) => file.path === 'SKILL.md')?.path ||
@@ -114,7 +123,7 @@ type AppContextValue = {
   expandedFolders: Set<string>;
   agentsExpanded: boolean;
   apiKey: string;
-  notice: string;
+  notice: PageNotice | null;
   installPath: string;
   dialogOpen: boolean;
   dialogSkill: Skill | null;
@@ -147,7 +156,7 @@ type AppContextValue = {
   setSelectedFilePath: (path: string) => void;
   setEditing: (updater: (current: boolean) => boolean) => void;
   toggleFavorite: (skillId: string) => void;
-  openInstallDialog: (skill: Skill) => void;
+  openInstallDialog: (skill: Skill, noticeScope?: NoticeScope) => void;
   confirmInstall: (overwrite?: boolean) => Promise<void>;
   openSkillLocation: () => Promise<void>;
   openImportSkill: (kind: ImportSkillSourceKind) => Promise<void> | void;
@@ -176,6 +185,7 @@ const AppContext = createContext<AppContextValue | null>(null);
 export const AppProvider = ({ children }: { children: ReactNode }) => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const refreshRequestRef = useRef(0);
+  const noticeIdRef = useRef(0);
   const [, startAgentTransition] = useTransition();
 
   const [agents, setAgents] = useState<Agent[]>([]);
@@ -191,10 +201,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   );
   const [agentsExpanded, setAgentsExpanded] = useState(true);
   const [apiKey, setApiKeyState] = useState(getInitialApiKey);
-  const [notice, setNotice] = useState('');
+  const [notice, setNotice] = useState<PageNotice | null>(null);
   const [installPath, setInstallPath] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogSkill, setDialogSkill] = useState<Skill | null>(null);
+  const [dialogNoticeScope, setDialogNoticeScope] = useState<NoticeScope>('local');
   const [dialogAgents, setDialogAgents] = useState<Set<string>>(new Set());
   const [installConflict, setInstallConflict] = useState(false);
   const [installSubmitting, setInstallSubmitting] = useState(false);
@@ -257,6 +268,29 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setApiKeyState(nextApiKey);
     window?.localStorage?.setItem(API_KEY_STORAGE_KEY, nextApiKey);
   }, []);
+
+  const showNotice = useCallback((text: string, scope: NoticeScope = 'global') => {
+    noticeIdRef.current += 1;
+    setNotice({
+      id: noticeIdRef.current,
+      text,
+      scope,
+    });
+  }, []);
+
+  const getSkillNoticeScope = useCallback((skill?: Skill | null): NoticeScope => {
+    if (skill?.agentId) return 'agents';
+    if (skill && discoverSkills.some((item) => item.id === skill.id)) return 'discover';
+    return 'local';
+  }, [discoverSkills]);
+
+  useEffect(() => {
+    if (!notice) return;
+    const timer = window.setTimeout(() => {
+      setNotice((current) => (current?.id === notice.id ? null : current));
+    }, NOTICE_DURATION_MS);
+    return () => window.clearTimeout(timer);
+  }, [notice]);
 
   const resolveInstalledAgents = useCallback(async (): Promise<Agent[]> => {
     if (!window?.skillpkg?.detectAgents) return [];
@@ -389,16 +423,16 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const loadLocalSkills = useCallback(async (path: string) => {
     if (!path) return;
     if (!window?.skillpkg?.loadSkills) {
-      setNotice('当前环境不支持读取本地路径。');
+      showNotice('当前环境不支持读取本地路径。', 'local');
       return;
     }
     const skills = await window.skillpkg.loadSkills(path);
     setLocalSkills(skills);
-  }, []);
+  }, [showNotice]);
 
   const loadDiscoverSkills = useCallback(async () => {
     if (!window?.skillpkg?.loadSkills) {
-      setNotice('当前环境不支持读取发现页数据。');
+      showNotice('当前环境不支持读取发现页数据。', 'discover');
       return;
     }
     const skills = await window.skillpkg.loadSkills(DISCOVER_MOCK_PATH);
@@ -410,7 +444,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       setSelectedDiscoverSkillId(skills[0].id);
       setSelectedFilePath(getDefaultSkillFilePath(skills[0]));
     }
-  }, [selectedDiscoverSkillId]);
+  }, [selectedDiscoverSkillId, showNotice]);
 
   useEffect(() => {
     let active = true;
@@ -464,13 +498,14 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     });
   };
 
-  const openInstallDialog = (skill: Skill) => {
+  const openInstallDialog = (skill: Skill, noticeScope: NoticeScope = getSkillNoticeScope(skill)) => {
     if (!validateSkill(skill)) {
-      setNotice('Skill 校验失败：缺少必要字段或文件。');
+      showNotice('Skill 校验失败：缺少必要字段或文件。', noticeScope);
       return;
     }
     setDialogAgents(new Set(agents.map((agent) => agent.id)));
     setDialogSkill(skill);
+    setDialogNoticeScope(noticeScope);
     setInstallConflict(false);
     setDialogOpen(true);
   };
@@ -478,16 +513,17 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const confirmInstall = async (overwrite = false) => {
     if (!dialogSkill) return;
     if (installSubmitting) return;
+    const noticeScope = dialogNoticeScope;
     if (!installPath) {
-      setNotice('请先设置统一路径。');
+      showNotice('请先设置统一路径。', noticeScope);
       return;
     }
     if (!window?.skillpkg?.installSkill) {
-      setNotice('当前环境不支持安装 Skill。');
+      showNotice('当前环境不支持安装 Skill。', noticeScope);
       return;
     }
     if (!dialogAgents.size) {
-      setNotice('请至少选择一个 Agent。');
+      showNotice('请至少选择一个 Agent。', noticeScope);
       return;
     }
     const selectedAgents = agents.filter((agent) => dialogAgents.has(agent.id));
@@ -505,16 +541,16 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         return;
       }
       if (!result.ok && result.reason === 'agent-skill-conflict') {
-        setNotice('目标 Agent 已存在同名自有 Skill，未覆盖。');
+        showNotice('目标 Agent 已存在同名自有 Skill，未覆盖。', noticeScope);
         return;
       }
       if (!result.ok) {
-        setNotice('安装失败，请检查 Agent 技能目录权限。');
+        showNotice('安装失败，请检查 Agent 技能目录权限。', noticeScope);
         return;
       }
       await loadLocalSkills(installPath);
       await syncInstalledByAgent(selectedAgents, installPath);
-      setNotice(`已为 ${dialogAgents.size} 个 Agent 安装 ${dialogSkill.name}。`);
+      showNotice(`已为 ${dialogAgents.size} 个 Agent 安装 ${dialogSkill.name}。`, noticeScope);
       setDialogOpen(false);
       setImportStatus('idle');
     } finally {
@@ -524,12 +560,13 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const openSkillLocation = async () => {
+    const noticeScope = dialogNoticeScope;
     if (!dialogSkill || !installPath) {
-      setNotice('请先设置统一路径。');
+      showNotice('请先设置统一路径。', noticeScope);
       return;
     }
     if (!window?.skillpkg?.openSkillPath) {
-      setNotice('当前环境不支持打开路径。');
+      showNotice('当前环境不支持打开路径。', noticeScope);
       return;
     }
     const ok = await window.skillpkg.openSkillPath({
@@ -537,7 +574,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       skillId: dialogSkill.id,
     });
     if (!ok) {
-      setNotice('未找到该 Skill 的本地路径。');
+      showNotice('未找到该 Skill 的本地路径。', noticeScope);
     }
   };
 
@@ -572,7 +609,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   const completeImportedSkill = async (skill: Skill | null | undefined, reused?: boolean) => {
     if (!skill) {
-      setNotice('导入失败：未返回有效 Skill。');
+      showNotice('导入失败：未返回有效 Skill。', 'local');
       setImportStatus('error');
       return;
     }
@@ -582,8 +619,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setImportDialogOpen(false);
     resetImportSelection();
     setImportStatus('ready');
-    setNotice(reused ? `已使用统一库中现有 ${skill.name}。` : `已导入 ${skill.name}，请确认安装到 Agents。`);
-    openInstallDialog(skill);
+    showNotice(reused ? `已使用统一库中现有 ${skill.name}。` : `已导入 ${skill.name}，请确认安装到 Agents。`, 'local');
+    openInstallDialog(skill, 'local');
   };
 
   const runImportSkillSource = async (payload: {
@@ -596,7 +633,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     candidateId?: string;
   }) => {
     if (!window?.skillpkg?.importSkillSource) {
-      setNotice('当前环境不支持导入 Skill。');
+      showNotice('当前环境不支持导入 Skill。', 'local');
       setImportStatus('error');
       return;
     }
@@ -622,7 +659,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       setImportStatus('ready');
       return;
     }
-    setNotice(mapImportReason(result.reason));
+    showNotice(mapImportReason(result.reason), 'local');
     setImportStatus('error');
   };
 
@@ -640,7 +677,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
     if (!installPath && kind !== 'skillpkg') {
-      setNotice('请先设置统一路径。');
+      showNotice('请先设置统一路径。', 'local');
       return;
     }
 
@@ -650,7 +687,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
     if (kind === 'zip') {
       if (!window?.skillpkg?.selectImportZip) {
-        setNotice('当前环境不支持选择 Zip 文件。');
+        showNotice('当前环境不支持选择 Zip 文件。', 'local');
         return;
       }
       setImportStatus('picking');
@@ -676,7 +713,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const confirmImportSkill = async () => {
     if (importCandidates.length) {
       if (!selectedImportCandidateId) {
-        setNotice('请选择一个 Skill。');
+        showNotice('请选择一个 Skill。', 'local');
         return;
       }
       await runImportSkillSource({
@@ -689,7 +726,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
     const value = importDialogValue.trim();
     if (!value) {
-      setNotice('请输入导入地址。');
+      showNotice('请输入导入地址。', 'local');
       return;
     }
     if (importDialogKind === 'git') {
@@ -711,17 +748,17 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   ) => {
     if (skill.managed) return;
     if (!installPath) {
-      setNotice('请先设置统一路径。');
+      showNotice('请先设置统一路径。', 'agents');
       return;
     }
     if (!window?.skillpkg?.migrateSkills) {
-      setNotice('当前环境不支持托管 Agent Skill。');
+      showNotice('当前环境不支持托管 Agent Skill。', 'agents');
       return;
     }
     const targetAgentId = skill.agentId || selectedAgentId;
     const targetAgent = agents.find((agent) => agent.id === targetAgentId);
     if (!targetAgent) {
-      setNotice('未找到当前 Agent 配置。');
+      showNotice('未找到当前 Agent 配置。', 'agents');
       return;
     }
     setPendingSkillIds((prev) => new Set(prev).add(skill.id));
@@ -745,13 +782,13 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         return;
       }
       if (!result?.ok) {
-        setNotice('托管失败，请检查 Agent 技能目录和统一路径权限。');
+        showNotice('托管失败，请检查 Agent 技能目录和统一路径权限。', 'agents');
         return;
       }
       setHostingConflictSkill(null);
       await loadLocalSkills(installPath);
       await syncInstalledByAgent(agents, installPath);
-      setNotice(options.useExisting ? '已改用当前托管 Skill。' : '已托管当前 Skill。');
+      showNotice(options.useExisting ? '已改用当前托管 Skill。' : '已托管当前 Skill。', 'agents');
     } finally {
       setPendingSkillIds((prev) => {
         const next = new Set(prev);
@@ -771,11 +808,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   const unhostAgentSkill = async (skill: Skill) => {
     if (!installPath) {
-      setNotice('请先设置统一路径。');
+      showNotice('请先设置统一路径。', 'agents');
       return;
     }
     if (!window?.skillpkg?.unhostAgentSkill) {
-      setNotice('当前环境不支持取消托管。');
+      showNotice('当前环境不支持取消托管。', 'agents');
       return;
     }
     const targetAgentId = skill.agentId || selectedAgentId;
@@ -787,11 +824,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         installPath,
       });
       if (!result.ok) {
-        setNotice('取消托管失败：该 Skill 不是有效的托管链接。');
+        showNotice('取消托管失败：该 Skill 不是有效的托管链接。', 'agents');
         return;
       }
       await syncInstalledByAgent(agents, installPath);
-      setNotice('已取消托管，并复制到当前 Agent 的 Skill 目录。');
+      showNotice('已取消托管，并复制到当前 Agent 的 Skill 目录。', 'agents');
     } finally {
       setPendingSkillIds((prev) => {
         const next = new Set(prev);
@@ -855,9 +892,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setLocalSkills((prev) => prev.map(updateSkill));
     setDiscoverSkills((prev) => prev.map(updateSkill));
     if (!result.ok) {
-      setNotice('此文件无法加载预览。');
+      showNotice('此文件无法加载预览。', getSkillNoticeScope(skill));
     }
-  }, []);
+  }, [getSkillNoticeScope, showNotice]);
 
   const updateDraft = (value: string) => {
     if (!selectedLibrarySkillId || !selectedFilePath) return;
@@ -901,12 +938,13 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       content: draft,
       size: new Blob([draft]).size,
     };
+    const noticeScope = getSkillNoticeScope(targetSkill);
     if (!getFilePolicy(draftFile).canEdit) {
-      setNotice('此文件类型或大小不支持编辑。');
+      showNotice('此文件类型或大小不支持编辑。', noticeScope);
       return;
     }
     if (!installPath || !window?.skillpkg?.saveSkillFile) {
-      setNotice('请先设置统一路径。');
+      showNotice('请先设置统一路径。', noticeScope);
       return;
     }
     const saved = await window.skillpkg.saveSkillFile({
@@ -917,7 +955,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       rootPath: targetSkill.rootPath,
     });
     if (!saved) {
-      setNotice('保存失败：此文件类型或大小不支持编辑。');
+      showNotice('保存失败：此文件类型或大小不支持编辑。', noticeScope);
       return;
     }
     setLocalSkills((prev) =>
@@ -968,23 +1006,23 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       delete next[key];
       return next;
     });
-    setNotice('已保存修改。');
+    showNotice('已保存修改。', noticeScope);
     setEditing(false);
   };
 
   const handleSelectInstallPath = async () => {
     try {
       if (!window?.skillpkg?.selectInstallPath) {
-        setNotice('当前环境不支持选择本地路径。');
+        showNotice('当前环境不支持选择本地路径。', 'settings');
         return;
       }
       const selectedPath = await window.skillpkg.selectInstallPath();
       if (selectedPath) {
         setInstallPath(selectedPath);
-        setNotice('已更新统一路径。');
+        showNotice('已更新统一路径。', 'settings');
       }
     } catch (error) {
-      setNotice('选择路径失败，请重试。');
+      showNotice('选择路径失败，请重试。', 'settings');
     }
   };
 

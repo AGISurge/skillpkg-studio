@@ -47,6 +47,10 @@ const AppLayout = () => {
 
   const activeSection = getActiveSection(location.pathname);
   const currentRoute = menuRoutes.find((item) => item.id === activeSection);
+  const visibleNotice =
+    notice && (notice.scope === "global" || notice.scope === activeSection)
+      ? notice
+      : null;
 
   const handleSelectAgent = useCallback((agentId: string) => {
     setSelectedAgentId(agentId);
@@ -135,7 +139,11 @@ const AppLayout = () => {
           ) : null}
         </header>
 
-        {notice ? <div className="notice">{notice}</div> : null}
+        {visibleNotice ? (
+          <div className="notice page-notice" key={visibleNotice.id}>
+            {visibleNotice.text}
+          </div>
+        ) : null}
         <Outlet />
       </main>
     </div>

@@ -660,6 +660,10 @@ body[data-theme='light'] {
   font-size: 13px;
 }
 
+.page-notice {
+  animation: notice-lifecycle 3s ease forwards;
+}
+
 .path-info {
   display: flex;
   align-items: center;
@@ -1426,6 +1430,22 @@ body[data-theme='light'] {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes notice-lifecycle {
+  0% {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  8%,
+  82% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-4px);
   }
 }
 

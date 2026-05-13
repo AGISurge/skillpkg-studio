@@ -72,7 +72,7 @@ const LocalPage = () => {
         setSelectedFilePath(getDefaultSkillFilePath(skill));
       }}
       onToggleFavorite={toggleFavorite}
-      onReinstall={openInstallDialog}
+      onReinstall={(skill) => openInstallDialog(skill, 'local')}
       onSelectFile={handleFileSelect}
       expandedFolders={expandedFolders}
       onToggleFolder={handleToggleFolder}
