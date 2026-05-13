@@ -192,6 +192,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [discoverSkills, setDiscoverSkills] = useState<Skill[]>([]);
   const [localSkills, setLocalSkills] = useState<Skill[]>([]);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
+  const [favoritesHydrated, setFavoritesHydrated] = useState(false);
   const [selectedAgentId, setSelectedAgentId] = useState('claude');
   const [selectedDiscoverSkillId, setSelectedDiscoverSkillId] = useState('');
   const [selectedLibrarySkillId, setSelectedLibrarySkillId] = useState('');
@@ -468,6 +469,44 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     loadDiscoverSkills();
   }, [loadDiscoverSkills]);
+
+  useEffect(() => {
+    let active = true;
+    const loadFavorites = async () => {
+      try {
+        if (!window?.skillpkg?.loadFavoriteSkillIds) return;
+        const skillIds = await window.skillpkg.loadFavoriteSkillIds();
+        if (active) {
+          setFavorites(new Set(skillIds));
+        }
+      } catch (error) {
+        if (active) {
+          showNotice('读取收藏失败。', 'favorites');
+        }
+      } finally {
+        if (active) {
+          setFavoritesHydrated(true);
+        }
+      }
+    };
+    loadFavorites();
+    return () => {
+      active = false;
+    };
+  }, [showNotice]);
+
+  useEffect(() => {
+    if (!favoritesHydrated) return;
+    if (!window?.skillpkg?.replaceFavoriteSkillIds) return;
+    const skillIds = [...favorites];
+    void window.skillpkg.replaceFavoriteSkillIds(skillIds).then((result) => {
+      if (!result.ok) {
+        showNotice('收藏保存失败，重启后可能丢失。', 'favorites');
+      }
+    }).catch(() => {
+      showNotice('收藏保存失败，重启后可能丢失。', 'favorites');
+    });
+  }, [favorites, favoritesHydrated, showNotice]);
 
   useEffect(() => {
     if (!installPath) return;

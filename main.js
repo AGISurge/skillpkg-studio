@@ -88,6 +88,12 @@ const initDatabase = async () => {
         UNIQUE(skillId, agentId)
       );
     `);
+    db.run(`
+      CREATE TABLE IF NOT EXISTS skill_favorite (
+        skillId TEXT PRIMARY KEY,
+        createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
     await saveDatabase();
   } catch (error) {
     dbInitError = error;
@@ -151,6 +157,48 @@ const deleteSkillInstallRecord = async ({ skillId, agentId }) => {
     agentId,
   ]);
   await saveDatabase();
+};
+
+const listFavoriteSkillIds = () => {
+  if (!db || dbInitError) return [];
+  const stmt = db.prepare(
+    'SELECT skillId FROM skill_favorite ORDER BY createdAt DESC, skillId ASC;',
+  );
+  const rows = [];
+  while (stmt.step()) {
+    const row = stmt.getAsObject();
+    if (typeof row.skillId === 'string') rows.push(row.skillId);
+  }
+  stmt.free();
+  return rows;
+};
+
+const replaceFavoriteSkillIds = async (skillIds) => {
+  if (!db || dbInitError) return { ok: false, reason: 'db-unavailable' };
+  const normalizedSkillIds = Array.isArray(skillIds)
+    ? [...new Set(skillIds.filter((skillId) => typeof skillId === 'string' && skillId.trim()))]
+    : [];
+
+  try {
+    db.run('BEGIN TRANSACTION;');
+    db.run('DELETE FROM skill_favorite;');
+    const stmt = db.prepare(
+      'INSERT INTO skill_favorite (skillId) VALUES (?);',
+    );
+    try {
+      normalizedSkillIds.forEach((skillId) => stmt.run([skillId]));
+    } finally {
+      stmt.free();
+    }
+    db.run('COMMIT;');
+    await saveDatabase();
+    return { ok: true };
+  } catch (error) {
+    try {
+      db.run('ROLLBACK;');
+    } catch (_rollbackError) {}
+    return { ok: false, reason: 'save-failed' };
+  }
 };
 
 const getSkillMarkdownMetadata = async (skillDir) => {
@@ -418,6 +466,11 @@ const registerIpcHandlers = () => {
 
   ipcMain.handle('load-skill-install-records', async (_event, filters) =>
     listSkillInstallRecords(filters));
+
+  ipcMain.handle('load-favorite-skill-ids', async () => listFavoriteSkillIds());
+
+  ipcMain.handle('replace-favorite-skill-ids', async (_event, skillIds) =>
+    replaceFavoriteSkillIds(skillIds));
 
   ipcMain.handle('get-db-info', async () => getDatabaseInfo());
 

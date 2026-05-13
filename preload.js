@@ -21,6 +21,9 @@ contextBridge.exposeInMainWorld('skillpkg', {
   loadSkillFile: (payload) => ipcRenderer.invoke('load-skill-file', payload),
   loadSkillInstallRecords: (filters) =>
     ipcRenderer.invoke('load-skill-install-records', filters),
+  loadFavoriteSkillIds: () => ipcRenderer.invoke('load-favorite-skill-ids'),
+  replaceFavoriteSkillIds: (skillIds) =>
+    ipcRenderer.invoke('replace-favorite-skill-ids', skillIds),
   getDbInfo: () => ipcRenderer.invoke('get-db-info'),
   getAgentSkillCounts: (payload) =>
     ipcRenderer.invoke('get-agent-skill-counts', payload),

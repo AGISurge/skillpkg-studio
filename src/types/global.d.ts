@@ -183,6 +183,16 @@ declare global {
         }>
       >;
       /**
+       * 读取收藏的技能 ID。
+       */
+      loadFavoriteSkillIds: () => Promise<string[]>;
+      /**
+       * 用当前收藏列表覆盖 SQLite 中的收藏记录。
+       */
+      replaceFavoriteSkillIds: (
+        skillIds: string[],
+      ) => Promise<{ ok: boolean; reason?: string }>;
+      /**
        * 获取 SQLite 数据库状态。
        */
       getDbInfo: () => Promise<{
