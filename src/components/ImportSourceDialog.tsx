@@ -21,17 +21,14 @@ type ImportSourceDialogProps = {
 
 const sourceMeta: Record<Exclude<ImportSkillSourceKind, 'zip'>, {
   title: string;
-  subtitle: string;
   placeholder: string;
 }> = {
   git: {
     title: 'Git 仓库地址',
-    subtitle: '从仓库中扫描包含 SKILL.md 的目录',
     placeholder: 'https://github.com/owner/repo.git',
   },
   skillpkg: {
     title: 'skillpkg.com URL',
-    subtitle: '通过 SkillPkg 服务解析 Skill',
     placeholder: 'https://skillpkg.com/packages/...',
   },
 };
@@ -58,7 +55,6 @@ const ImportSourceDialog = ({
   const meta = kind === 'zip'
     ? {
         title: '选择 Skill',
-        subtitle: '请选择本次要导入的 Skill',
         placeholder: '',
       }
     : sourceMeta[kind];
@@ -70,7 +66,7 @@ const ImportSourceDialog = ({
           <div>
             <div className="dialog-title">{selectingCandidate ? '选择 Skill' : meta.title}</div>
             <div className="dialog-subtitle">
-              {selectingCandidate ? '检测到多个 Skill，本次只能导入一个' : meta.subtitle}
+              {selectingCandidate && '检测到多个 Skill，本次只能导入一个'}
             </div>
           </div>
           <button type="button" className="icon-btn" onClick={onClose} disabled={busy}>
@@ -116,7 +112,7 @@ const ImportSourceDialog = ({
                 value={value}
                 onChange={(event) => onChangeValue(event.target.value)}
                 placeholder={meta.placeholder}
-                className="settings-input"
+                className="settings-input focus:outline-none focus:ring-0 focus-visible:ring-0"
                 disabled={busy}
                 autoFocus
               />

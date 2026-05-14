@@ -430,6 +430,39 @@ body[data-theme='light'] {
   font-family: "JetBrains Mono", monospace;
 }
 
+.settings-api-key-input {
+  min-height: 46px;
+  border: 1px solid rgba(20, 30, 50, 0.14);
+  background: var(--surface-bg-strong);
+}
+
+.settings-api-key-input:focus-within {
+  border-color: rgba(80, 120, 255, 0.22);
+  box-shadow: 0 0 0 3px rgba(80, 120, 255, 0.08);
+}
+
+body:not([data-theme='light']) .settings-api-key-input {
+  border: 1px solid rgba(255, 255, 255, 0.055);
+  background: rgba(255, 255, 255, 0.035);
+}
+
+body:not([data-theme='light']) .settings-api-key-input:focus-within {
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 0 0 3px rgba(80, 120, 255, 0.07);
+}
+
+@media (prefers-color-scheme: light) {
+  body[data-theme='system'] .settings-api-key-input {
+    border: 1px solid rgba(20, 30, 50, 0.14);
+    background: var(--surface-bg-strong);
+  }
+
+  body[data-theme='system'] .settings-api-key-input:focus-within {
+    border-color: rgba(80, 120, 255, 0.22);
+    box-shadow: 0 0 0 3px rgba(80, 120, 255, 0.08);
+  }
+}
+
 .input-icon-btn {
   width: 34px;
   height: 34px;

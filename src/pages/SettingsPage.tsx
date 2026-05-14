@@ -15,6 +15,7 @@ import {
   InputGroupInput,
 } from "../components/ui/input-group";
 import { useAppContext } from "../AppContext";
+import { Button } from "@/components/ui/button";
 
 type ThemeMode = "system" | "light" | "dark";
 
@@ -79,7 +80,7 @@ const SettingsPage = () => {
             <p>用于访问 SkillPKG 服务。</p>
           </div>
         </div>
-        <InputGroup>
+        <InputGroup className="settings-api-key-input">
           <InputGroupAddon>
             <KeyRegular className="icon" />
           </InputGroupAddon>
@@ -92,17 +93,17 @@ const SettingsPage = () => {
             autoComplete="off"
           />
           <InputGroupAddon align="inline-end">
-            <button
+            <Button
               onClick={() => setApiKeyVisible((current) => !current)}
               aria-label={apiKeyVisible ? "隐藏 API Key" : "显示 API Key"}
             >
-              {" "}
+             
               {apiKeyVisible ? (
                 <EyeOffRegular className="icon" />
               ) : (
                 <EyeRegular className="icon" />
               )}
-            </button>
+            </Button>
           </InputGroupAddon>
         </InputGroup>
       </section>
