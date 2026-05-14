@@ -555,7 +555,7 @@ body:not([data-theme='light']) .settings-api-key-input:focus-within {
   border-radius: 12px;
   padding: 10px 16px;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 500;
   display: inline-flex;
   align-items: center;
   gap: 8px;

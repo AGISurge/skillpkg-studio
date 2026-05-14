@@ -1,5 +1,6 @@
 import { CheckmarkCircleRegular, DismissCircleRegular } from '@fluentui/react-icons';
 import type { Agent, Skill } from '../types/models';
+import { Button } from './ui/button';
 
 /**
  * 安装确认弹窗参数。
@@ -73,27 +74,27 @@ const InstallDialog = ({
           ) : null}
         </div>
         <div className="dialog-footer">
-          <button type="button" className="btn ghost" onClick={onOpenSkillPath} disabled={submitting}>
+          <Button type="button" variant="ghost" onClick={onOpenSkillPath} disabled={submitting}>
             查看位置
-          </button>
+          </Button>
           {conflict ? (
-            <button type="button" className="btn ghost" onClick={onKeep} disabled={submitting}>
+            <Button type="button" variant="ghost" onClick={onKeep} disabled={submitting}>
               保留现有
-            </button>
+            </Button>
           ) : null}
-          <button type="button" className="btn ghost" onClick={onClose} disabled={submitting}>
+          <Button type="button"  variant="ghost" onClick={onClose} disabled={submitting}>
             取消
-          </button>
+          </Button>
           {conflict ? (
-            <button type="button" className="btn primary" onClick={onOverwrite} disabled={submitting}>
+            <Button type="button" className="btn primary" onClick={onOverwrite} disabled={submitting}>
               {submitting ? <span className="mini-spinner" aria-hidden="true" /> : <CheckmarkCircleRegular className="icon" />}
               覆盖安装
-            </button>
+            </Button>
           ) : (
-            <button type="button" className="btn primary" onClick={onConfirm} disabled={submitting || !selectedAgents.size}>
+            <Button type="button" className="btn primary" onClick={onConfirm} disabled={submitting || !selectedAgents.size}>
               {submitting ? <span className="mini-spinner" aria-hidden="true" /> : <CheckmarkCircleRegular className="icon" />}
               确认安装
-            </button>
+            </Button>
           )}
         </div>
       </div>

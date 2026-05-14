@@ -284,7 +284,6 @@ const SkillsPage = ({
             </div>
             <div className="detail-body">
               <div className="tree pt-4">
-                <div className="section-title">目录</div>
                 <SkillTree
                   files={selectedSkill.files}
                   selectedFilePath={selectedFilePath}

@@ -4,6 +4,7 @@ import type {
   ImportSkillSourceKind,
   ImportSkillStatus,
 } from '../AppContext';
+import { Button } from './ui/button';
 
 type ImportSourceDialogProps = {
   open: boolean;
@@ -121,11 +122,11 @@ const ImportSourceDialog = ({
         </div>
 
         <div className="dialog-footer">
-          <button type="button" className="btn ghost" onClick={onClose} disabled={busy}>
+          <Button type="button" variant="ghost" onClick={onClose} disabled={busy}>
             取消
-          </button>
+          </Button>
           {!apiKeyRequired ? (
-            <button
+            <Button
               type="button"
               className="btn primary"
               onClick={onConfirm}
@@ -133,7 +134,7 @@ const ImportSourceDialog = ({
             >
               {busy ? <span className="mini-spinner" aria-hidden="true" /> : <CheckmarkCircleRegular className="icon" />}
               {selectingCandidate ? '导入所选 Skill' : '开始导入'}
-            </button>
+            </Button>
           ) : null}
         </div>
       </div>
