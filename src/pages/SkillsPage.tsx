@@ -283,7 +283,7 @@ const SkillsPage = ({
               </div>
             </div>
             <div className="detail-body">
-              <div className="tree pt-4">
+              <div className="tree py-4 px-2">
                 <SkillTree
                   files={selectedSkill.files}
                   selectedFilePath={selectedFilePath}

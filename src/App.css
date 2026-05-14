@@ -89,7 +89,7 @@ body[data-theme='light'] {
   --code-bg: #ffffff;
   --code-bg-strong: #f3f6fb;
   --code-text: #1f2937;
-  --editor-bg: #ffffff;
+  --editor-bg: #f9f9f9;
   --editor-text: #1b2433;
   --editor-selection-bg: rgba(80, 120, 255, 0.2);
   --accent-bg: rgba(80, 120, 255, 0.16);
@@ -133,7 +133,7 @@ body[data-theme='light'] {
     --code-bg: #ffffff;
     --code-bg-strong: #f3f6fb;
     --code-text: #1f2937;
-    --editor-bg: #ffffff;
+    --editor-bg: #f9f9f9;
     --editor-text: #1b2433;
     --editor-selection-bg: rgba(80, 120, 255, 0.2);
     --accent-bg: rgba(80, 120, 255, 0.16);
@@ -738,7 +738,6 @@ body:not([data-theme='light']) .settings-api-key-input:focus-within {
   background: var(--panel-bg);
   border: 1px solid var(--border-subtle);
   border-radius: 20px;
-  padding: 15px;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -993,6 +992,7 @@ body:not([data-theme='light']) .settings-api-key-input:focus-within {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
+  padding:12px;
   gap: 16px;
 }
 
@@ -1002,9 +1002,6 @@ body:not([data-theme='light']) .settings-api-key-input:focus-within {
   font-family: "Space Grotesk", sans-serif;
 }
 
-.detail-body{
-  border-top: 1px solid var(--border-subtle);
-}
 
 .detail-subtitle {
   font-size: 13px;
@@ -1131,7 +1128,7 @@ body:not([data-theme='light']) .settings-api-key-input:focus-within {
 .detail-body {
   display: grid;
   grid-template-columns: 220px 1fr;
-  gap: 16px;
+  border-top: 1px solid var(--border-subtle);
   flex: 1 1 auto;
   min-height: 0;
   min-width: 0;
@@ -1183,7 +1180,8 @@ body:not([data-theme='light']) .settings-api-key-input:focus-within {
   padding-bottom: 4px;
   max-width: 100%;
   flex: 0 0 auto;
-
+  padding-bottom:12px;
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .viewer-header-inner {
@@ -1191,6 +1189,7 @@ body:not([data-theme='light']) .settings-api-key-input:focus-within {
   justify-content: space-between;
   align-items: center;
   gap: 12px;
+  padding:0 12px;
   min-width: max-content;
   width: 100%;
 }
@@ -1219,6 +1218,8 @@ body:not([data-theme='light']) .settings-api-key-input:focus-within {
   color: var(--editor-text);
   display: flex;
   flex-direction: column;
+  margin-top:-12px;
+  padding:12px;
   overflow: auto;
   min-height: 0;
   min-width: 0;

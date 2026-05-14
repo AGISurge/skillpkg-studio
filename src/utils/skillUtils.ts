@@ -205,6 +205,10 @@ export const getLanguage = (filePath: string): string => {
   return FILE_LANGUAGE_MAP[getExtension(filePath)] || 'plaintext';
 };
 
+export const stripMarkdownFrontmatter = (content: string): string => {
+  return content.replace(/^---[ \t]*\r?\n[\s\S]*?\r?\n---[ \t]*(?:\r?\n|$)/, '');
+};
+
 /**
  * 将文件列表构建为目录树结构。
  * @param files - 技能文件列表。
@@ -249,8 +253,9 @@ export const validateSkill = (skill: Skill | null): boolean => {
 export const getMarkdownContent = (file?: SkillFile | null): string => {
   if (!file) return '';
   if (getFilePolicy(file).kind !== 'text') return '';
-  const isMarkdown = getExtension(file.path) === 'md';
-  if (isMarkdown) return file.content;
+  const extension = getExtension(file.path);
+  const isMarkdown = extension === 'md' || extension === 'mdx';
+  if (isMarkdown) return stripMarkdownFrontmatter(file.content);
   const language = getLanguage(file.path);
   return `\`\`\`${language}\n${file.content}\n\`\`\``;
 };
