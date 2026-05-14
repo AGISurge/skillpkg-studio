@@ -1,11 +1,11 @@
 const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron/main');
 const path = require('path');
 const fs = require('fs/promises');
-const os = require('os');
 const isDev = require('electron-is-dev');
 const initSqlJs = require('sql.js');
 const {
   ensureDir,
+  getDefaultSkillLibraryPath,
   pathExists,
   removeIfExists,
 } = require('./electron/pathUtils');
@@ -44,7 +44,7 @@ const createWindow = () => {
 };
 
 const getDefaultInstallPath = () =>
-  path.join(os.homedir(), '.skillpkg', 'skills');
+  getDefaultSkillLibraryPath({ appDataPath: app.getPath('appData') });
 
 const getImportTempRoot = () =>
   path.join(app.getPath('temp'), 'skillpkg-studio', 'imports');

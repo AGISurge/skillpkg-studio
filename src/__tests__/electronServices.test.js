@@ -18,6 +18,7 @@ const {
 const { getFilePolicy } = require('../../electron/filePolicy');
 const { unhostAgentSkillLink } = require('../../electron/agentService');
 const { resolveAgentSkillPath } = require('../../electron/agentCatalog');
+const { getDefaultSkillLibraryPath } = require('../../electron/pathUtils');
 
 describe('electron skill services', () => {
   let tmpDir;
@@ -110,6 +111,32 @@ describe('electron skill services', () => {
       ['managed', 'managed', true],
       ['own', 'agent', false],
     ]);
+  });
+
+  test('marks agent links to the default skill library as managed', async () => {
+    const homeDirSpy = jest.spyOn(os, 'homedir').mockReturnValue(tmpDir);
+    try {
+      const libraryRoot = path.join(tmpDir, '.skillpkg', 'skills');
+      const agentRoot = path.join(tmpDir, 'agent');
+      const managedSkill = path.join(libraryRoot, 'managed');
+      await fs.mkdir(managedSkill, { recursive: true });
+      await fs.mkdir(agentRoot, { recursive: true });
+      await fs.writeFile(path.join(managedSkill, 'SKILL.md'), '# Managed');
+      await fs.symlink(managedSkill, path.join(agentRoot, 'managed'), 'dir');
+
+      const [skill] = await loadSkillsFromPath(agentRoot, {
+        mode: 'agent',
+        agentId: 'claude',
+      });
+
+      expect(skill).toEqual(expect.objectContaining({
+        id: 'managed',
+        source: 'managed',
+        managed: true,
+      }));
+    } finally {
+      homeDirSpy.mockRestore();
+    }
   });
 
   test('marks double symlinks through the managed library as managed', async () => {
@@ -245,6 +272,35 @@ describe('electron skill services', () => {
     expect(resolveAgentSkillPath('claude')).toBe(path.join(os.homedir(), '.claude', 'skills'));
     expect(resolveAgentSkillPath('codex')).toBe(path.join(os.homedir(), '.codex', 'skills'));
     expect(resolveAgentSkillPath('cursor')).toBe(path.join(os.homedir(), '.cursor', 'skills'));
+  });
+});
+
+describe('default skill library paths', () => {
+  test('uses ~/.skillpkg/skills on macOS and Linux', () => {
+    expect(getDefaultSkillLibraryPath({
+      platform: 'darwin',
+      homeDir: '/Users/example',
+    })).toBe(path.join('/Users/example', '.skillpkg', 'skills'));
+    expect(getDefaultSkillLibraryPath({
+      platform: 'linux',
+      homeDir: '/home/example',
+    })).toBe(path.join('/home/example', '.skillpkg', 'skills'));
+  });
+
+  test('uses AppData/skillpkg/skills on Windows', () => {
+    expect(getDefaultSkillLibraryPath({
+      platform: 'win32',
+      homeDir: 'C:\\Users\\Example',
+      appDataPath: 'C:\\Users\\Example\\AppData\\Roaming',
+    })).toBe(path.join('C:\\Users\\Example\\AppData\\Roaming', 'skillpkg', 'skills'));
+  });
+
+  test('falls back to the Windows roaming AppData path when appData is missing', () => {
+    expect(getDefaultSkillLibraryPath({
+      platform: 'win32',
+      homeDir: 'C:\\Users\\Example',
+      env: { APPDATA: '' },
+    })).toBe(path.join('C:\\Users\\Example', 'AppData', 'Roaming', 'skillpkg', 'skills'));
   });
 });
 

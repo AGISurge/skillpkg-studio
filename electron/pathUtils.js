@@ -33,6 +33,26 @@ const removeIfExists = async (targetPath) => {
   await fs.rm(targetPath, { recursive: true, force: true });
 };
 
+const getDefaultSkillLibraryPath = (options = {}) => {
+  const platform = options.platform || os.platform();
+  const homeDir = options.homeDir ?? os.homedir();
+  if (platform === 'win32') {
+    const envAppData = Object.prototype.hasOwnProperty.call(options.env || {}, 'APPDATA')
+      ? options.env.APPDATA
+      : process.env.APPDATA;
+    const appDataPath = options.appDataPath || envAppData;
+    const fallbackAppDataPath = homeDir ? path.join(homeDir, 'AppData', 'Roaming') : null;
+    const basePath = appDataPath || fallbackAppDataPath;
+    return basePath ? path.join(basePath, 'skillpkg', 'skills') : null;
+  }
+  return homeDir ? path.join(homeDir, '.skillpkg', 'skills') : null;
+};
+
+const getLegacySkillLibraryPath = (options = {}) => {
+  const homeDir = options.homeDir ?? os.homedir();
+  return homeDir ? path.join(homeDir, 'skillpkg', 'skills') : null;
+};
+
 const resolveTemplatePath = (template) => {
   if (!template || typeof template !== 'string') return null;
   let resolved = template;
@@ -68,6 +88,8 @@ const isPathInside = (childPath, parentPath) => {
 
 module.exports = {
   ensureDir,
+  getDefaultSkillLibraryPath,
+  getLegacySkillLibraryPath,
   isPathInside,
   normalizeRealPath,
   pathExists,

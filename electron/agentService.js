@@ -2,7 +2,15 @@ const path = require('path');
 const fs = require('fs/promises');
 const os = require('os');
 const { detectAgent, getAgentConfig, resolveAgentSkillPath } = require('./agentCatalog');
-const { ensureDir, isPathInside, normalizeRealPath, pathExists, removeIfExists } = require('./pathUtils');
+const {
+  ensureDir,
+  getDefaultSkillLibraryPath,
+  getLegacySkillLibraryPath,
+  isPathInside,
+  normalizeRealPath,
+  pathExists,
+  removeIfExists,
+} = require('./pathUtils');
 const { loadSkillsFromPath } = require('./skillScanner');
 
 const listInstalledAgents = async (agentIds) => {
@@ -75,9 +83,11 @@ const uninstallAgentSkillLink = async ({ agent, skillId, installPath }) => {
 };
 
 const getDefaultManagedRoots = () => [
-  path.join(os.homedir(), '.skillpkg', 'skills'),
-  path.join(os.homedir(), 'skillpkg', 'skills'),
-];
+  getDefaultSkillLibraryPath(),
+  getDefaultSkillLibraryPath({ platform: 'darwin' }),
+  getDefaultSkillLibraryPath({ platform: 'linux' }),
+  getLegacySkillLibraryPath(),
+].filter(Boolean);
 
 const getManagedRootPaths = async (installPath) => {
   const roots = [
