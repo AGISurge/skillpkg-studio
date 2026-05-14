@@ -13,7 +13,6 @@ const {
 const {
   importSkillSource,
   normalizeGitSource,
-  parseSkillsShInstallation,
   scanImportCandidates,
 } = require('../../electron/importService');
 const { getFilePolicy } = require('../../electron/filePolicy');
@@ -364,14 +363,5 @@ describe('electron import service', () => {
       ok: false,
       reason: 'invalid-git-url',
     }));
-  });
-
-  test('parses skills.sh Installation commands', () => {
-    expect(parseSkillsShInstallation(
-      '<code>npx skills add https://github.com/vercel-labs/skills --skill find-skills</code>',
-    )).toEqual({
-      repo: 'https://github.com/vercel-labs/skills',
-      skill: 'find-skills',
-    });
   });
 });

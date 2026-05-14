@@ -32,14 +32,6 @@ const slugify = (value, fallback = 'imported-skill') => {
   return slug || fallback;
 };
 
-const decodeHtml = (value) =>
-  String(value || '')
-    .replace(/&amp;/g, '&')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>');
-
 const getSafeTargetPath = (rootPath, relativePath) => {
   const targetPath = path.normalize(path.join(rootPath, relativePath || ''));
   if (!isPathInside(targetPath, rootPath)) {
@@ -333,61 +325,6 @@ const importFromGit = async ({ url, installPath, tempRoot, preferredSkillId }) =
   });
 };
 
-const parseSkillsShInstallation = (html) => {
-  const text = decodeHtml(html)
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/\s+/g, ' ');
-  const commandMatch = text.match(/npx\s+skills\s+add\s+([^\s`]+)(?:\s+--skill\s+([^\s`]+))?/i);
-  if (commandMatch) {
-    return {
-      repo: commandMatch[1],
-      skill: commandMatch[2] || null,
-    };
-  }
-  return null;
-};
-
-const resolveSkillsShUrl = async (url) => {
-  let parsed;
-  try {
-    parsed = new URL(url);
-  } catch (error) {
-    return { ok: false, reason: 'invalid-url' };
-  }
-  if (parsed.hostname !== 'skills.sh') {
-    return { ok: false, reason: 'invalid-skills-sh-url' };
-  }
-
-  const response = await fetch(parsed.toString()).catch(() => null);
-  if (!response?.ok) return { ok: false, reason: 'skills-sh-fetch-failed' };
-  const html = await response.text();
-  const installation = parseSkillsShInstallation(html);
-  if (installation) {
-    return { ok: true, ...installation };
-  }
-
-  const segments = parsed.pathname.split('/').filter(Boolean);
-  if (segments.length >= 2) {
-    return {
-      ok: true,
-      repo: `${segments[0]}/${segments[1]}`,
-      skill: segments[2] || null,
-    };
-  }
-  return { ok: false, reason: 'skills-sh-installation-missing' };
-};
-
-const importFromSkillsSh = async ({ url, installPath, tempRoot }) => {
-  const resolved = await resolveSkillsShUrl(url);
-  if (!resolved.ok) return resolved;
-  return importFromGit({
-    url: resolved.repo,
-    installPath,
-    tempRoot,
-    preferredSkillId: resolved.skill,
-  });
-};
-
 const resolveSkillpkgUrl = async ({ apiKey }) => {
   if (!apiKey?.trim()) {
     return { ok: false, reason: 'api-key-required' };
@@ -419,7 +356,6 @@ const importSkillSource = async (payload) => {
 
   if (kind === 'zip') return importFromZip(payload);
   if (kind === 'git') return importFromGit(payload);
-  if (kind === 'skills-sh') return importFromSkillsSh(payload);
   if (kind === 'skillpkg') return resolveSkillpkgUrl(payload);
   if (kind === 'session') return importFromSession(payload);
   return { ok: false, reason: 'unsupported-source' };
@@ -428,7 +364,6 @@ const importSkillSource = async (payload) => {
 module.exports = {
   importSkillSource,
   normalizeGitSource,
-  parseSkillsShInstallation,
   resolveSkillpkgUrl,
   scanImportCandidates,
 };

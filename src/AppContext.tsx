@@ -22,7 +22,7 @@ import type { AgentId } from './config/agents';
 import { DISCOVER_MOCK_PATH } from './config/discover';
 
 export type ThemeMode = 'system' | 'light' | 'dark';
-export type ImportSkillSourceKind = 'zip' | 'git' | 'skills-sh' | 'skillpkg';
+export type ImportSkillSourceKind = 'zip' | 'git' | 'skillpkg';
 export type ImportSkillStatus =
   | 'idle'
   | 'picking'
@@ -629,11 +629,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       'invalid-git-url': '请输入有效的 Git 仓库地址。',
       'invalid-path': '导入路径无效。',
       'invalid-skill': '候选目录不是有效 Skill。',
-      'invalid-skills-sh-url': '请输入有效的 skills.sh URL。',
       'no-skill-found': '未找到有效 SKILL.md。',
       'session-expired': '导入候选已过期，请重新导入。',
-      'skills-sh-fetch-failed': '无法读取 skills.sh 页面，请稍后重试。',
-      'skills-sh-installation-missing': '未能从 skills.sh 页面解析安装信息。',
       'source-missing': '未找到导入来源。',
       'unsupported-source': '暂不支持该导入方式。',
     };
@@ -663,7 +660,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const runImportSkillSource = async (payload: {
-    kind: 'zip' | 'git' | 'skills-sh' | 'skillpkg' | 'session';
+    kind: 'zip' | 'git' | 'skillpkg' | 'session';
     installPath?: string;
     zipPath?: string;
     url?: string;
@@ -770,10 +767,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
     if (importDialogKind === 'git') {
       await runImportSkillSource({ kind: 'git', installPath, url: value });
-      return;
-    }
-    if (importDialogKind === 'skills-sh') {
-      await runImportSkillSource({ kind: 'skills-sh', installPath, url: value });
       return;
     }
     if (importDialogKind === 'skillpkg') {

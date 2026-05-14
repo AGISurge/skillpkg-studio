@@ -6,7 +6,6 @@ import {
   ChevronDownRegular,
   CloudRegular,
   FolderZipRegular,
-  GlobeRegular,
 } from '@fluentui/react-icons';
 import type { ImportSkillSourceKind, ImportSkillStatus } from '../AppContext';
 
@@ -35,12 +34,6 @@ const IMPORT_SOURCE_OPTIONS: ImportSourceOption[] = [
     label: 'skillpkg.com URL',
     description: '需要 API Key',
     icon: CloudRegular,
-  },
-  {
-    id: 'skills-sh',
-    label: 'skills.sh URL',
-    description: '解析 Installation',
-    icon: GlobeRegular,
   },
 ];
 

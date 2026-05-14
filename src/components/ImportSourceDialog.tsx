@@ -34,11 +34,6 @@ const sourceMeta: Record<Exclude<ImportSkillSourceKind, 'zip'>, {
     subtitle: '通过 SkillPkg 服务解析 Skill',
     placeholder: 'https://skillpkg.com/packages/...',
   },
-  'skills-sh': {
-    title: 'skills.sh URL',
-    subtitle: '解析 Installation 后使用 Git 仓库方式导入',
-    placeholder: 'https://skills.sh/owner/repo/skill',
-  },
 };
 
 const busyStatuses: ImportSkillStatus[] = ['resolving', 'downloading', 'scanning'];

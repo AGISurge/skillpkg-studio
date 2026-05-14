@@ -22,7 +22,7 @@ declare global {
        * 从外部来源导入 Skill 到统一库。
        */
       importSkillSource: (payload: {
-        kind: 'zip' | 'git' | 'skills-sh' | 'skillpkg' | 'session';
+        kind: 'zip' | 'git' | 'skillpkg' | 'session';
         installPath?: string;
         zipPath?: string;
         url?: string;
