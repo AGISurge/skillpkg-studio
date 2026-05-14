@@ -1183,6 +1183,7 @@ body:not([data-theme='light']) .settings-api-key-input:focus-within {
   padding-bottom: 4px;
   max-width: 100%;
   flex: 0 0 auto;
+
 }
 
 .viewer-header-inner {
@@ -1216,9 +1217,6 @@ body:not([data-theme='light']) .settings-api-key-input:focus-within {
 .viewer-content {
   background: var(--editor-bg);
   color: var(--editor-text);
-  border-radius: 16px;
-  border: 1px solid var(--border-subtle);
-  padding: 16px;
   display: flex;
   flex-direction: column;
   overflow: auto;
