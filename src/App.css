@@ -800,7 +800,6 @@ body:not([data-theme='light']) .settings-api-key-input:focus-within {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin: 0 8px;
   padding: 0 12px;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
@@ -851,7 +850,6 @@ body:not([data-theme='light']) .settings-api-key-input:focus-within {
   flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
-  padding: 0 8px;
 }
 
 .skill-search-highlight {
