@@ -61,6 +61,7 @@ type SkillsPageProps = {
   mode: "local" | "favorites" | "agents";
   installedSkillIds?: Set<string>;
   pendingSkillIds?: Set<string>;
+  hostedAgentNamesBySkillId?: Record<string, string[]>;
   onSelectSkill: (skill: Skill) => void;
   onToggleFavorite: (skillId: string) => void;
   onInstallToggle?: (skill: Skill) => void;
@@ -89,6 +90,7 @@ const SkillsPage = ({
   mode,
   installedSkillIds,
   pendingSkillIds,
+  hostedAgentNamesBySkillId,
   onSelectSkill,
   onToggleFavorite,
   onInstallToggle,
@@ -167,6 +169,7 @@ const SkillsPage = ({
               skill.managed || installedSkillIds?.has(skill.id),
             );
             const isPending = Boolean(pendingSkillIds?.has(skill.id));
+            const hostedAgentNames = hostedAgentNamesBySkillId?.[skill.id] || [];
             return (
               <div
                 key={skill.id}
@@ -199,6 +202,15 @@ const SkillsPage = ({
                   </button>
                 </div>
                 <p>{highlightSearchMatch(skill.description, debouncedSearchValue)}</p>
+                {mode === "local" && hostedAgentNames.length > 0 && (
+                  <div className="skill-agent-tags" aria-label="已托管的 Agents">
+                    {hostedAgentNames.map((agentName) => (
+                      <span className="skill-agent-tag" key={`${skill.id}-${agentName}`}>
+                        {agentName}
+                      </span>
+                    ))}
+                  </div>
+                )}
                 {mode === "agents" && onInstallToggle && (
                   <div
                     className="skill-card-footer"

@@ -873,6 +873,26 @@ body[data-theme='light'] {
   overflow: hidden;
 }
 
+.skill-agent-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.skill-agent-tag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 3px 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  background: var(--tag-bg);
+  color: var(--text-soft);
+  font-size: 11px;
+  line-height: 1;
+}
+
 .skill-meta {
   display: flex;
   justify-content: space-between;
