@@ -45,6 +45,9 @@ body {
   --code-bg: rgba(10, 12, 18, 0.7);
   --code-bg-strong: rgba(6, 8, 12, 0.85);
   --code-text: #e7ecf3;
+  --editor-bg: rgba(10, 12, 18, 0.72);
+  --editor-text: #e7ecf3;
+  --editor-selection-bg: rgba(80, 140, 255, 0.32);
   --accent-bg: rgba(80, 120, 255, 0.15);
   --accent-bg-strong: rgba(80, 120, 255, 0.18);
   --accent-bg-soft: rgba(80, 120, 255, 0.12);
@@ -86,6 +89,9 @@ body[data-theme='light'] {
   --code-bg: #ffffff;
   --code-bg-strong: #f3f6fb;
   --code-text: #1f2937;
+  --editor-bg: #ffffff;
+  --editor-text: #1b2433;
+  --editor-selection-bg: rgba(80, 120, 255, 0.2);
   --accent-bg: rgba(80, 120, 255, 0.16);
   --accent-bg-strong: rgba(80, 120, 255, 0.16);
   --accent-bg-soft: rgba(80, 120, 255, 0.12);
@@ -127,6 +133,9 @@ body[data-theme='light'] {
     --code-bg: #ffffff;
     --code-bg-strong: #f3f6fb;
     --code-text: #1f2937;
+    --editor-bg: #ffffff;
+    --editor-text: #1b2433;
+    --editor-selection-bg: rgba(80, 120, 255, 0.2);
     --accent-bg: rgba(80, 120, 255, 0.16);
     --accent-bg-strong: rgba(80, 120, 255, 0.16);
     --accent-bg-soft: rgba(80, 120, 255, 0.12);
@@ -960,6 +969,10 @@ body[data-theme='light'] {
   font-family: "Space Grotesk", sans-serif;
 }
 
+.detail-body{
+  border-top: 1px solid var(--border-subtle);
+}
+
 .detail-subtitle {
   font-size: 13px;
   color: var(--text-muted);
@@ -1001,9 +1014,9 @@ body[data-theme='light'] {
 }
 
 .preview {
-  background: var(--code-bg);
+  background: var(--editor-bg);
+  color: var(--editor-text);
   padding: 16px;
-  border-radius: 16px;
   border: 1px solid var(--border-subtle);
   overflow: auto;
   border-radius:4px;
@@ -1129,6 +1142,7 @@ body[data-theme='light'] {
   min-height: 0;
   min-width: 0;
   overflow: hidden;
+}
 
 .viewer-header {
   display: flex;
@@ -1167,7 +1181,8 @@ body[data-theme='light'] {
 }
 
 .viewer-content {
-  background: var(--code-bg);
+  background: var(--editor-bg);
+  color: var(--editor-text);
   border-radius: 16px;
   border: 1px solid var(--border-subtle);
   padding: 16px;
@@ -1177,8 +1192,6 @@ body[data-theme='light'] {
   min-height: 0;
   min-width: 0;
   flex: 1 1 auto;
-  background:#f9f9f9;
-}
 }
 .viewer-content p {
   @apply my-6;
@@ -1195,12 +1208,18 @@ body[data-theme='light'] {
   min-height: 0;
   background: transparent;
   border: none;
-  color: inherit;
-  font-family: "Source Code Pro", monospace;
+  color: var(--editor-text);
+  caret-color: var(--accent-border-strong);
+  font-family: "JetBrains Mono", monospace;
   font-size: 13px;
+  line-height: 1.7;
   outline: none;
   resize: none;
   overflow: auto;
+}
+
+.viewer-content textarea::selection {
+  background: var(--editor-selection-bg);
 }
 
 .image-preview {

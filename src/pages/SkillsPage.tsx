@@ -282,7 +282,7 @@ const SkillsPage = ({
                 </div>
               </div>
             </div>
-            <div className="detail-body border-t">
+            <div className="detail-body">
               <div className="tree pt-4">
                 <div className="section-title">目录</div>
                 <SkillTree
