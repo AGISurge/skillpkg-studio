@@ -1157,6 +1157,18 @@ body:not([data-theme='light']) .settings-api-key-input:focus-within {
   border-radius: 8px;
   cursor: pointer;
   font-size: 12px;
+  min-width: 0;
+}
+
+.tree-item .icon {
+  flex: 0 0 auto;
+}
+
+.tree-item span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .tree-item.active,
