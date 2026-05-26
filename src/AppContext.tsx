@@ -72,8 +72,9 @@ export const useToolbar = (content: ReactNode) => {
   const setToolbar = useContext(ToolbarSetterContext);
   useEffect(() => {
     setToolbar(content);
-    return () => setToolbar(null);
   }, [content, setToolbar]);
+
+  useEffect(() => () => setToolbar(null), [setToolbar]);
 };
 
 export const useToolbarContent = () => useContext(ToolbarContext);

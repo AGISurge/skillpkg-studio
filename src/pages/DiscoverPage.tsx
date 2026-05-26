@@ -37,6 +37,7 @@ const DiscoverPage = () => {
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<Set<string>>(new Set());
   const [searchValue, setSearchValue] = useState('');
   const [debouncedSearchValue, setDebouncedSearchValue] = useState('');
+  const [searchComposing, setSearchComposing] = useState(false);
   const [featuredOnly, setFeaturedOnly] = useState(false);
   const [skills, setSkills] = useState<SkillpkgSkillSummary[]>([]);
   const [meta, setMeta] = useState<SkillpkgListMeta | null>(null);
@@ -62,11 +63,12 @@ const DiscoverPage = () => {
   const canLoadMore = Boolean(meta && page < meta.totalPages);
 
   useEffect(() => {
+    if (searchComposing) return;
     const timer = window.setTimeout(() => {
       setDebouncedSearchValue(searchValue);
     }, SEARCH_DEBOUNCE_MS);
     return () => window.clearTimeout(timer);
-  }, [searchValue]);
+  }, [searchComposing, searchValue]);
 
   useEffect(() => {
     let active = true;
@@ -275,6 +277,11 @@ const DiscoverPage = () => {
           type="search"
           value={searchValue}
           onChange={(event) => setSearchValue(event.target.value)}
+          onCompositionStart={() => setSearchComposing(true)}
+          onCompositionEnd={(event) => {
+            setSearchComposing(false);
+            setSearchValue(event.currentTarget.value);
+          }}
           placeholder="搜索 Skill"
           aria-label="搜索 Skill"
           disabled={!normalizedApiKey}
@@ -284,7 +291,11 @@ const DiscoverPage = () => {
             type="button"
             className="skill-search-clear"
             aria-label="清空搜索"
-            onClick={() => setSearchValue('')}
+            onClick={() => {
+              setSearchComposing(false);
+              setSearchValue('');
+              setDebouncedSearchValue('');
+            }}
           >
             <DismissRegular className="icon" />
           </button>
