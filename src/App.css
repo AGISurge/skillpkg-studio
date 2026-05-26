@@ -688,11 +688,11 @@ body:not([data-theme='light']) .settings-api-key-input:focus-within {
   border: 1px solid var(--border-subtle);
   border-radius: 18px;
   background: var(--panel-bg);
-  padding: 28px;
+  padding: 20px 15px 15px 15px;
   color: inherit;
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 15px;
   transition: border-color 0.18s ease, background 0.18s ease;
 }
 
@@ -711,7 +711,7 @@ body:not([data-theme='light']) .settings-api-key-input:focus-within {
 .discover-card h2 {
   margin: 0;
   color: var(--app-text-strong);
-  font-size: 22px;
+  font-size: 16px;
   line-height: 1.25;
   font-weight: 700;
   overflow-wrap: anywhere;
@@ -735,11 +735,11 @@ body:not([data-theme='light']) .discover-type-pill {
 .discover-card p {
   margin: 0;
   color: var(--text-soft);
-  font-size: 15px;
+  font-size: 12px;
   line-height: 1.7;
   display: -webkit-box;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
+  -webkit-line-clamp: 4;
   overflow: hidden;
 }
 

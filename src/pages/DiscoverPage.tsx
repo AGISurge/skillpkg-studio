@@ -338,15 +338,16 @@ const DiscoverPage = () => {
               <article className="discover-card" key={skill.publicId}>
                 <div className="discover-card-head">
                   <h2>{skill.name}</h2>
-                  <span className="discover-type-pill">Skill</span>
                 </div>
-                <p>{skill.description || '暂无描述。'}</p>
-                <div className="discover-author">
-                  <span>{skill.author?.displayName || skill.author?.slug || 'Unknown'}</span>
-                </div>
+                <p className='grow'>{skill.description || '暂无描述。'}</p>
                 <div className="discover-divider" />
+                <div className="flex justify-between items-center">
                 <div className="discover-category">
                   {skill.category?.name || '未分类'}
+                </div>
+                 <div className="discover-author">
+                  <span>{skill.author?.displayName || skill.author?.slug || 'Unknown'}</span>
+                </div>
                 </div>
               </article>
             ))}
