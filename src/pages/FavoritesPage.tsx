@@ -1,5 +1,6 @@
 import { useEffect, useMemo } from 'react';
 import { useAppContext } from '../AppContext';
+import { AGENT_CATALOG } from '../config/agents';
 import SkillsPage from './SkillsPage';
 
 const getDefaultSkillFilePath = (skill: { files: Array<{ path: string }> }) =>
@@ -19,6 +20,7 @@ const FavoritesPage = () => {
     expandedFolders,
     editing,
     fileDrafts,
+    installedByAgent,
     setSelectedLibrarySkillId,
     setSelectedFilePath,
     setEditing,
@@ -34,6 +36,21 @@ const FavoritesPage = () => {
     () => localSkills.filter((skill) => favorites.has(skill.id)),
     [favorites, localSkills]
   );
+  const hostedAgentNamesBySkillId = useMemo(() => {
+    const next: Record<string, string[]> = {};
+
+    Object.entries(installedByAgent).forEach(([agentId, skillIds]) => {
+      const agentName =
+        AGENT_CATALOG[agentId as keyof typeof AGENT_CATALOG]?.name || agentId;
+
+      skillIds.forEach((skillId) => {
+        next[skillId] = [...(next[skillId] || []), agentName];
+      });
+    });
+
+    return next;
+  }, [installedByAgent]);
+
   const selectedSkill =
     favoriteSkills.find((skill) => skill.id === selectedLibrarySkillId) ||
     favoriteSkills[0] ||
@@ -59,6 +76,7 @@ const FavoritesPage = () => {
       selectedFile={selectedFile}
       selectedFilePath={selectedFilePath}
       favorites={favorites}
+      hostedAgentNamesBySkillId={hostedAgentNamesBySkillId}
       onSelectSkill={(skill) => {
         setSelectedLibrarySkillId(skill.id);
         setSelectedFilePath(getDefaultSkillFilePath(skill));

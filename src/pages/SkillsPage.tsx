@@ -202,7 +202,7 @@ const SkillsPage = ({
                   </button>
                 </div>
                 <p>{highlightSearchMatch(skill.description, debouncedSearchValue)}</p>
-                {mode === "local" && hostedAgentNames.length > 0 && (
+                {(mode === "local" || mode === "favorites") && hostedAgentNames.length > 0 && (
                   <div className="skill-agent-tags" aria-label="已托管的 Agents">
                     {hostedAgentNames.map((agentName) => (
                       <span className="skill-agent-tag" key={`${skill.id}-${agentName}`}>
