@@ -33,6 +33,37 @@ export type Skill = {
   managed?: boolean;
 };
 
+export type SkillpkgCategory = {
+  publicId: string;
+  slug: string;
+  name: string;
+};
+
+export type SkillpkgAuthor = {
+  slug: string;
+  displayName: string;
+  homepage?: string | null;
+};
+
+export type SkillpkgSkillSummary = {
+  publicId: string;
+  slug: string;
+  name: string;
+  description?: string | null;
+  category: SkillpkgCategory | null;
+  author: SkillpkgAuthor;
+  homepage?: string | null;
+  riskLevel?: 'benign' | 'suspicious' | 'malicious' | null;
+  isFeatured: boolean;
+};
+
+export type SkillpkgListMeta = {
+  totalDocs: number;
+  totalPages: number;
+  page: number;
+  limit: number;
+};
+
 /**
  * Agent 配置结构。
  */

@@ -7,6 +7,10 @@ contextBridge.exposeInMainWorld('skillpkg', {
   importSkillSource: (payload) => ipcRenderer.invoke('import-skill-source', payload),
   scanImportCandidates: (payload) =>
     ipcRenderer.invoke('scan-import-candidates', payload),
+  listSkillpkgCategories: (payload) =>
+    ipcRenderer.invoke('list-skillpkg-categories', payload),
+  listSkillpkgSkills: (payload) =>
+    ipcRenderer.invoke('list-skillpkg-skills', payload),
   loadSkills: (installPath) => ipcRenderer.invoke('load-skills', installPath),
   installSkill: (payload) => ipcRenderer.invoke('install-skill', payload),
   // 检查指定的 Agent 是否安装

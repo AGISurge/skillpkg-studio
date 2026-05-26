@@ -19,6 +19,10 @@ const { getFilePolicy } = require('../../electron/filePolicy');
 const { unhostAgentSkillLink } = require('../../electron/agentService');
 const { resolveAgentSkillPath } = require('../../electron/agentCatalog');
 const { getDefaultSkillLibraryPath } = require('../../electron/pathUtils');
+const {
+  buildSkillpkgSkillsPath,
+  listSkillpkgSkills,
+} = require('../../electron/skillpkgApi');
 
 describe('electron skill services', () => {
   let tmpDir;
@@ -272,6 +276,79 @@ describe('electron skill services', () => {
     expect(resolveAgentSkillPath('claude')).toBe(path.join(os.homedir(), '.claude', 'skills'));
     expect(resolveAgentSkillPath('codex')).toBe(path.join(os.homedir(), '.codex', 'skills'));
     expect(resolveAgentSkillPath('cursor')).toBe(path.join(os.homedir(), '.cursor', 'skills'));
+  });
+});
+
+describe('skillpkg external api client', () => {
+  test('builds default skill list query params', () => {
+    expect(buildSkillpkgSkillsPath({
+      page: 1,
+      pageSize: 20,
+    })).toBe('/api/v1/skills?page=1&pageSize=20');
+  });
+
+  test('builds combined featured search and multi-category query params', () => {
+    expect(buildSkillpkgSkillsPath({
+      categoryPublicIds: ['cat_a', 'cat_b'],
+      q: ' code ',
+      isFeatured: true,
+      page: 2,
+      pageSize: 20,
+    })).toBe('/api/v1/skills?categoryPublicIds=cat_a%2Ccat_b&q=code&isFeatured=true&page=2&pageSize=20');
+  });
+
+  test('requests paged skills without requiring a type field', async () => {
+    const fetchImpl = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        data: {
+          docs: [
+            {
+              publicId: 'skill_public_1',
+              slug: 'code-review',
+              name: 'Code Review',
+              description: 'Review code changes',
+              category: null,
+              author: { slug: 'author', displayName: 'Author' },
+              isFeatured: true,
+            },
+          ],
+          meta: {
+            totalDocs: 1,
+            totalPages: 1,
+            page: 1,
+            limit: 20,
+          },
+        },
+      }),
+    });
+
+    const result = await listSkillpkgSkills({
+      apiKey: 'skp_test',
+      baseUrl: 'https://example.test',
+      fetchImpl,
+      categoryPublicIds: ['cat_a'],
+      page: 1,
+      pageSize: 20,
+    });
+
+    expect(fetchImpl).toHaveBeenCalledWith(
+      'https://example.test/api/v1/skills?categoryPublicIds=cat_a&page=1&pageSize=20',
+      expect.objectContaining({
+        headers: {
+          Authorization: 'Bearer skp_test',
+        },
+      }),
+    );
+    expect(result).toEqual(expect.objectContaining({
+      ok: true,
+      docs: [
+        expect.objectContaining({
+          publicId: 'skill_public_1',
+          name: 'Code Review',
+        }),
+      ],
+    }));
   });
 });
 

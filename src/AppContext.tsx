@@ -19,7 +19,6 @@ import type {
 import { getFilePolicy, validateSkill } from './utils/skillUtils';
 import { AGENT_CATALOG, AGENT_TOOL_IDS } from './config/agents';
 import type { AgentId } from './config/agents';
-import { DISCOVER_MOCK_PATH } from './config/discover';
 
 export type ThemeMode = 'system' | 'light' | 'dark';
 export type ImportSkillSourceKind = 'zip' | 'git' | 'skillpkg';
@@ -431,22 +430,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setLocalSkills(skills);
   }, [showNotice]);
 
-  const loadDiscoverSkills = useCallback(async () => {
-    if (!window?.skillpkg?.loadSkills) {
-      showNotice('当前环境不支持读取发现页数据。', 'discover');
-      return;
-    }
-    const skills = await window.skillpkg.loadSkills(DISCOVER_MOCK_PATH);
-    setDiscoverSkills(skills);
-    if (
-      skills[0] &&
-      !skills.some((skill) => skill.id === selectedDiscoverSkillId)
-    ) {
-      setSelectedDiscoverSkillId(skills[0].id);
-      setSelectedFilePath(getDefaultSkillFilePath(skills[0]));
-    }
-  }, [selectedDiscoverSkillId, showNotice]);
-
   useEffect(() => {
     let active = true;
     const loadInitialPath = async () => {
@@ -465,10 +448,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       active = false;
     };
   }, []);
-
-  useEffect(() => {
-    loadDiscoverSkills();
-  }, [loadDiscoverSkills]);
 
   useEffect(() => {
     let active = true;

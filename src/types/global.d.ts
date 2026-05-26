@@ -1,4 +1,11 @@
-import type { AgentDetectionResult, AgentSkillsResult, Skill } from './models';
+import type {
+  AgentDetectionResult,
+  AgentSkillsResult,
+  Skill,
+  SkillpkgCategory,
+  SkillpkgListMeta,
+  SkillpkgSkillSummary,
+} from './models';
 
 declare global {
   interface Window {
@@ -61,6 +68,34 @@ declare global {
           version: string;
           relativePath: string;
         }>;
+      }>;
+      /**
+       * 获取 SkillPkg 远程分类列表。
+       */
+      listSkillpkgCategories: (payload: {
+        apiKey: string;
+      }) => Promise<{
+        ok: boolean;
+        reason?: string;
+        status?: number;
+        categories?: SkillpkgCategory[];
+      }>;
+      /**
+       * 获取 SkillPkg 远程 Skill 列表。
+       */
+      listSkillpkgSkills: (payload: {
+        apiKey: string;
+        categoryPublicIds?: string[];
+        q?: string;
+        isFeatured?: boolean;
+        page?: number;
+        pageSize?: number;
+      }) => Promise<{
+        ok: boolean;
+        reason?: string;
+        status?: number;
+        docs?: SkillpkgSkillSummary[];
+        meta?: SkillpkgListMeta;
       }>;
       /**
        * 从指定路径加载技能列表。

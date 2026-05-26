@@ -550,6 +550,332 @@ body:not([data-theme='light']) .settings-api-key-input:focus-within {
   align-items: center;
 }
 
+.discover-toolbar {
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) minmax(180px, 260px) auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+}
+
+.discover-category-strip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+  min-width: 0;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+}
+
+.discover-category-strip::-webkit-scrollbar {
+  display: none;
+}
+
+.discover-category-chip {
+  flex: 0 0 auto;
+  min-height: 30px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  background: var(--surface-bg-strong);
+  color: var(--text-soft);
+  padding: 5px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.discover-category-chip:hover,
+.discover-category-chip.selected {
+  color: var(--app-text-strong);
+  background: var(--accent-bg);
+  border-color: var(--accent-border);
+}
+
+.discover-search {
+  min-height: 34px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  background: var(--surface-bg-strong);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px 0 11px;
+  min-width: 0;
+}
+
+.discover-search .icon {
+  width: 15px;
+  height: 15px;
+  color: var(--text-muted);
+  flex: 0 0 auto;
+}
+
+.discover-search input {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: inherit;
+  font-size: 12px;
+}
+
+.discover-search input::placeholder {
+  color: var(--text-faint);
+}
+
+.discover-segment {
+  display: inline-grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  min-height: 34px;
+  padding: 3px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  background: var(--surface-bg-strong);
+  gap: 3px;
+}
+
+.discover-segment button {
+  min-width: 62px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--text-soft);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 5px 9px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.discover-segment button.selected {
+  background: var(--accent-bg);
+  color: var(--app-text-strong);
+}
+
+.discover-segment .icon {
+  width: 13px;
+  height: 13px;
+}
+
+.discover-page {
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+}
+
+.discover-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding-right: 6px;
+}
+
+.discover-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 14px;
+  align-items: stretch;
+}
+
+.discover-card {
+  min-height: 210px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 18px;
+  background: var(--panel-bg);
+  padding: 28px;
+  color: inherit;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  transition: border-color 0.18s ease, background 0.18s ease;
+}
+
+.discover-card:hover {
+  border-color: var(--accent-border-strong);
+  background: var(--surface-bg-strong);
+}
+
+.discover-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.discover-card h2 {
+  margin: 0;
+  color: var(--app-text-strong);
+  font-size: 22px;
+  line-height: 1.25;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.discover-type-pill {
+  flex: 0 0 auto;
+  border: 1px solid rgba(245, 158, 11, 0.42);
+  border-radius: 999px;
+  color: #d97706;
+  background: rgba(245, 158, 11, 0.08);
+  padding: 4px 13px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+body:not([data-theme='light']) .discover-type-pill {
+  color: #fbbf24;
+}
+
+.discover-card p {
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 15px;
+  line-height: 1.7;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+}
+
+.discover-author {
+  margin-top: auto;
+  color: var(--text-muted);
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.discover-divider {
+  height: 1px;
+  background: var(--border-subtle);
+}
+
+.discover-category {
+  color: #ef6f5c;
+  font-size: 14px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.discover-empty {
+  min-height: 220px;
+  border: 1px dashed var(--border-soft);
+  border-radius: 16px;
+  background: var(--surface-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.discover-inline-error {
+  margin-top: 14px;
+}
+
+.discover-bottom-skeleton {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 14px;
+  margin-top: 14px;
+  pointer-events: none;
+}
+
+.discover-sentinel {
+  height: 1px;
+}
+
+.skeleton {
+  display: block;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    var(--surface-bg-strong),
+    var(--surface-bg-hover),
+    var(--surface-bg-strong)
+  );
+  background-size: 220% 100%;
+  animation: skeleton-pulse 1.2s ease-in-out infinite;
+}
+
+.discover-category-skeleton {
+  width: 78px;
+  height: 30px;
+}
+
+.discover-skeleton-card {
+  pointer-events: none;
+}
+
+.skeleton-title {
+  width: min(68%, 230px);
+  height: 28px;
+  border-radius: 8px;
+}
+
+.skeleton-pill {
+  width: 62px;
+  height: 28px;
+}
+
+.skeleton-line {
+  width: 72%;
+  height: 16px;
+  border-radius: 8px;
+}
+
+.skeleton-line.wide {
+  width: 92%;
+}
+
+.skeleton-meta {
+  width: 140px;
+  height: 16px;
+  border-radius: 8px;
+}
+
+.skeleton-meta.short {
+  width: 78px;
+}
+
+.discover-card-foot {
+  margin-top: auto;
+  padding-top: 18px;
+  border-top: 1px solid var(--border-subtle);
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+@keyframes skeleton-pulse {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+
+@media (max-width: 1100px) {
+  .discover-toolbar {
+    grid-template-columns: minmax(120px, 1fr) minmax(150px, 220px) auto;
+  }
+}
+
+@media (max-width: 760px) {
+  .discover-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .discover-grid,
+  .discover-bottom-skeleton {
+    grid-template-columns: 1fr;
+  }
+}
+
 .btn {
   border: 1px solid transparent;
   border-radius: 12px;

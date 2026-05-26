@@ -25,6 +25,10 @@ const {
   parseSkillMarkdownMetadata,
 } = require('./electron/skillScanner');
 const { importSkillSource } = require('./electron/importService');
+const {
+  listSkillpkgCategories,
+  listSkillpkgSkills,
+} = require('./electron/skillpkgApi');
 
 const createWindow = () => {
   const win = new BrowserWindow({
@@ -392,6 +396,12 @@ const registerIpcHandlers = () => {
       ...(payload || {}),
       tempRoot: getImportTempRoot(),
     }));
+
+  ipcMain.handle('list-skillpkg-categories', async (_event, payload) =>
+    listSkillpkgCategories(payload || {}));
+
+  ipcMain.handle('list-skillpkg-skills', async (_event, payload) =>
+    listSkillpkgSkills(payload || {}));
 
   ipcMain.handle('get-agent-skill-counts', async (_event, payload) => {
     const { agents, installPath } = payload || {};
