@@ -1631,6 +1631,10 @@ body:not([data-theme='light']) .discover-type-pill {
   width: min(560px, 92vw);
 }
 
+.batch-install-dialog {
+  width: min(640px, 92vw);
+}
+
 .dialog-header {
   display: flex;
   justify-content: space-between;
@@ -1661,6 +1665,69 @@ body:not([data-theme='light']) .discover-type-pill {
   gap: 10px;
   max-height: min(360px, 48vh);
   overflow: auto;
+}
+
+.import-candidate-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.import-candidate-title {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.link-button {
+  border: 0;
+  background: transparent;
+  color: var(--app-text-strong);
+  cursor: pointer;
+  font: inherit;
+  padding: 0;
+}
+
+.link-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  border: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1;
+  padding: 3px 6px;
+}
+
+.status-pill.warning {
+  border-color: rgba(245, 158, 11, 0.45);
+  color: var(--warning-text, #b45309);
+}
+
+.batch-skill-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-height: 120px;
+  overflow: auto;
+}
+
+.batch-skill-chip {
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  background: var(--surface-bg);
+  color: var(--app-text);
+  font-size: 12px;
+  padding: 5px 9px;
 }
 
 .import-url-field {

@@ -36,11 +36,18 @@ declare global {
         apiKey?: string;
         sessionId?: string;
         candidateId?: string;
+        candidateIds?: string[];
       }) => Promise<{
         ok: boolean;
         reason?: string;
         sessionId?: string;
         reused?: boolean;
+        reusedSkillIds?: string[];
+        failedCandidates?: Array<{
+          candidateId: string;
+          skillId?: string;
+          reason: string;
+        }>;
         candidates?: Array<{
           id: string;
           skillId: string;
@@ -48,8 +55,12 @@ declare global {
           description: string;
           version: string;
           relativePath: string;
+          idConflict?: boolean;
+          nameConflict?: boolean;
+          existingSkillId?: string | null;
         }>;
         skill?: Skill | null;
+        skills?: Skill[];
       }>;
       /**
        * 扫描导入目录中的候选 Skill。
@@ -67,6 +78,9 @@ declare global {
           description: string;
           version: string;
           relativePath: string;
+          idConflict?: boolean;
+          nameConflict?: boolean;
+          existingSkillId?: string | null;
         }>;
       }>;
       /**
@@ -115,6 +129,28 @@ declare global {
         }>;
         overwrite?: boolean;
       }) => Promise<{ ok: boolean; reason?: string }>;
+      /**
+       * 将统一库中已有的多个 Skill 批量安装到 Agents。
+       */
+      installLibrarySkills: (payload: {
+        installPath: string;
+        skillIds: string[];
+        agents: Array<{
+          id: string;
+          name: string;
+          pathMac: string;
+          pathWindows: string;
+        }>;
+      }) => Promise<{
+        ok: boolean;
+        reason?: string;
+        results: Array<{
+          skillId: string;
+          agentId?: string;
+          ok: boolean;
+          reason?: string;
+        }>;
+      }>;
       /**
        * 打开指定技能的本地路径。
        */

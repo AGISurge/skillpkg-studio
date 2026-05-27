@@ -12,10 +12,11 @@ type ImportSourceDialogProps = {
   status: ImportSkillStatus;
   value: string;
   candidates: ImportSkillCandidate[];
-  selectedCandidateId: string;
+  selectedCandidateIds: Set<string>;
   apiKeyRequired: boolean;
   onChangeValue: (value: string) => void;
-  onSelectCandidate: (id: string) => void;
+  onToggleCandidate: (id: string) => void;
+  onSelectAllCandidates: (selected: boolean) => void;
   onConfirm: () => void;
   onClose: () => void;
 };
@@ -42,10 +43,11 @@ const ImportSourceDialog = ({
   status,
   value,
   candidates,
-  selectedCandidateId,
+  selectedCandidateIds,
   apiKeyRequired,
   onChangeValue,
-  onSelectCandidate,
+  onToggleCandidate,
+  onSelectAllCandidates,
   onConfirm,
   onClose,
 }: ImportSourceDialogProps) => {
@@ -53,6 +55,8 @@ const ImportSourceDialog = ({
 
   const busy = busyStatuses.includes(status);
   const selectingCandidate = candidates.length > 0;
+  const selectedCount = selectedCandidateIds.size;
+  const allSelected = selectingCandidate && selectedCount === candidates.length;
   const meta = kind === 'zip'
     ? {
         title: '选择 Skill',
@@ -67,7 +71,7 @@ const ImportSourceDialog = ({
           <div>
             <div className="dialog-title">{selectingCandidate ? '选择 Skill' : meta.title}</div>
             <div className="dialog-subtitle">
-              {selectingCandidate && '检测到多个 Skill，本次只能导入一个'}
+              {selectingCandidate && `检测到 ${candidates.length} 个 Skill，默认全部导入`}
             </div>
           </div>
           <button type="button" className="icon-btn" onClick={onClose} disabled={busy}>
@@ -82,30 +86,50 @@ const ImportSourceDialog = ({
               请先在设置页配置 SkillPKG API Key，再导入 skillpkg.com URL。
             </div>
           ) : selectingCandidate ? (
-            <div className="import-candidate-list">
-              {candidates.map((candidate) => (
-                <label
-                  key={candidate.id}
-                  className={`dialog-option ${selectedCandidateId === candidate.id ? 'selected' : ''}`}
+            <>
+              <div className="import-candidate-toolbar">
+                <span>{selectedCount} / {candidates.length} 已选</span>
+                <button
+                  type="button"
+                  className="link-button"
+                  onClick={() => onSelectAllCandidates(!allSelected)}
+                  disabled={busy}
                 >
-                  <input
-                    type="radio"
-                    name="import-candidate"
-                    checked={selectedCandidateId === candidate.id}
-                    onChange={() => onSelectCandidate(candidate.id)}
-                    disabled={busy}
-                  />
-                  <span>
-                    <span className="option-title">{candidate.name}</span>
-                    <span className="option-subtitle">
-                      {candidate.skillId}
-                      {candidate.relativePath ? ` · ${candidate.relativePath}` : ''}
-                    </span>
-                    <span className="option-subtitle">{candidate.description}</span>
-                  </span>
-                </label>
-              ))}
-            </div>
+                  {allSelected ? '取消全选' : '全选'}
+                </button>
+              </div>
+              <div className="import-candidate-list">
+                {candidates.map((candidate) => {
+                  const selected = selectedCandidateIds.has(candidate.id);
+                  return (
+                    <label
+                      key={candidate.id}
+                      className={`dialog-option ${selected ? 'selected' : ''}`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selected}
+                        onChange={() => onToggleCandidate(candidate.id)}
+                        disabled={busy}
+                      />
+                      <span>
+                        <span className="option-title import-candidate-title">
+                          {candidate.name}
+                          {candidate.idConflict ? <span className="status-pill warning">ID 已存在</span> : null}
+                          {candidate.nameConflict ? <span className="status-pill">同名已存在</span> : null}
+                        </span>
+                        <span className="option-subtitle">
+                          {candidate.skillId}
+                          {candidate.relativePath ? ` · ${candidate.relativePath}` : ''}
+                          {candidate.version ? ` · v${candidate.version}` : ''}
+                        </span>
+                        <span className="option-subtitle">{candidate.description}</span>
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            </>
           ) : (
             <label className="dialog-option import-url-field">
               <input
@@ -130,10 +154,10 @@ const ImportSourceDialog = ({
               type="button"
               className="btn primary"
               onClick={onConfirm}
-              disabled={busy || (selectingCandidate ? !selectedCandidateId : !value.trim())}
+              disabled={busy || (selectingCandidate ? selectedCount === 0 : !value.trim())}
             >
               {busy ? <span className="mini-spinner" aria-hidden="true" /> : <CheckmarkCircleRegular className="icon" />}
-              {selectingCandidate ? '导入所选 Skill' : '开始导入'}
+              {selectingCandidate ? '导入已选 Skill' : '开始导入'}
             </Button>
           ) : null}
         </div>

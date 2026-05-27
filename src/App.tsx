@@ -6,6 +6,7 @@ import AppLayout from './components/AppLayout';
 import InstallDialog from './components/InstallDialog';
 import HostConflictDialog from './components/HostConflictDialog';
 import ImportSourceDialog from './components/ImportSourceDialog';
+import BatchInstallDialog from './components/BatchInstallDialog';
 import DiscoverPage from './pages/DiscoverPage';
 import LocalPage from './pages/LocalPage';
 import FavoritesPage from './pages/FavoritesPage';
@@ -27,15 +28,23 @@ const AppDialogs = () => {
     importDialogKind,
     importDialogValue,
     importCandidates,
-    selectedImportCandidateId,
+    selectedImportCandidateIds,
+    batchInstallOpen,
+    batchInstallSkills,
+    batchInstallAgents,
+    batchInstallSubmitting,
     setDialogAgents,
+    setBatchInstallAgents,
     setInstallConflict,
     setDialogOpen,
     confirmInstall,
     closeImportDialog,
     setImportDialogValue,
-    setSelectedImportCandidateId,
+    toggleImportCandidate,
+    setAllImportCandidatesSelected,
     confirmImportSkill,
+    closeBatchInstallDialog,
+    confirmBatchInstall,
     resolveHostingConflict,
     cancelHostingConflict,
     openSkillLocation,
@@ -73,12 +82,30 @@ const AppDialogs = () => {
         status={importStatus}
         value={importDialogValue}
         candidates={importCandidates}
-        selectedCandidateId={selectedImportCandidateId}
+        selectedCandidateIds={selectedImportCandidateIds}
         apiKeyRequired={importDialogKind === 'skillpkg' && !apiKey.trim()}
         onChangeValue={setImportDialogValue}
-        onSelectCandidate={setSelectedImportCandidateId}
+        onToggleCandidate={toggleImportCandidate}
+        onSelectAllCandidates={setAllImportCandidatesSelected}
         onConfirm={confirmImportSkill}
         onClose={closeImportDialog}
+      />
+      <BatchInstallDialog
+        open={batchInstallOpen}
+        skills={batchInstallSkills}
+        agents={agents}
+        selectedAgents={batchInstallAgents}
+        submitting={batchInstallSubmitting}
+        onToggleAgent={(id) => {
+          setBatchInstallAgents((prev) => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+          });
+        }}
+        onClose={closeBatchInstallDialog}
+        onConfirm={confirmBatchInstall}
       />
       <HostConflictDialog
         skill={hostingConflictSkill}

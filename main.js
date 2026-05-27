@@ -262,6 +262,70 @@ const writeSkillToLibrary = async ({ installPath, skill, overwrite }) => {
   return { ok: true, skillDir };
 };
 
+const isSafeSkillId = (skillId) =>
+  Boolean(skillId) &&
+  typeof skillId === 'string' &&
+  !skillId.includes('/') &&
+  !skillId.includes('\\') &&
+  skillId !== '.' &&
+  skillId !== '..';
+
+const installLibrarySkillsToAgents = async ({ installPath, skillIds, agents }) => {
+  const agentList = Array.isArray(agents) ? agents : [];
+  const ids = Array.isArray(skillIds) ? Array.from(new Set(skillIds)) : [];
+  if (!installPath || !ids.length || !agentList.length) {
+    return { ok: false, reason: 'invalid', results: [] };
+  }
+
+  const results = [];
+  for (const skillId of ids) {
+    if (!isSafeSkillId(skillId)) {
+      results.push({ skillId, ok: false, reason: 'invalid-skill-id' });
+      continue;
+    }
+
+    const targetDir = path.join(installPath, skillId);
+    if (!await hasSkillMarkdown(targetDir)) {
+      results.push({ skillId, ok: false, reason: 'invalid-skill' });
+      continue;
+    }
+
+    const markdownMetadata = await getSkillMarkdownMetadata(targetDir);
+    for (const agent of agentList) {
+      try {
+        const linkResult = await ensureAgentSkillLink({
+          agent,
+          skillId,
+          targetDir,
+        });
+        results.push({ skillId, ...linkResult });
+        if (linkResult.ok) {
+          await upsertSkillInstallRecord({
+            skillId,
+            agentId: linkResult.agentId,
+            version: markdownMetadata.version || null,
+            description: markdownMetadata.description || null,
+          });
+        }
+      } catch (error) {
+        const config = getAgentConfig(agent);
+        results.push({
+          skillId,
+          agentId: config?.id,
+          ok: false,
+          reason: 'link-failed',
+        });
+      }
+    }
+  }
+
+  return {
+    ok: results.some((result) => result.ok),
+    reason: results.some((result) => result.ok) ? undefined : results[0]?.reason || 'install-failed',
+    results,
+  };
+};
+
 const copySkillDirIntoLibrary = async ({ sourceDir, targetDir, installPath }) => {
   const sourceRealPath = await fs.realpath(sourceDir).catch(() => sourceDir);
   const tempDir = path.join(
@@ -449,6 +513,9 @@ const registerIpcHandlers = () => {
     }
     return { ok: true, results: installResults };
   });
+
+  ipcMain.handle('install-library-skills', async (_event, payload) =>
+    installLibrarySkillsToAgents(payload || {}));
 
   ipcMain.handle('uninstall-agent-skill', async (_event, payload) => {
     const { agentId, skillId, installPath } = payload || {};

@@ -39,6 +39,9 @@ export type ImportSkillCandidate = {
   description: string;
   version: string;
   relativePath: string;
+  idConflict?: boolean;
+  nameConflict?: boolean;
+  existingSkillId?: string | null;
 };
 
 export type NoticeScope = 'discover' | 'local' | 'favorites' | 'agents' | 'settings' | 'global';
@@ -136,8 +139,12 @@ type AppContextValue = {
   importDialogKind: ImportSkillSourceKind | null;
   importDialogValue: string;
   importCandidates: ImportSkillCandidate[];
-  selectedImportCandidateId: string;
+  selectedImportCandidateIds: Set<string>;
   importSessionId: string;
+  batchInstallOpen: boolean;
+  batchInstallSkills: Skill[];
+  batchInstallAgents: Set<string>;
+  batchInstallSubmitting: boolean;
   editing: boolean;
   fileDrafts: Record<string, string>;
   theme: ThemeMode;
@@ -162,8 +169,12 @@ type AppContextValue = {
   openImportSkill: (kind: ImportSkillSourceKind) => Promise<void> | void;
   closeImportDialog: () => void;
   setImportDialogValue: (value: string) => void;
-  setSelectedImportCandidateId: (id: string) => void;
+  toggleImportCandidate: (id: string) => void;
+  setAllImportCandidatesSelected: (selected: boolean) => void;
   confirmImportSkill: () => Promise<void>;
+  closeBatchInstallDialog: () => void;
+  setBatchInstallAgents: React.Dispatch<React.SetStateAction<Set<string>>>;
+  confirmBatchInstall: () => Promise<void>;
   handleInstallToggle: (skill: Skill) => Promise<void>;
   resolveHostingConflict: (action: 'use-managed' | 'overwrite') => Promise<void>;
   cancelHostingConflict: () => void;
@@ -216,8 +227,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [importDialogKind, setImportDialogKind] = useState<ImportSkillSourceKind | null>(null);
   const [importDialogValue, setImportDialogValue] = useState('');
   const [importCandidates, setImportCandidates] = useState<ImportSkillCandidate[]>([]);
-  const [selectedImportCandidateId, setSelectedImportCandidateId] = useState('');
+  const [selectedImportCandidateIds, setSelectedImportCandidateIds] = useState<Set<string>>(new Set());
   const [importSessionId, setImportSessionId] = useState('');
+  const [batchInstallOpen, setBatchInstallOpen] = useState(false);
+  const [batchInstallSkills, setBatchInstallSkills] = useState<Skill[]>([]);
+  const [batchInstallAgents, setBatchInstallAgents] = useState<Set<string>>(new Set());
+  const [batchInstallSubmitting, setBatchInstallSubmitting] = useState(false);
   const [editing, setEditing] = useState(false);
   const [fileDrafts, setFileDrafts] = useState<Record<string, string>>({});
   const [theme, setTheme] = useState<ThemeMode>(getInitialTheme);
@@ -608,6 +623,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       'install-path-missing': '请先设置统一路径。',
       'invalid-git-url': '请输入有效的 Git 仓库地址。',
       'invalid-path': '导入路径无效。',
+      'invalid-skill-id': 'Skill ID 无效。',
       'invalid-skill': '候选目录不是有效 Skill。',
       'no-skill-found': '未找到有效 SKILL.md。',
       'session-expired': '导入候选已过期，请重新导入。',
@@ -619,8 +635,14 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   const resetImportSelection = () => {
     setImportCandidates([]);
-    setSelectedImportCandidateId('');
+    setSelectedImportCandidateIds(new Set());
     setImportSessionId('');
+  };
+
+  const startBatchInstall = (skills: Skill[]) => {
+    setBatchInstallSkills(skills);
+    setBatchInstallAgents(new Set(agents.map((agent) => agent.id)));
+    setBatchInstallOpen(true);
   };
 
   const completeImportedSkill = async (skill: Skill | null | undefined, reused?: boolean) => {
@@ -639,6 +661,29 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     openInstallDialog(skill, 'local');
   };
 
+  const completeImportedSkills = async (
+    skills: Skill[],
+    reusedSkillIds: string[] = [],
+    failedCount = 0,
+  ) => {
+    if (!skills.length) {
+      showNotice('导入失败：未返回有效 Skill。', 'local');
+      setImportStatus('error');
+      return;
+    }
+    await loadLocalSkills(installPath);
+    setSelectedLibrarySkillId(skills[0].id);
+    setSelectedFilePath(getDefaultSkillFilePath(skills[0]));
+    setImportDialogOpen(false);
+    resetImportSelection();
+    setImportStatus('ready');
+    const reusedCount = reusedSkillIds.length;
+    const failureText = failedCount ? `，${failedCount} 个导入失败` : '';
+    const reusedText = reusedCount ? `，其中 ${reusedCount} 个复用现有 Skill` : '';
+    showNotice(`已导入 ${skills.length} 个 Skill${reusedText}${failureText}，请确认安装到 Agents。`, 'local');
+    startBatchInstall(skills);
+  };
+
   const runImportSkillSource = async (payload: {
     kind: 'zip' | 'git' | 'skillpkg' | 'session';
     installPath?: string;
@@ -647,6 +692,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     apiKey?: string;
     sessionId?: string;
     candidateId?: string;
+    candidateIds?: string[];
   }) => {
     if (!window?.skillpkg?.importSkillSource) {
       showNotice('当前环境不支持导入 Skill。', 'local');
@@ -663,12 +709,22 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     await waitForNextPaint();
     const result = await window.skillpkg.importSkillSource(payload);
     if (result.ok) {
+      const requestedMultipleCandidates =
+        payload.kind === 'session' && (payload.candidateIds?.length || 0) > 1;
+      if (result.skills?.length && (result.skills.length > 1 || requestedMultipleCandidates)) {
+        await completeImportedSkills(
+          result.skills,
+          result.reusedSkillIds || [],
+          result.failedCandidates?.length || 0,
+        );
+        return;
+      }
       await completeImportedSkill(result.skill, result.reused);
       return;
     }
     if (result.reason === 'multiple-candidates' && result.candidates?.length && result.sessionId) {
       setImportCandidates(result.candidates);
-      setSelectedImportCandidateId(result.candidates[0].id);
+      setSelectedImportCandidateIds(new Set(result.candidates.map((candidate) => candidate.id)));
       setImportSessionId(result.sessionId);
       setImportDialogValue('');
       setImportDialogOpen(true);
@@ -728,14 +784,15 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   const confirmImportSkill = async () => {
     if (importCandidates.length) {
-      if (!selectedImportCandidateId) {
-        showNotice('请选择一个 Skill。', 'local');
+      const candidateIds = [...selectedImportCandidateIds];
+      if (!candidateIds.length) {
+        showNotice('请至少选择一个 Skill。', 'local');
         return;
       }
       await runImportSkillSource({
         kind: 'session',
         installPath,
-        candidateId: selectedImportCandidateId,
+        candidateIds,
         sessionId: importSessionId,
       });
       return;
@@ -751,6 +808,69 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
     if (importDialogKind === 'skillpkg') {
       await runImportSkillSource({ kind: 'skillpkg', installPath, url: value, apiKey });
+    }
+  };
+
+  const toggleImportCandidate = (id: string) => {
+    setSelectedImportCandidateIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const setAllImportCandidatesSelected = (selected: boolean) => {
+    setSelectedImportCandidateIds(
+      selected ? new Set(importCandidates.map((candidate) => candidate.id)) : new Set(),
+    );
+  };
+
+  const closeBatchInstallDialog = () => {
+    if (batchInstallSubmitting) return;
+    setBatchInstallOpen(false);
+    setBatchInstallSkills([]);
+    setBatchInstallAgents(new Set());
+  };
+
+  const confirmBatchInstall = async () => {
+    if (!batchInstallSkills.length || batchInstallSubmitting) return;
+    if (!window?.skillpkg?.installLibrarySkills) {
+      showNotice('当前环境不支持批量安装 Skill。', 'local');
+      return;
+    }
+    if (!batchInstallAgents.size) {
+      showNotice('请至少选择一个 Agent。', 'local');
+      return;
+    }
+    const selectedAgents = agents.filter((agent) => batchInstallAgents.has(agent.id));
+    setBatchInstallSubmitting(true);
+    setImportStatus('installing');
+    try {
+      const result = await window.skillpkg.installLibrarySkills({
+        installPath,
+        skillIds: batchInstallSkills.map((skill) => skill.id),
+        agents: selectedAgents,
+      });
+      const successCount = result.results.filter((item) => item.ok).length;
+      const failedCount = result.results.length - successCount;
+      if (!result.ok) {
+        showNotice('批量安装失败，请检查 Agent 技能目录权限。', 'local');
+        return;
+      }
+      await syncInstalledByAgent(selectedAgents, installPath);
+      showNotice(
+        failedCount
+          ? `已完成 ${successCount} 项安装，${failedCount} 项因冲突或权限失败。`
+          : `已将 ${batchInstallSkills.length} 个 Skill 安装到 ${selectedAgents.length} 个 Agent。`,
+        'local',
+      );
+      setBatchInstallOpen(false);
+      setBatchInstallSkills([]);
+      setBatchInstallAgents(new Set());
+    } finally {
+      setBatchInstallSubmitting(false);
+      setImportStatus((current) => (current === 'installing' ? 'idle' : current));
     }
   };
 
@@ -1072,8 +1192,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     importDialogKind,
     importDialogValue,
     importCandidates,
-    selectedImportCandidateId,
+    selectedImportCandidateIds,
     importSessionId,
+    batchInstallOpen,
+    batchInstallSkills,
+    batchInstallAgents,
+    batchInstallSubmitting,
     editing,
     fileDrafts,
     theme,
@@ -1098,8 +1222,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     openImportSkill,
     closeImportDialog,
     setImportDialogValue,
-    setSelectedImportCandidateId,
+    toggleImportCandidate,
+    setAllImportCandidatesSelected,
     confirmImportSkill,
+    closeBatchInstallDialog,
+    setBatchInstallAgents,
+    confirmBatchInstall,
     handleInstallToggle,
     resolveHostingConflict,
     cancelHostingConflict,

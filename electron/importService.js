@@ -11,11 +11,13 @@ const {
 } = require('./pathUtils');
 const {
   hasSkillMarkdown,
+  loadSkillsFromPath,
   parseSkillMarkdownMetadata,
   readSkillFromDir,
 } = require('./skillScanner');
 
 const IMPORT_SESSION_TTL_MS = 30 * 60 * 1000;
+const MAX_SKILL_SCAN_DEPTH = 3;
 const SKIPPED_DIRS = new Set(['.git', 'node_modules']);
 const importSessions = new Map();
 
@@ -130,51 +132,101 @@ const readCandidateMetadata = async (skillDir) => {
   return parseSkillMarkdownMetadata(content);
 };
 
-const buildCandidate = async ({ rootPath, skillDir, preferredId }) => {
+const normalizeSkillName = (value) => String(value || '').trim().toLowerCase();
+
+const loadConflictIndex = async (installPath) => {
+  if (!installPath || !await pathExists(installPath)) {
+    return {
+      existingIds: new Set(),
+      skillIdByName: new Map(),
+    };
+  }
+  const skills = await loadSkillsFromPath(installPath, { mode: 'library' }).catch(() => []);
+  const entries = await fs.readdir(installPath, { withFileTypes: true }).catch(() => []);
+  const existingDirs = entries
+    .filter((entry) => entry.isDirectory() || entry.isSymbolicLink())
+    .map((entry) => entry.name);
+  return {
+    existingIds: new Set([...skills.map((skill) => skill.id), ...existingDirs]),
+    skillIdByName: new Map(
+      skills
+        .map((skill) => [normalizeSkillName(skill.name), skill.id])
+        .filter(([name]) => Boolean(name)),
+    ),
+  };
+};
+
+const buildCandidate = async ({ rootPath, skillDir, preferredId, conflictIndex }) => {
   const relativePath = path.relative(rootPath, skillDir).split(path.sep).join('/');
   const metadata = await readCandidateMetadata(skillDir);
   const directoryName = path.basename(skillDir);
   const skillId = slugify(
     relativePath ? directoryName : preferredId || metadata.name || directoryName,
   );
+  const name = metadata.name || skillId;
+  const existingSkillId = conflictIndex?.skillIdByName.get(normalizeSkillName(name));
+  const idConflict = Boolean(conflictIndex?.existingIds.has(skillId));
+  const nameConflict = Boolean(existingSkillId);
   return {
     id: `${relativePath || '.'}::${skillId}`,
     skillId,
-    name: metadata.name || skillId,
+    name,
     description: metadata.description || '未提供描述。',
     version: metadata.version || '0.1.0',
     relativePath,
+    idConflict,
+    nameConflict,
+    existingSkillId: existingSkillId || (idConflict ? skillId : null),
   };
 };
 
-const walkSkillCandidates = async ({ rootPath, currentPath, preferredId, results }) => {
+const walkSkillCandidates = async ({
+  rootPath,
+  currentPath,
+  preferredId,
+  results,
+  conflictIndex,
+  depth,
+}) => {
   const entries = await fs.readdir(currentPath, { withFileTypes: true }).catch(() => []);
   if (await hasSkillMarkdown(currentPath)) {
-    results.push(await buildCandidate({ rootPath, skillDir: currentPath, preferredId }));
+    results.push(await buildCandidate({
+      rootPath,
+      skillDir: currentPath,
+      preferredId,
+      conflictIndex,
+    }));
     return;
   }
 
+  if (depth >= MAX_SKILL_SCAN_DEPTH) return;
   for (const entry of entries) {
     if (!entry.isDirectory() || SKIPPED_DIRS.has(entry.name)) continue;
+    if (entry.isSymbolicLink()) continue;
     await walkSkillCandidates({
       rootPath,
       currentPath: path.join(currentPath, entry.name),
       preferredId,
       results,
+      conflictIndex,
+      depth: depth + 1,
     });
   }
 };
 
-const scanImportCandidates = async ({ rootPath, preferredId }) => {
+const scanImportCandidates = async ({ rootPath, preferredId, installPath }) => {
   if (!rootPath || !await pathExists(rootPath)) {
     return { ok: false, reason: 'source-missing', candidates: [] };
   }
   const results = [];
+  const conflictIndex = await loadConflictIndex(installPath);
   await walkSkillCandidates({
     rootPath,
     currentPath: rootPath,
     preferredId,
     results,
+    conflictIndex,
+    depth: 0,
   });
   return {
     ok: true,
@@ -218,6 +270,43 @@ const importCandidateToLibrary = async ({ installPath, rootPath, candidate }) =>
     source: 'library',
   });
   return { ok: true, skill, reused: false };
+};
+
+const importCandidatesToLibrary = async ({ installPath, rootPath, candidates }) => {
+  const skills = [];
+  const reusedSkillIds = [];
+  const failedCandidates = [];
+
+  for (const candidate of candidates) {
+    const result = await importCandidateToLibrary({ installPath, rootPath, candidate });
+    if (result.ok) {
+      if (result.skill) skills.push(result.skill);
+      if (result.reused && result.skill?.id) reusedSkillIds.push(result.skill.id);
+      continue;
+    }
+    failedCandidates.push({
+      candidateId: candidate.id,
+      skillId: candidate.skillId,
+      reason: result.reason || 'import-failed',
+    });
+  }
+
+  if (!skills.length) {
+    return {
+      ok: false,
+      reason: failedCandidates[0]?.reason || 'import-failed',
+      failedCandidates,
+    };
+  }
+
+  return {
+    ok: true,
+    skill: skills[0],
+    skills,
+    reused: reusedSkillIds.length === skills.length,
+    reusedSkillIds,
+    failedCandidates,
+  };
 };
 
 const storeSession = ({ rootPath, candidates }) => {
@@ -287,6 +376,7 @@ const importFromZip = async ({ zipPath, installPath, tempRoot }) => {
   const scan = await scanImportCandidates({
     rootPath,
     preferredId: path.basename(zipPath),
+    installPath,
   });
   if (!scan.ok) return scan;
   return resolveSingleOrSelection({
@@ -315,6 +405,7 @@ const importFromGit = async ({ url, installPath, tempRoot, preferredSkillId }) =
   const scan = await scanImportCandidates({
     rootPath: scanRoot,
     preferredId: preferredSkillId || source.repoName,
+    installPath,
   });
   if (!scan.ok) return scan;
   return resolveSingleOrSelection({
@@ -332,16 +423,21 @@ const resolveSkillpkgUrl = async ({ apiKey }) => {
   return { ok: false, reason: 'api-not-configured' };
 };
 
-const importFromSession = async ({ sessionId, candidateId, installPath }) => {
+const importFromSession = async ({ sessionId, candidateId, candidateIds, installPath }) => {
   pruneSessions();
   const session = importSessions.get(sessionId);
   if (!session) return { ok: false, reason: 'session-expired' };
-  const candidate = session.candidates.find((item) => item.id === candidateId);
-  if (!candidate) return { ok: false, reason: 'candidate-missing' };
-  const result = await importCandidateToLibrary({
+  const selectedIds = Array.isArray(candidateIds) && candidateIds.length
+    ? candidateIds
+    : candidateId ? [candidateId] : [];
+  if (!selectedIds.length) return { ok: false, reason: 'candidate-missing' };
+  const selectedIdSet = new Set(selectedIds);
+  const candidates = session.candidates.filter((item) => selectedIdSet.has(item.id));
+  if (!candidates.length) return { ok: false, reason: 'candidate-missing' };
+  const result = await importCandidatesToLibrary({
     installPath,
     rootPath: session.rootPath,
-    candidate,
+    candidates,
   });
   if (result.ok) importSessions.delete(sessionId);
   return result;

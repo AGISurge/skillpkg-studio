@@ -13,6 +13,8 @@ contextBridge.exposeInMainWorld('skillpkg', {
     ipcRenderer.invoke('list-skillpkg-skills', payload),
   loadSkills: (installPath) => ipcRenderer.invoke('load-skills', installPath),
   installSkill: (payload) => ipcRenderer.invoke('install-skill', payload),
+  installLibrarySkills: (payload) =>
+    ipcRenderer.invoke('install-library-skills', payload),
   // 检查指定的 Agent 是否安装
   detectAgents: (names) => ipcRenderer.invoke('detect-agents', names),
   loadAgentSkills: (payload) => ipcRenderer.invoke('load-agent-skills', payload),

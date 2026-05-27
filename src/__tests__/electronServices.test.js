@@ -466,6 +466,88 @@ describe('electron import service', () => {
     expect(scan.candidates.map((candidate) => candidate.skillId)).toEqual(['one', 'two']);
   });
 
+  test('does not scan nested skills inside a detected skill directory', async () => {
+    const rootPath = path.join(tmpDir, 'nested');
+    await fs.mkdir(path.join(rootPath, 'parent', 'child'), { recursive: true });
+    await fs.writeFile(path.join(rootPath, 'parent', 'SKILL.md'), '# Parent');
+    await fs.writeFile(path.join(rootPath, 'parent', 'child', 'SKILL.md'), '# Child');
+
+    const scan = await scanImportCandidates({ rootPath });
+
+    expect(scan.ok).toBe(true);
+    expect(scan.candidates.map((candidate) => candidate.skillId)).toEqual(['parent']);
+  });
+
+  test('limits import candidate scanning to three directory levels', async () => {
+    const rootPath = path.join(tmpDir, 'depth');
+    await fs.mkdir(path.join(rootPath, 'one', 'two', 'three'), { recursive: true });
+    await fs.mkdir(path.join(rootPath, 'one', 'two', 'three', 'four'), { recursive: true });
+    await fs.writeFile(path.join(rootPath, 'one', 'two', 'three', 'SKILL.md'), '# Third Level');
+    await fs.writeFile(path.join(rootPath, 'one', 'two', 'three', 'four', 'SKILL.md'), '# Fourth Level');
+
+    const scan = await scanImportCandidates({ rootPath });
+
+    expect(scan.ok).toBe(true);
+    expect(scan.candidates.map((candidate) => candidate.name)).toEqual(['Third Level']);
+  });
+
+  test('marks id and name conflicts against local library skills', async () => {
+    const installPath = path.join(tmpDir, 'library');
+    const rootPath = path.join(tmpDir, 'incoming');
+    await fs.mkdir(path.join(installPath, 'existing-id'), { recursive: true });
+    await fs.mkdir(path.join(installPath, 'other-id'), { recursive: true });
+    await fs.mkdir(path.join(rootPath, 'existing-id'), { recursive: true });
+    await fs.writeFile(path.join(installPath, 'existing-id', 'SKILL.md'), '# Existing ID');
+    await fs.writeFile(path.join(installPath, 'other-id', 'SKILL.md'), '# Duplicate Name');
+    await fs.writeFile(path.join(rootPath, 'existing-id', 'SKILL.md'), '# Duplicate Name');
+
+    const scan = await scanImportCandidates({ rootPath, installPath });
+
+    expect(scan.ok).toBe(true);
+    expect(scan.candidates[0]).toEqual(expect.objectContaining({
+      skillId: 'existing-id',
+      idConflict: true,
+      nameConflict: true,
+      existingSkillId: 'other-id',
+    }));
+  });
+
+  test('imports only selected candidates from a multi-skill session', async () => {
+    const zipPath = path.join(tmpDir, 'bundle.zip');
+    const installPath = path.join(tmpDir, 'library');
+    const tempRoot = path.join(tmpDir, 'imports');
+    await createZip(zipPath, {
+      'skills/one/SKILL.md': '# One',
+      'skills/two/SKILL.md': '# Two',
+    });
+
+    const candidatesResult = await importSkillSource({
+      kind: 'zip',
+      zipPath,
+      installPath,
+      tempRoot,
+    });
+
+    expect(candidatesResult).toEqual(expect.objectContaining({
+      ok: false,
+      reason: 'multiple-candidates',
+    }));
+
+    const one = candidatesResult.candidates.find((candidate) => candidate.skillId === 'one');
+    const importResult = await importSkillSource({
+      kind: 'session',
+      installPath,
+      tempRoot,
+      sessionId: candidatesResult.sessionId,
+      candidateIds: [one.id],
+    });
+
+    expect(importResult.ok).toBe(true);
+    expect(importResult.skills.map((skill) => skill.id)).toEqual(['one']);
+    await expect(fs.readFile(path.join(installPath, 'one', 'SKILL.md'), 'utf-8')).resolves.toContain('One');
+    await expect(fs.access(path.join(installPath, 'two'))).rejects.toThrow();
+  });
+
   test('reports no-skill-found for archives without SKILL.md', async () => {
     const zipPath = path.join(tmpDir, 'empty.zip');
     await createZip(zipPath, {
