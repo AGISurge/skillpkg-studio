@@ -529,6 +529,29 @@ body:not([data-theme='light']) .settings-api-key-input:focus-within {
   gap: 4px;
 }
 
+.topbar-icon-button {
+  width: 28px;
+  height: 28px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  opacity: 0.5;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: opacity 0.18s ease, background 0.18s ease, border-color 0.18s ease;
+}
+
+.topbar-icon-button:hover,
+.topbar-icon-button:focus-visible {
+  opacity: 1;
+  background: var(--surface-bg-hover);
+  border-color: var(--border-subtle);
+  outline: none;
+}
+
 .topbar-right {
   justify-content: flex-end;
   flex: 1;
@@ -861,33 +884,6 @@ body:not([data-theme='light']) .discover-type-pill {
   flex-direction: column;
   gap: 12px;
   overflow: hidden;
-}
-
-.discover-detail-top {
-  flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-}
-
-.discover-back-button {
-  width: 34px;
-  height: 34px;
-  border: 1px solid var(--border-subtle);
-  border-radius: 10px;
-  background: var(--surface-bg-strong);
-  color: inherit;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.18s ease;
-}
-
-.discover-back-button:hover,
-.discover-back-button:focus-visible {
-  background: var(--surface-bg-hover);
-  border-color: var(--accent-border);
-  outline: none;
 }
 
 .discover-detail-grid {

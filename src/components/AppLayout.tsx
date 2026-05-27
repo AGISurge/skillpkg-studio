@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
+  ArrowLeftRegular,
   PanelLeftContractRegular,
   PanelLeftExpandRegular,
 } from "@fluentui/react-icons";
@@ -46,7 +47,7 @@ const AppLayout = () => {
   const [sidebarFloating, setSidebarFloating] = useState(false);
 
   const activeSection = getActiveSection(location.pathname);
-  const currentRoute = menuRoutes.find((item) => item.id === activeSection);
+  const isDiscoverDetail = /^\/discover\/[^/]+/.test(location.pathname);
   const visibleNotice =
     notice && (notice.scope === "global" || notice.scope === activeSection)
       ? notice
@@ -123,7 +124,8 @@ const AppLayout = () => {
         <header className="topbar">
           <div className="topbar-left">
             <button
-              className="opacity-50 hover:opacity-100 transition-opacity rounded focus-visible:ring focus-visible:ring-primary -mt-0.5"
+              type="button"
+              className="topbar-icon-button"
               aria-label={sidebarOpen ? "收起侧栏" : "展开侧栏"}
               title={sidebarOpen ? "收起侧栏" : "展开侧栏"}
               onClick={() => setSidebarOpen((prev) => !prev)}
@@ -134,6 +136,17 @@ const AppLayout = () => {
                 <PanelLeftExpandRegular className="size-5" />
               )}
             </button>
+            {isDiscoverDetail ? (
+              <button
+                type="button"
+                className="topbar-icon-button"
+                aria-label="返回发现列表"
+                title="返回发现列表"
+                onClick={() => navigate("/discover")}
+              >
+                <ArrowLeftRegular className="size-4" />
+              </button>
+            ) : null}
           </div>
           {toolbarContent ? (
             <div className="topbar-right actions">{toolbarContent}</div>

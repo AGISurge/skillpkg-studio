@@ -1,6 +1,5 @@
 import {
   ArrowDownloadRegular,
-  ArrowLeftRegular,
   ChevronDownRegular,
   ChevronRightRegular,
   DocumentRegular,
@@ -10,7 +9,7 @@ import {
 } from '@fluentui/react-icons';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useParams } from 'react-router-dom';
 import rehypeHighlight from 'rehype-highlight';
 import remarkGfm from 'remark-gfm';
 import { useAppContext, useToolbar } from '../AppContext';
@@ -178,7 +177,6 @@ const FileTree = ({ rootName, nodes }: FileTreeProps) => {
 const DiscoverDetailPage = () => {
   const { apiKey } = useAppContext();
   const { publicId = '' } = useParams();
-  const navigate = useNavigate();
   const location = useLocation();
   const summary = (location.state as { skill?: SkillpkgSkillSummary } | null)?.skill;
   const normalizedApiKey = apiKey.trim();
@@ -310,18 +308,6 @@ const DiscoverDetailPage = () => {
 
   return (
     <section className="discover-detail-page fade-in">
-      <div className="discover-detail-top">
-        <button
-          type="button"
-          className="discover-back-button"
-          aria-label="返回发现列表"
-          title="返回发现列表"
-          onClick={() => navigate('/discover')}
-        >
-          <ArrowLeftRegular className="icon" />
-        </button>
-      </div>
-
       {loading && !detail ? (
         <DiscoverDetailSkeleton />
       ) : displayDetail ? (
