@@ -52,22 +52,25 @@ const AppLayout = () => {
       ? notice
       : null;
 
-  const handleSelectAgent = useCallback((agentId: string) => {
-    setSelectedAgentId(agentId);
-    const agentSkills = agentSkillsByAgent[agentId] || [];
-    const firstSkill = agentSkills[0];
-    if (firstSkill) {
-      setSelectedLibrarySkillId(firstSkill.id);
-      setSelectedFilePath(getDefaultSkillFilePath(firstSkill.files));
-    }
-    navigate(`/agents/${agentId}`);
-  }, [
-    agentSkillsByAgent,
-    navigate,
-    setSelectedAgentId,
-    setSelectedFilePath,
-    setSelectedLibrarySkillId,
-  ]);
+  const handleSelectAgent = useCallback(
+    (agentId: string) => {
+      setSelectedAgentId(agentId);
+      const agentSkills = agentSkillsByAgent[agentId] || [];
+      const firstSkill = agentSkills[0];
+      if (firstSkill) {
+        setSelectedLibrarySkillId(firstSkill.id);
+        setSelectedFilePath(getDefaultSkillFilePath(firstSkill.files));
+      }
+      navigate(`/agents/${agentId}`);
+    },
+    [
+      agentSkillsByAgent,
+      navigate,
+      setSelectedAgentId,
+      setSelectedFilePath,
+      setSelectedLibrarySkillId,
+    ],
+  );
 
   useEffect(() => {
     if (!window.matchMedia) return;
@@ -120,19 +123,17 @@ const AppLayout = () => {
         <header className="topbar">
           <div className="topbar-left">
             <button
-              type="button"
-              className="opacity-50 hover:opacity-100 transition-opacity rounded focus-visible:ring focus-visible:ring-primary"
+              className="opacity-50 hover:opacity-100 transition-opacity rounded focus-visible:ring focus-visible:ring-primary -mt-0.5"
               aria-label={sidebarOpen ? "收起侧栏" : "展开侧栏"}
               title={sidebarOpen ? "收起侧栏" : "展开侧栏"}
               onClick={() => setSidebarOpen((prev) => !prev)}
             >
               {sidebarOpen ? (
-                <PanelLeftContractRegular className="icon" />
+                <PanelLeftContractRegular className="size-5" />
               ) : (
-                <PanelLeftExpandRegular className="icon" />
+                <PanelLeftExpandRegular className="size-5" />
               )}
             </button>
-            <div className="page-title">{currentRoute?.label}</div>
           </div>
           {toolbarContent ? (
             <div className="topbar-right actions">{toolbarContent}</div>

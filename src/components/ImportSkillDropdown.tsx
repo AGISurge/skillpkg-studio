@@ -8,6 +8,7 @@ import {
   FolderZipRegular,
 } from '@fluentui/react-icons';
 import type { ImportSkillSourceKind, ImportSkillStatus } from '../AppContext';
+import { Button } from './ui/button';
 
 type ImportSourceOption = {
   id: ImportSkillSourceKind;
@@ -72,7 +73,7 @@ const ImportSkillDropdown = ({ status, onSelect }: ImportSkillDropdownProps) => 
 
   return (
     <div className="import-menu" ref={rootRef}>
-      <button
+      <Button
         type="button"
         className={`btn ghost import-trigger ${busy ? 'loading' : ''}`}
         onClick={() => setOpen((current) => !current)}
@@ -83,7 +84,7 @@ const ImportSkillDropdown = ({ status, onSelect }: ImportSkillDropdownProps) => 
         {busy ? <span className="mini-spinner" aria-hidden="true" /> : <ArrowImportRegular className="icon" />}
         {label}
         <ChevronDownRegular className="icon" />
-      </button>
+      </Button>
       {open ? (
         <div className="import-menu-popover" role="menu">
           {options.map((option) => {
