@@ -20,7 +20,11 @@ const { unhostAgentSkillLink } = require('../../electron/agentService');
 const { resolveAgentSkillPath } = require('../../electron/agentCatalog');
 const { getDefaultSkillLibraryPath } = require('../../electron/pathUtils');
 const {
+  buildSkillpkgSkillDetailPath,
+  buildSkillpkgSkillDownloadPath,
   buildSkillpkgSkillsPath,
+  getSkillpkgSkillDetail,
+  getSkillpkgSkillDownloadUrl,
   listSkillpkgSkills,
 } = require('../../electron/skillpkgApi');
 
@@ -297,6 +301,11 @@ describe('skillpkg external api client', () => {
     })).toBe('/api/v1/skills?categoryPublicIds=cat_a%2Ccat_b&q=code&isFeatured=true&page=2&pageSize=20');
   });
 
+  test('builds skill detail and download paths from public id', () => {
+    expect(buildSkillpkgSkillDetailPath('skill_public_1')).toBe('/api/v1/skills/skill_public_1');
+    expect(buildSkillpkgSkillDownloadPath('skill_public_1')).toBe('/api/v1/skills/skill_public_1/download');
+  });
+
   test('requests paged skills without requiring a type field', async () => {
     const fetchImpl = jest.fn().mockResolvedValue({
       ok: true,
@@ -349,6 +358,73 @@ describe('skillpkg external api client', () => {
         }),
       ],
     }));
+  });
+
+  test('requests skill detail by public id', async () => {
+    const fetchImpl = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        data: {
+          publicId: 'skill_public_1',
+          slug: 'code-review',
+          name: 'Code Review',
+          skillMd: '# Code Review',
+          fileStructure: [{ name: 'SKILL.md', path: 'SKILL.md', type: 'file', bytes: 32 }],
+          downloadCount: 5,
+          publisher: null,
+        },
+      }),
+    });
+
+    const result = await getSkillpkgSkillDetail({
+      apiKey: 'skp_test',
+      baseUrl: 'https://example.test',
+      fetchImpl,
+      publicId: 'skill_public_1',
+    });
+
+    expect(fetchImpl).toHaveBeenCalledWith(
+      'https://example.test/api/v1/skills/skill_public_1',
+      expect.objectContaining({
+        headers: {
+          Authorization: 'Bearer skp_test',
+        },
+      }),
+    );
+    expect(result).toEqual(expect.objectContaining({
+      ok: true,
+      detail: expect.objectContaining({
+        publicId: 'skill_public_1',
+        skillMd: '# Code Review',
+      }),
+    }));
+  });
+
+  test('requests skill download url by public id', async () => {
+    const fetchImpl = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        data: {
+          url: 'https://example.test/downloads/skill.zip?signature=test',
+        },
+      }),
+    });
+
+    const result = await getSkillpkgSkillDownloadUrl({
+      apiKey: 'skp_test',
+      baseUrl: 'https://example.test',
+      fetchImpl,
+      publicId: 'skill_public_1',
+    });
+
+    expect(fetchImpl).toHaveBeenCalledWith(
+      'https://example.test/api/v1/skills/skill_public_1/download',
+      expect.any(Object),
+    );
+    expect(result).toEqual({
+      ok: true,
+      url: 'https://example.test/downloads/skill.zip?signature=test',
+    });
   });
 });
 

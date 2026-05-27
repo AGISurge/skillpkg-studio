@@ -8,6 +8,7 @@ import HostConflictDialog from './components/HostConflictDialog';
 import ImportSourceDialog from './components/ImportSourceDialog';
 import BatchInstallDialog from './components/BatchInstallDialog';
 import DiscoverPage from './pages/DiscoverPage';
+import DiscoverDetailPage from './pages/DiscoverDetailPage';
 import LocalPage from './pages/LocalPage';
 import FavoritesPage from './pages/FavoritesPage';
 import AgentsPage from './pages/AgentsPage';
@@ -122,6 +123,7 @@ const AppRoutes = () => (
     <Routes>
       <Route element={<AppLayout />}>
         <Route path={routePaths.discover} element={<DiscoverPage />} />
+        <Route path={routePaths.discoverDetail} element={<DiscoverDetailPage />} />
         <Route path={routePaths.local} element={<LocalPage />} />
         <Route path={routePaths.favorites} element={<FavoritesPage />} />
         <Route path={routePaths.agents} element={<AgentsPage />} />

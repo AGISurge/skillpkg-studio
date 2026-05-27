@@ -4,6 +4,8 @@ import {
   StarFilled,
 } from '@fluentui/react-icons';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { KeyboardEvent } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { SkillpkgCategory, SkillpkgListMeta, SkillpkgSkillSummary } from '../types/models';
 import { useAppContext, useToolbar } from '../AppContext';
 
@@ -33,6 +35,7 @@ const DiscoverSkeletonCard = () => (
 
 const DiscoverPage = () => {
   const { apiKey } = useAppContext();
+  const navigate = useNavigate();
   const [categories, setCategories] = useState<SkillpkgCategory[]>([]);
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<Set<string>>(new Set());
   const [searchValue, setSearchValue] = useState('');
@@ -250,6 +253,21 @@ const DiscoverPage = () => {
     });
   }, []);
 
+  const openSkillDetail = useCallback((skill: SkillpkgSkillSummary) => {
+    navigate(`/discover/${encodeURIComponent(skill.publicId)}`, {
+      state: { skill },
+    });
+  }, [navigate]);
+
+  const handleCardKeyDown = useCallback((
+    event: KeyboardEvent<HTMLElement>,
+    skill: SkillpkgSkillSummary,
+  ) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    openSkillDetail(skill);
+  }, [openSkillDetail]);
+
   const toolbar = useMemo(() => (
     <div className="discover-toolbar">
       <div className="discover-category-strip" aria-label="分类筛选">
@@ -346,7 +364,14 @@ const DiscoverPage = () => {
         ) : skills.length ? (
           <div className="discover-grid">
             {skills.map((skill) => (
-              <article className="discover-card" key={skill.publicId}>
+              <article
+                className="discover-card"
+                key={skill.publicId}
+                role="button"
+                tabIndex={0}
+                onClick={() => openSkillDetail(skill)}
+                onKeyDown={(event) => handleCardKeyDown(event, skill)}
+              >
                 <div className="discover-card-head">
                   <h2>{skill.name}</h2>
                 </div>

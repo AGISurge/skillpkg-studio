@@ -1,0 +1,409 @@
+import {
+  ArrowDownloadRegular,
+  ArrowLeftRegular,
+  ChevronDownRegular,
+  ChevronRightRegular,
+  DocumentRegular,
+  FolderRegular,
+  ShieldCheckmarkRegular,
+  WarningRegular,
+} from '@fluentui/react-icons';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import ReactMarkdown from 'react-markdown';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import rehypeHighlight from 'rehype-highlight';
+import remarkGfm from 'remark-gfm';
+import { useAppContext, useToolbar } from '../AppContext';
+import type {
+  SkillpkgFileNode,
+  SkillpkgSkillDetail,
+  SkillpkgSkillSummary,
+} from '../types/models';
+import { formatBytes, stripMarkdownFrontmatter } from '../utils/skillUtils';
+
+const detailCache = new Map<string, SkillpkgSkillDetail>();
+const detailRequests = new Map<string, Promise<SkillpkgSkillDetail>>();
+const markdownRemarkPlugins = [remarkGfm];
+const markdownRehypePlugins = [rehypeHighlight];
+
+const getErrorMessage = (reason?: string, status?: number) => {
+  if (reason === 'api-key-required') return '请先在设置页配置 SkillPKG API Key。';
+  if (status === 401) return 'API Key 无效或已过期，请在设置页更新。';
+  if (status === 404) return '未找到该 Skill。';
+  return reason || '读取 Skill 详情失败，请稍后重试。';
+};
+
+const getRiskMeta = (riskLevel?: SkillpkgSkillDetail['riskLevel']) => {
+  if (riskLevel === 'benign') {
+    return { label: '安全', className: 'safe', icon: ShieldCheckmarkRegular };
+  }
+  if (riskLevel === 'suspicious') {
+    return { label: '需留意', className: 'warning', icon: WarningRegular };
+  }
+  if (riskLevel === 'malicious') {
+    return { label: '高风险', className: 'danger', icon: WarningRegular };
+  }
+  return { label: '未知', className: 'unknown', icon: WarningRegular };
+};
+
+const getDisplaySource = (detail?: SkillpkgSkillDetail | null) => {
+  const source = detail?.homepage || detail?.publisher?.website || '';
+  if (!source) return '未知来源';
+  try {
+    return new URL(source).host.replace(/^www\./, '');
+  } catch (_error) {
+    return source;
+  }
+};
+
+const getInitialExpandedFolders = (nodes: SkillpkgFileNode[], rootPath: string) => {
+  const next = new Set<string>([rootPath]);
+  nodes.forEach((node) => {
+    if (node.type === 'dir') next.add(node.path);
+  });
+  return next;
+};
+
+const DiscoverDetailSkeleton = () => (
+  <div className="discover-detail-grid" aria-hidden="true">
+    <div className="discover-detail-main">
+      <div className="skeleton discover-detail-label-skeleton" />
+      <div className="skeleton discover-detail-code-skeleton" />
+      <div className="skeleton discover-detail-heading-skeleton" />
+      <div className="skeleton skeleton-line wide" />
+      <div className="skeleton skeleton-line" />
+      <div className="skeleton discover-detail-heading-skeleton short" />
+      <div className="skeleton skeleton-line wide" />
+      <div className="skeleton skeleton-line wide" />
+    </div>
+    <aside className="discover-detail-sidebar">
+      <div className="discover-detail-card">
+        <div className="skeleton skeleton-title" />
+        <div className="skeleton skeleton-line wide" />
+        <div className="skeleton skeleton-line" />
+        <div className="skeleton discover-detail-button-skeleton" />
+      </div>
+      <div className="discover-detail-card">
+        <div className="skeleton skeleton-meta" />
+        <div className="skeleton skeleton-line wide" />
+        <div className="skeleton skeleton-line" />
+      </div>
+    </aside>
+  </div>
+);
+
+type FileTreeProps = {
+  rootName: string;
+  nodes: SkillpkgFileNode[];
+};
+
+const FileTree = ({ rootName, nodes }: FileTreeProps) => {
+  const rootPath = '__root__';
+  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(
+    () => getInitialExpandedFolders(nodes, rootPath),
+  );
+
+  useEffect(() => {
+    setExpandedFolders(getInitialExpandedFolders(nodes, rootPath));
+  }, [nodes]);
+
+  const toggleFolder = useCallback((path: string) => {
+    setExpandedFolders((current) => {
+      const next = new Set(current);
+      if (next.has(path)) next.delete(path);
+      else next.add(path);
+      return next;
+    });
+  }, []);
+
+  const renderNodes = (items: SkillpkgFileNode[], depth = 0) => {
+    const sortedItems = [...items].sort((a, b) => {
+      if (a.type === b.type) return a.name.localeCompare(b.name);
+      return a.type === 'dir' ? -1 : 1;
+    });
+
+    return sortedItems.map((node) => {
+      const isDir = node.type === 'dir';
+      const isExpanded = expandedFolders.has(node.path);
+      return (
+        <div className="tree-node" key={node.path || node.name} style={{ paddingLeft: depth * 12 }}>
+          <button
+            type="button"
+            className={`tree-item ${isDir ? '' : 'readonly'}`}
+            onClick={() => {
+              if (isDir) toggleFolder(node.path);
+            }}
+            title={node.bytes !== undefined ? formatBytes(node.bytes) : node.path}
+          >
+            {isDir ? (
+              isExpanded ? (
+                <ChevronDownRegular className="icon" />
+              ) : (
+                <ChevronRightRegular className="icon" />
+              )
+            ) : (
+              <DocumentRegular className="icon" />
+            )}
+            {isDir ? <FolderRegular className="icon" /> : null}
+            <span>{node.name}</span>
+          </button>
+          {isDir && isExpanded && node.children?.length ? renderNodes(node.children, depth + 1) : null}
+        </div>
+      );
+    });
+  };
+
+  return (
+    <div className="discover-file-tree">
+      <div className="tree-node">
+        <button
+          type="button"
+          className="tree-item"
+          onClick={() => toggleFolder(rootPath)}
+        >
+          {expandedFolders.has(rootPath) ? (
+            <ChevronDownRegular className="icon" />
+          ) : (
+            <ChevronRightRegular className="icon" />
+          )}
+          <FolderRegular className="icon" />
+          <span>{rootName}</span>
+        </button>
+      </div>
+      {expandedFolders.has(rootPath) ? renderNodes(nodes, 1) : null}
+    </div>
+  );
+};
+
+const DiscoverDetailPage = () => {
+  const { apiKey } = useAppContext();
+  const { publicId = '' } = useParams();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const summary = (location.state as { skill?: SkillpkgSkillSummary } | null)?.skill;
+  const normalizedApiKey = apiKey.trim();
+  const cachedDetail = publicId ? detailCache.get(publicId) : undefined;
+  const [detail, setDetail] = useState<SkillpkgSkillDetail | null>(cachedDetail || null);
+  const [loading, setLoading] = useState(Boolean(publicId && !cachedDetail));
+  const [error, setError] = useState('');
+  const [downloading, setDownloading] = useState(false);
+
+  useToolbar(null);
+
+  useEffect(() => {
+    let active = true;
+    if (!publicId) {
+      setDetail(null);
+      setLoading(false);
+      setError('缺少 Skill ID。');
+      return () => {
+        active = false;
+      };
+    }
+
+    const cached = detailCache.get(publicId);
+    if (cached) {
+      setDetail(cached);
+      setLoading(false);
+      setError('');
+      return () => {
+        active = false;
+      };
+    }
+
+    if (!normalizedApiKey) {
+      setDetail(null);
+      setLoading(false);
+      setError(getErrorMessage('api-key-required'));
+      return () => {
+        active = false;
+      };
+    }
+    if (!window?.skillpkg?.getSkillpkgSkillDetail) {
+      setDetail(null);
+      setLoading(false);
+      setError('当前环境不支持访问 SkillPkg API。');
+      return () => {
+        active = false;
+      };
+    }
+
+    setDetail(null);
+    setLoading(true);
+    setError('');
+
+    const request = detailRequests.get(publicId) || window.skillpkg.getSkillpkgSkillDetail({
+      apiKey: normalizedApiKey,
+      publicId,
+    }).then((result) => {
+      if (!result.ok || !result.detail) {
+        throw new Error(getErrorMessage(result.reason, result.status));
+      }
+      detailCache.set(publicId, result.detail);
+      return result.detail;
+    }).finally(() => {
+      detailRequests.delete(publicId);
+    });
+
+    detailRequests.set(publicId, request);
+    void request
+      .then((nextDetail) => {
+        if (!active) return;
+        setDetail(nextDetail);
+      })
+      .catch((requestError) => {
+        if (!active) return;
+        setError(requestError?.message || getErrorMessage());
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [normalizedApiKey, publicId]);
+
+  const displayDetail = detail || (summary ? {
+    ...summary,
+    skillMd: '',
+    fileStructure: [],
+    version: null,
+    downloadCount: 0,
+    publisher: null,
+  } as SkillpkgSkillDetail : null);
+
+  const markdownContent = useMemo(() => {
+    if (!detail?.skillMd) return '';
+    return stripMarkdownFrontmatter(detail.skillMd);
+  }, [detail?.skillMd]);
+
+  const riskMeta = getRiskMeta(displayDetail?.riskLevel);
+  const RiskIcon = riskMeta.icon;
+
+  const handleDownload = async () => {
+    if (!publicId || downloading) return;
+    if (!normalizedApiKey) {
+      setError(getErrorMessage('api-key-required'));
+      return;
+    }
+    if (!window?.skillpkg?.downloadSkillpkgSkill) {
+      setError('当前环境不支持下载 Skill。');
+      return;
+    }
+    setDownloading(true);
+    setError('');
+    try {
+      const result = await window.skillpkg.downloadSkillpkgSkill({
+        apiKey: normalizedApiKey,
+        publicId,
+      });
+      if (!result.ok) {
+        setError(getErrorMessage(result.reason, result.status));
+      }
+    } catch (downloadError: any) {
+      setError(getErrorMessage(downloadError?.message));
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  return (
+    <section className="discover-detail-page fade-in">
+      <div className="discover-detail-top">
+        <button
+          type="button"
+          className="discover-back-button"
+          aria-label="返回发现列表"
+          title="返回发现列表"
+          onClick={() => navigate('/discover')}
+        >
+          <ArrowLeftRegular className="icon" />
+        </button>
+      </div>
+
+      {loading && !detail ? (
+        <DiscoverDetailSkeleton />
+      ) : displayDetail ? (
+        <div className="discover-detail-grid">
+          <main className="discover-detail-main">
+            <div className="discover-detail-md-label">SKILL.md</div>
+            {markdownContent ? (
+              <ReactMarkdown
+                remarkPlugins={markdownRemarkPlugins}
+                rehypePlugins={markdownRehypePlugins}
+                className="discover-markdown"
+              >
+                {markdownContent}
+              </ReactMarkdown>
+            ) : (
+              <div className="empty-state discover-detail-empty">
+                {error || '暂无 SKILL.md 预览。'}
+              </div>
+            )}
+          </main>
+
+          <aside className="discover-detail-sidebar">
+            <div className="discover-detail-card discover-summary-card">
+              <div className="discover-summary-accent" aria-hidden="true" />
+              <div className="discover-summary-head">
+                <h1>{displayDetail.name}</h1>
+                <span className="discover-type-pill">Skill</span>
+              </div>
+              <p>{displayDetail.description || '暂无描述。'}</p>
+              <dl className="discover-detail-meta-list">
+                <div>
+                  <dt>提交人</dt>
+                  <dd>{displayDetail.author?.displayName || displayDetail.author?.slug || 'Unknown'}</dd>
+                </div>
+                <div>
+                  <dt>来源</dt>
+                  <dd>{getDisplaySource(displayDetail)}</dd>
+                </div>
+                <div>
+                  <dt>风险等级</dt>
+                  <dd>
+                    <span className={`risk-badge ${riskMeta.className}`}>
+                      <RiskIcon className="icon" />
+                      {riskMeta.label}
+                    </span>
+                  </dd>
+                </div>
+              </dl>
+              <button
+                type="button"
+                className={`btn primary discover-download-button ${downloading ? 'loading' : ''}`}
+                onClick={handleDownload}
+                disabled={downloading}
+              >
+                {downloading ? (
+                  <span className="mini-spinner" aria-hidden="true" />
+                ) : (
+                  <ArrowDownloadRegular className="icon" />
+                )}
+                {downloading ? '获取链接中' : '下载 Zip'}
+              </button>
+            </div>
+
+            <div className="discover-detail-card discover-file-card">
+              <div className="discover-file-card-title">技能包文件清单</div>
+              {detail?.fileStructure?.length ? (
+                <FileTree rootName={detail.slug || detail.name} nodes={detail.fileStructure} />
+              ) : (
+                <div className="empty-state discover-file-empty">暂无文件结构。</div>
+              )}
+            </div>
+          </aside>
+        </div>
+      ) : (
+        <div className="empty-state discover-detail-empty">{error || '未找到该 Skill。'}</div>
+      )}
+
+      {error && displayDetail ? (
+        <div className="notice discover-detail-notice">{error}</div>
+      ) : null}
+    </section>
+  );
+};
+
+export default DiscoverDetailPage;

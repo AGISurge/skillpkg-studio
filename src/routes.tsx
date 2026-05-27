@@ -23,6 +23,7 @@ export type RouteConfig = {
  */
 export const routePaths = {
   discover: '/discover',
+  discoverDetail: '/discover/:publicId',
   local: '/local',
   favorites: '/favorites',
   agents: '/agents/:agentId?',

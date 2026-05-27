@@ -45,6 +45,21 @@ export type SkillpkgAuthor = {
   homepage?: string | null;
 };
 
+export type SkillpkgPublisher = {
+  publicId: string;
+  name: string;
+  description?: string | null;
+  website?: string | null;
+};
+
+export type SkillpkgFileNode = {
+  name: string;
+  path: string;
+  type: 'file' | 'dir';
+  bytes?: number;
+  children?: SkillpkgFileNode[];
+};
+
 export type SkillpkgSkillSummary = {
   publicId: string;
   slug: string;
@@ -55,6 +70,16 @@ export type SkillpkgSkillSummary = {
   homepage?: string | null;
   riskLevel?: 'benign' | 'suspicious' | 'malicious' | null;
   isFeatured: boolean;
+};
+
+export type SkillpkgSkillDetail = SkillpkgSkillSummary & {
+  skillMd: string;
+  fileStructure: SkillpkgFileNode[];
+  version?: string | null;
+  downloadCount: number;
+  publisher: SkillpkgPublisher | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
 };
 
 export type SkillpkgListMeta = {

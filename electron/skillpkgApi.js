@@ -39,6 +39,12 @@ const buildSkillpkgSkillsPath = ({
   return `/api/v1/skills?${params.toString()}`;
 };
 
+const buildSkillpkgSkillDetailPath = (publicId) =>
+  `/api/v1/skills/${encodeURIComponent(String(publicId || '').trim())}`;
+
+const buildSkillpkgSkillDownloadPath = (publicId) =>
+  `${buildSkillpkgSkillDetailPath(publicId)}/download`;
+
 const requestSkillpkg = async ({
   apiKey,
   path,
@@ -111,9 +117,45 @@ const listSkillpkgSkills = async (options = {}) => {
   };
 };
 
+const getSkillpkgSkillDetail = async (options = {}) => {
+  const publicId = String(options.publicId || '').trim();
+  if (!publicId) return { ok: false, reason: 'invalid-public-id' };
+
+  const result = await requestSkillpkg({
+    ...options,
+    path: buildSkillpkgSkillDetailPath(publicId),
+  });
+  if (!result.ok) return result;
+
+  return {
+    ok: true,
+    detail: result.data || null,
+  };
+};
+
+const getSkillpkgSkillDownloadUrl = async (options = {}) => {
+  const publicId = String(options.publicId || '').trim();
+  if (!publicId) return { ok: false, reason: 'invalid-public-id' };
+
+  const result = await requestSkillpkg({
+    ...options,
+    path: buildSkillpkgSkillDownloadPath(publicId),
+  });
+  if (!result.ok) return result;
+
+  return {
+    ok: true,
+    url: typeof result.data.url === 'string' ? result.data.url : '',
+  };
+};
+
 module.exports = {
   DEFAULT_SKILLPKG_API_BASE_URL,
+  buildSkillpkgSkillDetailPath,
+  buildSkillpkgSkillDownloadPath,
   buildSkillpkgSkillsPath,
+  getSkillpkgSkillDetail,
+  getSkillpkgSkillDownloadUrl,
   listSkillpkgCategories,
   listSkillpkgSkills,
 };

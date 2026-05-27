@@ -3,6 +3,7 @@ import type {
   AgentSkillsResult,
   Skill,
   SkillpkgCategory,
+  SkillpkgSkillDetail,
   SkillpkgListMeta,
   SkillpkgSkillSummary,
 } from './models';
@@ -110,6 +111,29 @@ declare global {
         status?: number;
         docs?: SkillpkgSkillSummary[];
         meta?: SkillpkgListMeta;
+      }>;
+      /**
+       * 获取 SkillPkg 远程 Skill 详情。
+       */
+      getSkillpkgSkillDetail: (payload: {
+        apiKey: string;
+        publicId: string;
+      }) => Promise<{
+        ok: boolean;
+        reason?: string;
+        status?: number;
+        detail?: SkillpkgSkillDetail | null;
+      }>;
+      /**
+       * 获取下载链接并交给系统浏览器/下载器。
+       */
+      downloadSkillpkgSkill: (payload: {
+        apiKey: string;
+        publicId: string;
+      }) => Promise<{
+        ok: boolean;
+        reason?: string;
+        status?: number;
       }>;
       /**
        * 从指定路径加载技能列表。
