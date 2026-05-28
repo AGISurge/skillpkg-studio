@@ -109,13 +109,13 @@ const DiscoverDetailSkeleton = () => (
       <div className="skeleton skeleton-line wide" />
     </div>
     <aside className="discover-detail-sidebar">
-      <div className="discover-detail-card">
+      <div className="discover-detail-card discover-detail-skeleton-card">
         <div className="skeleton skeleton-title" />
         <div className="skeleton skeleton-line wide" />
         <div className="skeleton skeleton-line" />
         <div className="skeleton discover-detail-button-skeleton" />
       </div>
-      <div className="discover-detail-card">
+      <div className="discover-detail-card discover-detail-skeleton-card">
         <div className="skeleton skeleton-meta" />
         <div className="skeleton skeleton-line wide" />
         <div className="skeleton skeleton-line" />

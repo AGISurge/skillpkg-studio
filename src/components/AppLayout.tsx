@@ -142,7 +142,7 @@ const AppLayout = () => {
                 className="topbar-icon-button"
                 aria-label="返回发现列表"
                 title="返回发现列表"
-                onClick={() => navigate("/discover")}
+                onClick={() => navigate("/discover", { state: { fromDiscoverDetail: true } })}
               >
                 <ArrowLeftRegular className="size-4" />
               </button>

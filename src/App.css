@@ -1050,6 +1050,12 @@ body:not([data-theme='light']) .discover-type-pill.solution {
   overflow: hidden;
 }
 
+.discover-detail-skeleton-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
 .discover-summary-accent {
   position: absolute;
   inset: 0 0 auto;
@@ -1227,7 +1233,7 @@ body:not([data-theme='light']) .discover-type-pill.solution {
   width: 100%;
   height: 46px;
   border-radius: 12px;
-  margin-top: 26px;
+  margin-top: 12px;
 }
 
 @keyframes skeleton-pulse {

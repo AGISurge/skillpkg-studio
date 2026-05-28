@@ -5,12 +5,58 @@ import {
 } from '@fluentui/react-icons';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import type { SkillpkgCategory, SkillpkgListMeta, SkillpkgSkillSummary } from '../types/models';
 import { useAppContext, useToolbar } from '../AppContext';
 
 const DISCOVER_PAGE_SIZE = 20;
 const SEARCH_DEBOUNCE_MS = 260;
+const DISCOVER_CACHE_TTL_MS = 60 * 60 * 1000;
+
+type DiscoverCategoriesCacheEntry = {
+  categories: SkillpkgCategory[];
+  expiresAt: number;
+};
+
+type DiscoverListCacheEntry = {
+  skills: SkillpkgSkillSummary[];
+  meta: SkillpkgListMeta | null;
+  page: number;
+  scrollTop: number;
+  expiresAt: number;
+};
+
+type DiscoverLocationState = {
+  fromDiscoverDetail?: boolean;
+} | null;
+
+type DiscoverViewState = {
+  selectedCategoryIds: string[];
+  searchValue: string;
+  debouncedSearchValue: string;
+  featuredOnly: boolean;
+};
+
+const categoryCache = new Map<string, DiscoverCategoriesCacheEntry>();
+const listCache = new Map<string, DiscoverListCacheEntry>();
+let pendingDiscoverReturnState: DiscoverViewState | null = null;
+
+const getCacheExpiry = () => Date.now() + DISCOVER_CACHE_TTL_MS;
+
+const isFreshCacheEntry = (entry?: { expiresAt: number }) =>
+  Boolean(entry && entry.expiresAt > Date.now());
+
+const getListCacheKey = (
+  apiKey: string,
+  categoryKey: string,
+  search: string,
+  featuredOnly: boolean,
+) => JSON.stringify({
+  apiKey,
+  categories: categoryKey,
+  q: search.trim(),
+  featuredOnly,
+});
 
 const getErrorMessage = (reason?: string, status?: number) => {
   if (reason === 'api-key-required') return '请先在设置页配置 SkillPKG API Key。';
@@ -43,12 +89,22 @@ const DiscoverSkeletonCard = () => (
 const DiscoverPage = () => {
   const { apiKey } = useAppContext();
   const navigate = useNavigate();
+  const location = useLocation();
+  const locationState = location.state as DiscoverLocationState;
+  const fromDiscoverDetail = locationState?.fromDiscoverDetail === true;
+  const initialReturnStateRef = useRef(
+    fromDiscoverDetail || Boolean(pendingDiscoverReturnState) ? pendingDiscoverReturnState : null,
+  );
   const [categories, setCategories] = useState<SkillpkgCategory[]>([]);
-  const [selectedCategoryIds, setSelectedCategoryIds] = useState<Set<string>>(new Set());
-  const [searchValue, setSearchValue] = useState('');
-  const [debouncedSearchValue, setDebouncedSearchValue] = useState('');
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState<Set<string>>(
+    () => new Set(initialReturnStateRef.current?.selectedCategoryIds || []),
+  );
+  const [searchValue, setSearchValue] = useState(initialReturnStateRef.current?.searchValue || '');
+  const [debouncedSearchValue, setDebouncedSearchValue] = useState(
+    initialReturnStateRef.current?.debouncedSearchValue || '',
+  );
   const [searchComposing, setSearchComposing] = useState(false);
-  const [featuredOnly, setFeaturedOnly] = useState(false);
+  const [featuredOnly, setFeaturedOnly] = useState(initialReturnStateRef.current?.featuredOnly || false);
   const [skills, setSkills] = useState<SkillpkgSkillSummary[]>([]);
   const [meta, setMeta] = useState<SkillpkgListMeta | null>(null);
   const [page, setPage] = useState(1);
@@ -60,6 +116,7 @@ const DiscoverPage = () => {
   const listRef = useRef<HTMLDivElement | null>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const requestIdRef = useRef(0);
+  const preferCachedReturnRef = useRef(fromDiscoverDetail || Boolean(initialReturnStateRef.current));
 
   const normalizedApiKey = apiKey.trim();
   const selectedCategoryKey = useMemo(
@@ -69,6 +126,15 @@ const DiscoverPage = () => {
   const selectedCategoryArray = useMemo(
     () => selectedCategoryKey ? selectedCategoryKey.split(',') : [],
     [selectedCategoryKey],
+  );
+  const listCacheKey = useMemo(
+    () => getListCacheKey(
+      normalizedApiKey,
+      selectedCategoryKey,
+      debouncedSearchValue,
+      featuredOnly,
+    ),
+    [debouncedSearchValue, featuredOnly, normalizedApiKey, selectedCategoryKey],
   );
   const canLoadMore = Boolean(meta && page < meta.totalPages);
 
@@ -88,6 +154,14 @@ const DiscoverPage = () => {
       setCategoriesLoading(false);
       return;
     }
+
+    const cached = categoryCache.get(normalizedApiKey);
+    if (isFreshCacheEntry(cached)) {
+      setCategories(cached?.categories || []);
+      setCategoriesLoading(false);
+      return;
+    }
+
     if (!window?.skillpkg?.listSkillpkgCategories) {
       setError('当前环境不支持访问 SkillPkg API。');
       return;
@@ -102,7 +176,12 @@ const DiscoverPage = () => {
           setCategories([]);
           return;
         }
-        setCategories(result.categories || []);
+        const nextCategories = result.categories || [];
+        categoryCache.set(normalizedApiKey, {
+          categories: nextCategories,
+          expiresAt: getCacheExpiry(),
+        });
+        setCategories(nextCategories);
       })
       .catch((requestError) => {
         if (active) {
@@ -129,6 +208,25 @@ const DiscoverPage = () => {
       setError(getErrorMessage('api-key-required'));
       return;
     }
+
+    const cached = listCache.get(listCacheKey);
+    const canReuseCachedList =
+      isFreshCacheEntry(cached) || (preferCachedReturnRef.current && Boolean(cached));
+    preferCachedReturnRef.current = false;
+    if (canReuseCachedList && cached) {
+      requestIdRef.current += 1;
+      setSkills(cached.skills);
+      setMeta(cached.meta);
+      setPage(cached.page);
+      setInitialLoading(false);
+      setLoadingMore(false);
+      setError('');
+      window.setTimeout(() => {
+        if (listRef.current) listRef.current.scrollTop = cached.scrollTop;
+      }, 0);
+      return;
+    }
+
     if (!window?.skillpkg?.listSkillpkgSkills) {
       setError('当前环境不支持访问 SkillPkg API。');
       return;
@@ -158,8 +256,17 @@ const DiscoverPage = () => {
         setMeta(null);
         return;
       }
-      setSkills(result.docs || []);
-      setMeta(result.meta || null);
+      const nextSkills = result.docs || [];
+      const nextMeta = result.meta || null;
+      setSkills(nextSkills);
+      setMeta(nextMeta);
+      listCache.set(listCacheKey, {
+        skills: nextSkills,
+        meta: nextMeta,
+        page: 1,
+        scrollTop: 0,
+        expiresAt: getCacheExpiry(),
+      });
     }).catch((requestError) => {
       if (requestIdRef.current !== requestId) return;
       setError(getErrorMessage(requestError?.message));
@@ -173,6 +280,7 @@ const DiscoverPage = () => {
   }, [
     debouncedSearchValue,
     featuredOnly,
+    listCacheKey,
     normalizedApiKey,
     selectedCategoryArray,
   ]);
@@ -207,12 +315,21 @@ const DiscoverPage = () => {
         setError(getErrorMessage(result.reason, result.status));
         return;
       }
+      const nextMeta = result.meta || null;
       setSkills((current) => {
         const existingIds = new Set(current.map((skill) => skill.publicId));
         const nextDocs = (result.docs || []).filter((skill) => !existingIds.has(skill.publicId));
-        return [...current, ...nextDocs];
+        const nextSkills = [...current, ...nextDocs];
+        listCache.set(listCacheKey, {
+          skills: nextSkills,
+          meta: nextMeta,
+          page: nextPage,
+          scrollTop: listRef.current?.scrollTop || 0,
+          expiresAt: getCacheExpiry(),
+        });
+        return nextSkills;
       });
-      setMeta(result.meta || null);
+      setMeta(nextMeta);
       setPage(nextPage);
     }).catch((requestError) => {
       if (requestIdRef.current !== requestId) return;
@@ -227,6 +344,7 @@ const DiscoverPage = () => {
     debouncedSearchValue,
     featuredOnly,
     initialLoading,
+    listCacheKey,
     loadingMore,
     normalizedApiKey,
     page,
@@ -260,11 +378,36 @@ const DiscoverPage = () => {
     });
   }, []);
 
+  const persistCurrentListCache = useCallback(() => {
+    if (!normalizedApiKey || !meta) return;
+    listCache.set(listCacheKey, {
+      skills,
+      meta,
+      page,
+      scrollTop: listRef.current?.scrollTop || 0,
+      expiresAt: getCacheExpiry(),
+    });
+  }, [listCacheKey, meta, normalizedApiKey, page, skills]);
+
   const openSkillDetail = useCallback((skill: SkillpkgSkillSummary) => {
+    pendingDiscoverReturnState = {
+      selectedCategoryIds: [...selectedCategoryIds],
+      searchValue,
+      debouncedSearchValue,
+      featuredOnly,
+    };
+    persistCurrentListCache();
     navigate(`/discover/${encodeURIComponent(skill.publicId)}`, {
       state: { skill },
     });
-  }, [navigate]);
+  }, [
+    debouncedSearchValue,
+    featuredOnly,
+    navigate,
+    persistCurrentListCache,
+    searchValue,
+    selectedCategoryIds,
+  ]);
 
   const handleCardKeyDown = useCallback((
     event: KeyboardEvent<HTMLElement>,
