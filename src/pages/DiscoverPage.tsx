@@ -3,7 +3,7 @@ import {
   SearchRegular,
   StarFilled,
 } from '@fluentui/react-icons';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import type { SkillpkgCategory, SkillpkgListMeta, SkillpkgSkillSummary } from '../types/models';
@@ -35,6 +35,7 @@ type DiscoverViewState = {
   searchValue: string;
   debouncedSearchValue: string;
   featuredOnly: boolean;
+  scrollTop: number;
 };
 
 const categoryCache = new Map<string, DiscoverCategoriesCacheEntry>();
@@ -57,6 +58,32 @@ const getListCacheKey = (
   q: search.trim(),
   featuredOnly,
 });
+
+const getDiscoverScrollTop = (element: HTMLDivElement | null) =>
+  element?.scrollTop || document.scrollingElement?.scrollTop || 0;
+
+const restoreDiscoverScrollTop = (element: HTMLDivElement | null, scrollTop: number) => {
+  if (!element || scrollTop <= 0) return;
+
+  let attempts = 0;
+  const restore = () => {
+    if (!element.isConnected) return;
+
+    element.scrollTop = scrollTop;
+    if (document.scrollingElement) {
+      document.scrollingElement.scrollTop = scrollTop;
+    }
+
+    attempts += 1;
+    const restored = Math.abs(element.scrollTop - scrollTop) < 2;
+    const canKeepTrying = attempts < 8;
+    if (!restored && canKeepTrying) {
+      window.requestAnimationFrame(restore);
+    }
+  };
+
+  window.requestAnimationFrame(restore);
+};
 
 const getErrorMessage = (reason?: string, status?: number) => {
   if (reason === 'api-key-required') return '请先在设置页配置 SkillPKG API Key。';
@@ -117,6 +144,7 @@ const DiscoverPage = () => {
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const requestIdRef = useRef(0);
   const preferCachedReturnRef = useRef(fromDiscoverDetail || Boolean(initialReturnStateRef.current));
+  const pendingScrollTopRef = useRef(initialReturnStateRef.current?.scrollTop || 0);
 
   const normalizedApiKey = apiKey.trim();
   const selectedCategoryKey = useMemo(
@@ -221,9 +249,7 @@ const DiscoverPage = () => {
       setInitialLoading(false);
       setLoadingMore(false);
       setError('');
-      window.setTimeout(() => {
-        if (listRef.current) listRef.current.scrollTop = cached.scrollTop;
-      }, 0);
+      pendingScrollTopRef.current = initialReturnStateRef.current?.scrollTop || cached.scrollTop;
       return;
     }
 
@@ -324,7 +350,7 @@ const DiscoverPage = () => {
           skills: nextSkills,
           meta: nextMeta,
           page: nextPage,
-          scrollTop: listRef.current?.scrollTop || 0,
+          scrollTop: getDiscoverScrollTop(listRef.current),
           expiresAt: getCacheExpiry(),
         });
         return nextSkills;
@@ -369,6 +395,14 @@ const DiscoverPage = () => {
     return () => observer.disconnect();
   }, [canLoadMore, initialLoading, loadMore]);
 
+  useLayoutEffect(() => {
+    const scrollTop = pendingScrollTopRef.current;
+    if (!scrollTop || initialLoading || !skills.length) return;
+
+    restoreDiscoverScrollTop(listRef.current, scrollTop);
+    pendingScrollTopRef.current = 0;
+  }, [initialLoading, skills.length]);
+
   const toggleCategory = useCallback((categoryId: string) => {
     setSelectedCategoryIds((current) => {
       const next = new Set(current);
@@ -384,17 +418,19 @@ const DiscoverPage = () => {
       skills,
       meta,
       page,
-      scrollTop: listRef.current?.scrollTop || 0,
+      scrollTop: getDiscoverScrollTop(listRef.current),
       expiresAt: getCacheExpiry(),
     });
   }, [listCacheKey, meta, normalizedApiKey, page, skills]);
 
   const openSkillDetail = useCallback((skill: SkillpkgSkillSummary) => {
+    const scrollTop = getDiscoverScrollTop(listRef.current);
     pendingDiscoverReturnState = {
       selectedCategoryIds: [...selectedCategoryIds],
       searchValue,
       debouncedSearchValue,
       featuredOnly,
+      scrollTop,
     };
     persistCurrentListCache();
     navigate(`/discover/${encodeURIComponent(skill.publicId)}`, {
