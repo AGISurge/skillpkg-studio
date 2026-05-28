@@ -113,6 +113,75 @@ const DiscoverSkeletonCard = () => (
   </div>
 );
 
+type DiscoverSearchInputProps = {
+  value: string;
+  disabled: boolean;
+  onValueChange: (value: string) => void;
+  onClear: () => void;
+};
+
+const DiscoverSearchInput = ({
+  value,
+  disabled,
+  onValueChange,
+  onClear,
+}: DiscoverSearchInputProps) => {
+  const [draftValue, setDraftValue] = useState(value);
+  const composingRef = useRef(false);
+
+  useEffect(() => {
+    if (!composingRef.current) {
+      setDraftValue(value);
+    }
+  }, [value]);
+
+  const commitValue = useCallback((nextValue: string) => {
+    setDraftValue(nextValue);
+    onValueChange(nextValue);
+  }, [onValueChange]);
+
+  return (
+    <label className="discover-search">
+      <SearchRegular className="icon" />
+      <input
+        type="text"
+        value={draftValue}
+        onChange={(event) => {
+          const nextValue = event.currentTarget.value;
+          setDraftValue(nextValue);
+          if (!composingRef.current) {
+            onValueChange(nextValue);
+          }
+        }}
+        onCompositionStart={() => {
+          composingRef.current = true;
+        }}
+        onCompositionEnd={(event) => {
+          composingRef.current = false;
+          commitValue(event.currentTarget.value);
+        }}
+        placeholder="搜索 Skill"
+        aria-label="搜索 Skill"
+        disabled={disabled}
+      />
+      {draftValue ? (
+        <button
+          type="button"
+          className="skill-search-clear"
+          aria-label="清空搜索"
+          onClick={() => {
+            composingRef.current = false;
+            setDraftValue('');
+            onClear();
+          }}
+        >
+          <DismissRegular className="icon" />
+        </button>
+      ) : null}
+    </label>
+  );
+};
+
 const DiscoverPage = () => {
   const { apiKey } = useAppContext();
   const navigate = useNavigate();
@@ -130,7 +199,6 @@ const DiscoverPage = () => {
   const [debouncedSearchValue, setDebouncedSearchValue] = useState(
     initialReturnStateRef.current?.debouncedSearchValue || '',
   );
-  const [searchComposing, setSearchComposing] = useState(false);
   const [featuredOnly, setFeaturedOnly] = useState(initialReturnStateRef.current?.featuredOnly || false);
   const [skills, setSkills] = useState<SkillpkgSkillSummary[]>([]);
   const [meta, setMeta] = useState<SkillpkgListMeta | null>(null);
@@ -167,12 +235,11 @@ const DiscoverPage = () => {
   const canLoadMore = Boolean(meta && page < meta.totalPages);
 
   useEffect(() => {
-    if (searchComposing) return;
     const timer = window.setTimeout(() => {
       setDebouncedSearchValue(searchValue);
     }, SEARCH_DEBOUNCE_MS);
     return () => window.clearTimeout(timer);
-  }, [searchComposing, searchValue]);
+  }, [searchValue]);
 
   useEffect(() => {
     let active = true;
@@ -454,6 +521,11 @@ const DiscoverPage = () => {
     openSkillDetail(skill);
   }, [openSkillDetail]);
 
+  const handleSearchClear = useCallback(() => {
+    setSearchValue('');
+    setDebouncedSearchValue('');
+  }, []);
+
   const toolbar = useMemo(() => (
     <div className="discover-toolbar">
       <div className="discover-category-strip" aria-label="分类筛选">
@@ -475,36 +547,12 @@ const DiscoverPage = () => {
           </button>
         ))}
       </div>
-      <label className="discover-search">
-        <SearchRegular className="icon" />
-        <input
-          type="search"
-          value={searchValue}
-          onChange={(event) => setSearchValue(event.target.value)}
-          onCompositionStart={() => setSearchComposing(true)}
-          onCompositionEnd={(event) => {
-            setSearchComposing(false);
-            setSearchValue(event.currentTarget.value);
-          }}
-          placeholder="搜索 Skill"
-          aria-label="搜索 Skill"
-          disabled={!normalizedApiKey}
-        />
-        {searchValue ? (
-          <button
-            type="button"
-            className="skill-search-clear"
-            aria-label="清空搜索"
-            onClick={() => {
-              setSearchComposing(false);
-              setSearchValue('');
-              setDebouncedSearchValue('');
-            }}
-          >
-            <DismissRegular className="icon" />
-          </button>
-        ) : null}
-      </label>
+      <DiscoverSearchInput
+        value={searchValue}
+        disabled={!normalizedApiKey}
+        onValueChange={setSearchValue}
+        onClear={handleSearchClear}
+      />
       <div className="discover-segment" role="group" aria-label="推荐筛选">
         <button
           type="button"
@@ -529,6 +577,7 @@ const DiscoverPage = () => {
     categories,
     categoriesLoading,
     featuredOnly,
+    handleSearchClear,
     normalizedApiKey,
     searchValue,
     selectedCategoryIds,

@@ -994,7 +994,7 @@ body:not([data-theme='light']) .discover-type-pill.solution {
   min-height: 0;
   min-width: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 300px);
   gap: 22px;
   overflow: hidden;
 }
@@ -1151,7 +1151,7 @@ body:not([data-theme='light']) .discover-type-pill.solution {
 .discover-summary-accent {
   position: absolute;
   inset: 0 0 auto;
-  height: 108px;
+  height: 88px;
   background:
     repeating-linear-gradient(
       135deg,
@@ -1176,7 +1176,7 @@ body:not([data-theme='light']) .discover-type-pill.solution {
 .discover-summary-head h1 {
   margin: 0;
   color: var(--app-text-strong);
-  font-size: 22px;
+  font-size: 20px;
   line-height: 1.25;
   font-weight: 700;
   overflow-wrap: anywhere;
