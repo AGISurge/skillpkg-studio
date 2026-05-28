@@ -15,6 +15,7 @@ const {
   parseSkillMarkdownMetadata,
   readSkillFromDir,
 } = require('./skillScanner');
+const { getSkillpkgSkillDownloadUrl } = require('./skillpkgApi');
 
 const IMPORT_SESSION_TTL_MS = 30 * 60 * 1000;
 const MAX_SKILL_SCAN_DEPTH = 3;
@@ -161,7 +162,7 @@ const buildCandidate = async ({ rootPath, skillDir, preferredId, conflictIndex }
   const metadata = await readCandidateMetadata(skillDir);
   const directoryName = path.basename(skillDir);
   const skillId = slugify(
-    relativePath ? directoryName : preferredId || metadata.name || directoryName,
+    relativePath ? directoryName : metadata.name || preferredId || directoryName,
   );
   const name = metadata.name || skillId;
   const existingSkillId = conflictIndex?.skillIdByName.get(normalizeSkillName(name));
@@ -386,6 +387,93 @@ const importFromZip = async ({ zipPath, installPath, tempRoot }) => {
   });
 };
 
+const getPublicIdFromSkillpkgUrl = (url) => {
+  const value = String(url || '').trim();
+  if (!value) return '';
+  try {
+    const parsed = new URL(value);
+    const segments = parsed.pathname.split('/').filter(Boolean);
+    const skillsIndex = segments.indexOf('skills');
+    if (skillsIndex >= 0 && segments[skillsIndex + 1]) {
+      return segments[skillsIndex + 1];
+    }
+    const packagesIndex = segments.indexOf('packages');
+    if (packagesIndex >= 0 && segments[packagesIndex + 1]) {
+      return segments[packagesIndex + 1];
+    }
+    return segments[segments.length - 1] || '';
+  } catch (_error) {
+    return value;
+  }
+};
+
+const writeResponseToFile = async (response, targetPath) => {
+  const arrayBuffer = await response.arrayBuffer();
+  await fs.writeFile(targetPath, Buffer.from(arrayBuffer));
+};
+
+const downloadZipFromUrl = async ({
+  url,
+  tempRoot,
+  preferredName,
+  fetchImpl = fetch,
+}) => {
+  if (!url) return { ok: false, reason: 'download-url-missing' };
+  const downloadsRoot = path.join(tempRoot, 'downloads');
+  await ensureDir(downloadsRoot);
+  const zipPath = path.join(
+    downloadsRoot,
+    `${slugify(preferredName, 'skillpkg')}-${Date.now()}-${createId()}.zip`,
+  );
+
+  let response;
+  try {
+    response = await fetchImpl(url);
+  } catch (error) {
+    return { ok: false, reason: error?.message || 'download-failed' };
+  }
+
+  if (!response?.ok) {
+    return {
+      ok: false,
+      status: response?.status,
+      reason: `download-failed${response?.status ? `: ${response.status}` : ''}`,
+    };
+  }
+
+  try {
+    await writeResponseToFile(response, zipPath);
+  } catch (error) {
+    return { ok: false, reason: 'download-failed' };
+  }
+
+  return { ok: true, zipPath };
+};
+
+const importFromSkillpkg = async (payload) => {
+  const publicId = String(payload.publicId || getPublicIdFromSkillpkgUrl(payload.url)).trim();
+  if (!publicId) return { ok: false, reason: 'invalid-public-id' };
+
+  const downloadUrlResult = await getSkillpkgSkillDownloadUrl({
+    ...payload,
+    publicId,
+  });
+  if (!downloadUrlResult.ok) return downloadUrlResult;
+
+  const downloadResult = await downloadZipFromUrl({
+    url: downloadUrlResult.url,
+    tempRoot: payload.tempRoot,
+    preferredName: publicId,
+    fetchImpl: payload.fetchImpl,
+  });
+  if (!downloadResult.ok) return downloadResult;
+
+  return importFromZip({
+    ...payload,
+    zipPath: downloadResult.zipPath,
+  });
+};
+
 const importFromGit = async ({ url, installPath, tempRoot, preferredSkillId }) => {
   const source = normalizeGitSource(url);
   if (!source) return { ok: false, reason: 'invalid-git-url' };
@@ -416,13 +504,6 @@ const importFromGit = async ({ url, installPath, tempRoot, preferredSkillId }) =
   });
 };
 
-const resolveSkillpkgUrl = async ({ apiKey }) => {
-  if (!apiKey?.trim()) {
-    return { ok: false, reason: 'api-key-required' };
-  }
-  return { ok: false, reason: 'api-not-configured' };
-};
-
 const importFromSession = async ({ sessionId, candidateId, candidateIds, installPath }) => {
   pruneSessions();
   const session = importSessions.get(sessionId);
@@ -448,11 +529,11 @@ const importSkillSource = async (payload) => {
   const { kind, installPath, tempRoot } = payload || {};
   if (!tempRoot) return { ok: false, reason: 'temp-root-missing' };
   await ensureDir(tempRoot);
-  if (!installPath && kind !== 'skillpkg') return { ok: false, reason: 'install-path-missing' };
+  if (!installPath && kind !== 'session') return { ok: false, reason: 'install-path-missing' };
 
   if (kind === 'zip') return importFromZip(payload);
   if (kind === 'git') return importFromGit(payload);
-  if (kind === 'skillpkg') return resolveSkillpkgUrl(payload);
+  if (kind === 'skillpkg') return importFromSkillpkg(payload);
   if (kind === 'session') return importFromSession(payload);
   return { ok: false, reason: 'unsupported-source' };
 };
@@ -460,6 +541,5 @@ const importSkillSource = async (payload) => {
 module.exports = {
   importSkillSource,
   normalizeGitSource,
-  resolveSkillpkgUrl,
   scanImportCandidates,
 };

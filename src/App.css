@@ -735,6 +735,7 @@ body:not([data-theme='light']) .settings-api-key-input:focus-within {
 }
 
 .discover-card h2 {
+  flex: 1 1 auto;
   margin: 0;
   color: var(--app-text-strong);
   font-size: 16px;
@@ -756,6 +757,16 @@ body:not([data-theme='light']) .settings-api-key-input:focus-within {
 
 body:not([data-theme='light']) .discover-type-pill {
   color: #fbbf24;
+}
+
+.discover-type-pill.solution {
+  border-color: rgba(20, 184, 166, 0.44);
+  color: #0f766e;
+  background: rgba(20, 184, 166, 0.1);
+}
+
+body:not([data-theme='light']) .discover-type-pill.solution {
+  color: #5eead4;
 }
 
 .discover-card p {

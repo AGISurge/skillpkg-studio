@@ -624,6 +624,64 @@ describe('electron import service', () => {
     await expect(fs.access(path.join(installPath, 'two'))).rejects.toThrow();
   });
 
+  test('downloads and imports a SkillPkg cloud zip into the library', async () => {
+    const zipPath = path.join(tmpDir, 'cloud-skill.zip');
+    const installPath = path.join(tmpDir, 'library');
+    await createZip(zipPath, {
+      'SKILL.md': '# Cloud Skill',
+      'notes.txt': 'from cloud',
+    });
+    const zipBuffer = await fs.readFile(zipPath);
+    const fetchImpl = jest
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          data: {
+            url: 'https://download.example.test/cloud-skill.zip?signature=test',
+          },
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        arrayBuffer: async () =>
+          zipBuffer.buffer.slice(
+            zipBuffer.byteOffset,
+            zipBuffer.byteOffset + zipBuffer.byteLength,
+          ),
+      });
+
+    const result = await importSkillSource({
+      kind: 'skillpkg',
+      publicId: 'skill_public_1',
+      apiKey: 'skp_test',
+      baseUrl: 'https://example.test',
+      installPath,
+      tempRoot: path.join(tmpDir, 'imports'),
+      fetchImpl,
+    });
+
+    expect(fetchImpl).toHaveBeenNthCalledWith(
+      1,
+      'https://example.test/api/v1/skills/skill_public_1/download',
+      expect.objectContaining({
+        headers: {
+          Authorization: 'Bearer skp_test',
+        },
+      }),
+    );
+    expect(fetchImpl).toHaveBeenNthCalledWith(
+      2,
+      'https://download.example.test/cloud-skill.zip?signature=test',
+    );
+    expect(result.ok).toBe(true);
+    expect(result.skill).toEqual(expect.objectContaining({
+      id: 'cloud-skill',
+      name: 'Cloud Skill',
+    }));
+    await expect(fs.readFile(path.join(installPath, 'cloud-skill', 'notes.txt'), 'utf-8')).resolves.toBe('from cloud');
+  });
+
   test('reports no-skill-found for archives without SKILL.md', async () => {
     const zipPath = path.join(tmpDir, 'empty.zip');
     await createZip(zipPath, {

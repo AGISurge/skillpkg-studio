@@ -34,6 +34,7 @@ declare global {
         installPath?: string;
         zipPath?: string;
         url?: string;
+        publicId?: string;
         apiKey?: string;
         sessionId?: string;
         candidateId?: string;
@@ -125,15 +126,30 @@ declare global {
         detail?: SkillpkgSkillDetail | null;
       }>;
       /**
-       * 获取下载链接并交给系统浏览器/下载器。
+       * 从 SkillPkg 云端下载并导入 Skill 到统一库。
        */
       downloadSkillpkgSkill: (payload: {
         apiKey: string;
         publicId: string;
+        installPath: string;
       }) => Promise<{
         ok: boolean;
         reason?: string;
         status?: number;
+        sessionId?: string;
+        candidates?: Array<{
+          id: string;
+          skillId: string;
+          name: string;
+          description: string;
+          version: string;
+          relativePath: string;
+          idConflict?: boolean;
+          nameConflict?: boolean;
+          existingSkillId?: string | null;
+        }>;
+        skill?: Skill | null;
+        skills?: Skill[];
       }>;
       /**
        * 从指定路径加载技能列表。

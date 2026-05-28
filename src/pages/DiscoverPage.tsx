@@ -18,6 +18,13 @@ const getErrorMessage = (reason?: string, status?: number) => {
   return reason || '读取 SkillPkg 发现列表失败，请稍后重试。';
 };
 
+const getPackageTypeMeta = (type?: SkillpkgSkillSummary['type']) => {
+  if (type === 'solution') {
+    return { label: 'Solution', className: 'solution' };
+  }
+  return { label: 'Skill', className: 'skill' };
+};
+
 const DiscoverSkeletonCard = () => (
   <div className="discover-card discover-skeleton-card" aria-hidden="true">
     <div className="discover-card-head">
@@ -363,30 +370,36 @@ const DiscoverPage = () => {
           </div>
         ) : skills.length ? (
           <div className="discover-grid">
-            {skills.map((skill) => (
-              <article
-                className="discover-card"
-                key={skill.publicId}
-                role="button"
-                tabIndex={0}
-                onClick={() => openSkillDetail(skill)}
-                onKeyDown={(event) => handleCardKeyDown(event, skill)}
-              >
-                <div className="discover-card-head">
-                  <h2>{skill.name}</h2>
-                </div>
-                <p className='grow'>{skill.description || '暂无描述。'}</p>
-                <div className="discover-divider" />
-                <div className="flex justify-between items-center">
-                <div className="discover-category">
-                  {skill.category?.name || '未分类'}
-                </div>
-                 <div className="discover-author">
-                  <span>{skill.author?.displayName || skill.author?.slug || 'Unknown'}</span>
-                </div>
-                </div>
-              </article>
-            ))}
+            {skills.map((skill) => {
+              const typeMeta = getPackageTypeMeta(skill.type);
+              return (
+                <article
+                  className="discover-card"
+                  key={skill.publicId}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => openSkillDetail(skill)}
+                  onKeyDown={(event) => handleCardKeyDown(event, skill)}
+                >
+                  <div className="discover-card-head">
+                    <h2>{skill.name}</h2>
+                    <span className={`discover-type-pill ${typeMeta.className}`}>
+                      {typeMeta.label}
+                    </span>
+                  </div>
+                  <p className='grow'>{skill.description || '暂无描述。'}</p>
+                  <div className="discover-divider" />
+                  <div className="flex justify-between items-center">
+                    <div className="discover-category">
+                      {skill.category?.name || '未分类'}
+                    </div>
+                    <div className="discover-author">
+                      <span>{skill.author?.displayName || skill.author?.slug || 'Unknown'}</span>
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
           </div>
         ) : (
           <div className="empty-state discover-empty">

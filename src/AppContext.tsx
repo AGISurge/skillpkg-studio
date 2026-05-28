@@ -167,6 +167,7 @@ type AppContextValue = {
   confirmInstall: (overwrite?: boolean) => Promise<void>;
   openSkillLocation: () => Promise<void>;
   openImportSkill: (kind: ImportSkillSourceKind) => Promise<void> | void;
+  importSkillpkgSkill: (publicId: string) => Promise<void>;
   closeImportDialog: () => void;
   setImportDialogValue: (value: string) => void;
   toggleImportCandidate: (id: string) => void;
@@ -233,6 +234,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [batchInstallSkills, setBatchInstallSkills] = useState<Skill[]>([]);
   const [batchInstallAgents, setBatchInstallAgents] = useState<Set<string>>(new Set());
   const [batchInstallSubmitting, setBatchInstallSubmitting] = useState(false);
+  const [batchInstallNoticeScope, setBatchInstallNoticeScope] = useState<NoticeScope>('local');
   const [editing, setEditing] = useState(false);
   const [fileDrafts, setFileDrafts] = useState<Record<string, string>>({});
   const [theme, setTheme] = useState<ThemeMode>(getInitialTheme);
@@ -615,14 +617,16 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const mapImportReason = (reason?: string) => {
     const messages: Record<string, string> = {
       'api-key-required': '请先在设置页配置 SkillPKG API Key。',
-      'api-not-configured': 'skillpkg.com API 尚未接入，接口提供后即可启用。',
       'candidate-missing': '未找到选择的 Skill 候选。',
+      'download-failed': '云端 Skill 下载失败，请检查网络后重试。',
+      'download-url-missing': '云端未返回可下载的 Skill 包。',
       'exists': '统一路径中已存在同名无效目录，请先处理后再导入。',
       'extract-failed': 'Zip 解压失败，请确认文件完整。',
       'git-clone-failed': 'Git 仓库拉取失败，请检查地址或网络。',
       'install-path-missing': '请先设置统一路径。',
       'invalid-git-url': '请输入有效的 Git 仓库地址。',
       'invalid-path': '导入路径无效。',
+      'invalid-public-id': 'SkillPkg Skill ID 无效。',
       'invalid-skill-id': 'Skill ID 无效。',
       'invalid-skill': '候选目录不是有效 Skill。',
       'no-skill-found': '未找到有效 SKILL.md。',
@@ -630,6 +634,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       'source-missing': '未找到导入来源。',
       'unsupported-source': '暂不支持该导入方式。',
     };
+    if (reason?.startsWith('download-failed')) {
+      return messages['download-failed'];
+    }
     return messages[reason || ''] || '导入失败，请检查来源。';
   };
 
@@ -639,15 +646,20 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setImportSessionId('');
   };
 
-  const startBatchInstall = (skills: Skill[]) => {
+  const startBatchInstall = (skills: Skill[], noticeScope: NoticeScope = 'local') => {
     setBatchInstallSkills(skills);
     setBatchInstallAgents(new Set(agents.map((agent) => agent.id)));
+    setBatchInstallNoticeScope(noticeScope);
     setBatchInstallOpen(true);
   };
 
-  const completeImportedSkill = async (skill: Skill | null | undefined, reused?: boolean) => {
+  const completeImportedSkill = async (
+    skill: Skill | null | undefined,
+    reused?: boolean,
+    noticeScope: NoticeScope = 'local',
+  ) => {
     if (!skill) {
-      showNotice('导入失败：未返回有效 Skill。', 'local');
+      showNotice('导入失败：未返回有效 Skill。', noticeScope);
       setImportStatus('error');
       return;
     }
@@ -657,17 +669,18 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setImportDialogOpen(false);
     resetImportSelection();
     setImportStatus('ready');
-    showNotice(reused ? `已使用统一库中现有 ${skill.name}。` : `已导入 ${skill.name}，请确认安装到 Agents。`, 'local');
-    openInstallDialog(skill, 'local');
+    showNotice(reused ? `已使用统一库中现有 ${skill.name}。` : `已导入 ${skill.name}，请确认安装到 Agents。`, noticeScope);
+    openInstallDialog(skill, noticeScope);
   };
 
   const completeImportedSkills = async (
     skills: Skill[],
     reusedSkillIds: string[] = [],
     failedCount = 0,
+    noticeScope: NoticeScope = 'local',
   ) => {
     if (!skills.length) {
-      showNotice('导入失败：未返回有效 Skill。', 'local');
+      showNotice('导入失败：未返回有效 Skill。', noticeScope);
       setImportStatus('error');
       return;
     }
@@ -680,8 +693,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const reusedCount = reusedSkillIds.length;
     const failureText = failedCount ? `，${failedCount} 个导入失败` : '';
     const reusedText = reusedCount ? `，其中 ${reusedCount} 个复用现有 Skill` : '';
-    showNotice(`已导入 ${skills.length} 个 Skill${reusedText}${failureText}，请确认安装到 Agents。`, 'local');
-    startBatchInstall(skills);
+    showNotice(`已导入 ${skills.length} 个 Skill${reusedText}${failureText}，请确认安装到 Agents。`, noticeScope);
+    startBatchInstall(skills, noticeScope);
   };
 
   const runImportSkillSource = async (payload: {
@@ -689,13 +702,14 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     installPath?: string;
     zipPath?: string;
     url?: string;
+    publicId?: string;
     apiKey?: string;
     sessionId?: string;
     candidateId?: string;
     candidateIds?: string[];
-  }) => {
+  }, noticeScope: NoticeScope = 'local') => {
     if (!window?.skillpkg?.importSkillSource) {
-      showNotice('当前环境不支持导入 Skill。', 'local');
+      showNotice('当前环境不支持导入 Skill。', noticeScope);
       setImportStatus('error');
       return;
     }
@@ -716,10 +730,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           result.skills,
           result.reusedSkillIds || [],
           result.failedCandidates?.length || 0,
+          noticeScope,
         );
         return;
       }
-      await completeImportedSkill(result.skill, result.reused);
+      await completeImportedSkill(result.skill, result.reused, noticeScope);
       return;
     }
     if (result.reason === 'multiple-candidates' && result.candidates?.length && result.sessionId) {
@@ -731,7 +746,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       setImportStatus('ready');
       return;
     }
-    showNotice(mapImportReason(result.reason), 'local');
+    showNotice(mapImportReason(result.reason), noticeScope);
     setImportStatus('error');
   };
 
@@ -748,7 +763,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     if (importStatus === 'downloading' || importStatus === 'scanning' || importStatus === 'resolving') {
       return;
     }
-    if (!installPath && kind !== 'skillpkg') {
+    if (!installPath) {
       showNotice('请先设置统一路径。', 'local');
       return;
     }
@@ -811,6 +826,34 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const importSkillpkgSkill = async (publicId: string) => {
+    if (
+      importStatus === 'downloading' ||
+      importStatus === 'scanning' ||
+      importStatus === 'resolving' ||
+      importStatus === 'installing'
+    ) {
+      return;
+    }
+    if (!installPath) {
+      showNotice('请先设置统一路径。', 'discover');
+      return;
+    }
+    if (!apiKey.trim()) {
+      showNotice('请先在设置页配置 SkillPKG API Key。', 'discover');
+      return;
+    }
+    setImportDialogKind('skillpkg');
+    setImportDialogValue('');
+    resetImportSelection();
+    await runImportSkillSource({
+      kind: 'skillpkg',
+      installPath,
+      publicId,
+      apiKey,
+    }, 'discover');
+  };
+
   const toggleImportCandidate = (id: string) => {
     setSelectedImportCandidateIds((current) => {
       const next = new Set(current);
@@ -831,16 +874,17 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setBatchInstallOpen(false);
     setBatchInstallSkills([]);
     setBatchInstallAgents(new Set());
+    setBatchInstallNoticeScope('local');
   };
 
   const confirmBatchInstall = async () => {
     if (!batchInstallSkills.length || batchInstallSubmitting) return;
     if (!window?.skillpkg?.installLibrarySkills) {
-      showNotice('当前环境不支持批量安装 Skill。', 'local');
+      showNotice('当前环境不支持批量安装 Skill。', batchInstallNoticeScope);
       return;
     }
     if (!batchInstallAgents.size) {
-      showNotice('请至少选择一个 Agent。', 'local');
+      showNotice('请至少选择一个 Agent。', batchInstallNoticeScope);
       return;
     }
     const selectedAgents = agents.filter((agent) => batchInstallAgents.has(agent.id));
@@ -855,7 +899,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       const successCount = result.results.filter((item) => item.ok).length;
       const failedCount = result.results.length - successCount;
       if (!result.ok) {
-        showNotice('批量安装失败，请检查 Agent 技能目录权限。', 'local');
+        showNotice('批量安装失败，请检查 Agent 技能目录权限。', batchInstallNoticeScope);
         return;
       }
       await syncInstalledByAgent(selectedAgents, installPath);
@@ -863,11 +907,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         failedCount
           ? `已完成 ${successCount} 项安装，${failedCount} 项因冲突或权限失败。`
           : `已将 ${batchInstallSkills.length} 个 Skill 安装到 ${selectedAgents.length} 个 Agent。`,
-        'local',
+        batchInstallNoticeScope,
       );
       setBatchInstallOpen(false);
       setBatchInstallSkills([]);
       setBatchInstallAgents(new Set());
+      setBatchInstallNoticeScope('local');
     } finally {
       setBatchInstallSubmitting(false);
       setImportStatus((current) => (current === 'installing' ? 'idle' : current));
@@ -1220,6 +1265,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     confirmInstall,
     openSkillLocation,
     openImportSkill,
+    importSkillpkgSkill,
     closeImportDialog,
     setImportDialogValue,
     toggleImportCandidate,

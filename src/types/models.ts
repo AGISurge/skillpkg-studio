@@ -52,6 +52,8 @@ export type SkillpkgPublisher = {
   website?: string | null;
 };
 
+export type SkillpkgPackageType = 'skill' | 'solution';
+
 export type SkillpkgFileNode = {
   name: string;
   path: string;
@@ -63,6 +65,7 @@ export type SkillpkgFileNode = {
 export type SkillpkgSkillSummary = {
   publicId: string;
   slug: string;
+  type: SkillpkgPackageType;
   name: string;
   description?: string | null;
   category: SkillpkgCategory | null;

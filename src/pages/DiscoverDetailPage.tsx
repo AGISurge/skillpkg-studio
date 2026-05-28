@@ -32,6 +32,13 @@ const getErrorMessage = (reason?: string, status?: number) => {
   return reason || '读取 Skill 详情失败，请稍后重试。';
 };
 
+const getPackageTypeMeta = (type?: SkillpkgSkillDetail['type']) => {
+  if (type === 'solution') {
+    return { label: 'Solution', className: 'solution' };
+  }
+  return { label: 'Skill', className: 'skill' };
+};
+
 const getRiskMeta = (riskLevel?: SkillpkgSkillDetail['riskLevel']) => {
   if (riskLevel === 'benign') {
     return { label: '安全', className: 'safe', icon: ShieldCheckmarkRegular };
@@ -175,7 +182,7 @@ const FileTree = ({ rootName, nodes }: FileTreeProps) => {
 };
 
 const DiscoverDetailPage = () => {
-  const { apiKey } = useAppContext();
+  const { apiKey, importSkillpkgSkill, importStatus } = useAppContext();
   const { publicId = '' } = useParams();
   const location = useLocation();
   const summary = (location.state as { skill?: SkillpkgSkillSummary } | null)?.skill;
@@ -184,7 +191,10 @@ const DiscoverDetailPage = () => {
   const [detail, setDetail] = useState<SkillpkgSkillDetail | null>(cachedDetail || null);
   const [loading, setLoading] = useState(Boolean(publicId && !cachedDetail));
   const [error, setError] = useState('');
-  const [downloading, setDownloading] = useState(false);
+  const importing = importStatus === 'downloading' ||
+    importStatus === 'scanning' ||
+    importStatus === 'resolving' ||
+    importStatus === 'installing';
 
   useToolbar(null);
 
@@ -278,31 +288,19 @@ const DiscoverDetailPage = () => {
 
   const riskMeta = getRiskMeta(displayDetail?.riskLevel);
   const RiskIcon = riskMeta.icon;
+  const packageTypeMeta = getPackageTypeMeta(displayDetail?.type);
 
   const handleDownload = async () => {
-    if (!publicId || downloading) return;
+    if (!publicId || importing) return;
     if (!normalizedApiKey) {
       setError(getErrorMessage('api-key-required'));
       return;
     }
-    if (!window?.skillpkg?.downloadSkillpkgSkill) {
-      setError('当前环境不支持下载 Skill。');
-      return;
-    }
-    setDownloading(true);
     setError('');
     try {
-      const result = await window.skillpkg.downloadSkillpkgSkill({
-        apiKey: normalizedApiKey,
-        publicId,
-      });
-      if (!result.ok) {
-        setError(getErrorMessage(result.reason, result.status));
-      }
+      await importSkillpkgSkill(publicId);
     } catch (downloadError: any) {
       setError(getErrorMessage(downloadError?.message));
-    } finally {
-      setDownloading(false);
     }
   };
 
@@ -334,7 +332,9 @@ const DiscoverDetailPage = () => {
               <div className="discover-summary-accent" aria-hidden="true" />
               <div className="discover-summary-head">
                 <h1>{displayDetail.name}</h1>
-                <span className="discover-type-pill">Skill</span>
+                <span className={`discover-type-pill ${packageTypeMeta.className}`}>
+                  {packageTypeMeta.label}
+                </span>
               </div>
               <p>{displayDetail.description || '暂无描述。'}</p>
               <dl className="discover-detail-meta-list">
@@ -358,16 +358,16 @@ const DiscoverDetailPage = () => {
               </dl>
               <button
                 type="button"
-                className={`btn primary discover-download-button ${downloading ? 'loading' : ''}`}
+                className={`btn primary discover-download-button ${importing ? 'loading' : ''}`}
                 onClick={handleDownload}
-                disabled={downloading}
+                disabled={importing}
               >
-                {downloading ? (
+                {importing ? (
                   <span className="mini-spinner" aria-hidden="true" />
                 ) : (
                   <ArrowDownloadRegular className="icon" />
                 )}
-                {downloading ? '获取链接中' : '下载 Zip'}
+                {importing ? '下载导入中' : '导入并安装'}
               </button>
             </div>
 

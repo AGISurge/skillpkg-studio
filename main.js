@@ -27,7 +27,6 @@ const {
 const { importSkillSource } = require('./electron/importService');
 const {
   getSkillpkgSkillDetail,
-  getSkillpkgSkillDownloadUrl,
   listSkillpkgCategories,
   listSkillpkgSkills,
 } = require('./electron/skillpkgApi');
@@ -473,11 +472,11 @@ const registerIpcHandlers = () => {
     getSkillpkgSkillDetail(payload || {}));
 
   ipcMain.handle('download-skillpkg-skill', async (_event, payload) => {
-    const result = await getSkillpkgSkillDownloadUrl(payload || {});
-    if (!result.ok) return result;
-    if (!result.url) return { ok: false, reason: 'download-url-missing' };
-    await shell.openExternal(result.url);
-    return { ok: true };
+    return importSkillSource({
+      ...(payload || {}),
+      kind: 'skillpkg',
+      tempRoot: getImportTempRoot(),
+    });
   });
 
   ipcMain.handle('get-agent-skill-counts', async (_event, payload) => {
