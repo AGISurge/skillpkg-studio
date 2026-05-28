@@ -17,7 +17,13 @@ const {
   scanImportCandidates,
 } = require('../../electron/importService');
 const { getFilePolicy } = require('../../electron/filePolicy');
-const { unhostAgentSkillLink } = require('../../electron/agentService');
+const {
+  deleteAgentSkillEntry,
+  deleteLibrarySkillEntry,
+  linkSkillToAgents,
+  unhostAgentSkillLink,
+  uninstallAgentSkillLink,
+} = require('../../electron/agentService');
 const { resolveAgentSkillPath } = require('../../electron/agentCatalog');
 const { getDefaultSkillLibraryPath } = require('../../electron/pathUtils');
 const {
@@ -275,6 +281,213 @@ describe('electron skill services', () => {
     expect(localStats.isDirectory()).toBe(true);
     await expect(fs.readFile(path.join(agentLink, 'notes.txt'), 'utf-8')).resolves.toBe('library-copy');
     await expect(fs.readFile(path.join(managedSkill, 'notes.txt'), 'utf-8')).resolves.toBe('library-copy');
+  });
+
+  test('uninstalls a managed skill by removing only the agent symlink', async () => {
+    const libraryRoot = path.join(tmpDir, 'library');
+    const agentRoot = path.join(tmpDir, 'agent');
+    const managedSkill = path.join(libraryRoot, 'managed');
+    const agentLink = path.join(agentRoot, 'managed');
+    await fs.mkdir(managedSkill, { recursive: true });
+    await fs.mkdir(agentRoot, { recursive: true });
+    await fs.writeFile(path.join(managedSkill, 'SKILL.md'), '# Managed');
+    await fs.symlink(managedSkill, agentLink, 'dir');
+
+    const result = await uninstallAgentSkillLink({
+      agent: {
+        id: 'test-agent',
+        name: 'Test Agent',
+        pathMac: agentRoot,
+        pathWindows: agentRoot,
+      },
+      skillId: 'managed',
+      installPath: libraryRoot,
+    });
+
+    expect(result).toEqual({ ok: true, removed: true });
+    await expect(fs.lstat(agentLink)).rejects.toThrow();
+    await expect(fs.readFile(path.join(managedSkill, 'SKILL.md'), 'utf-8')).resolves.toBe('# Managed');
+  });
+
+  test('links a library skill to every selected agent', async () => {
+    const libraryRoot = path.join(tmpDir, 'library');
+    const targetDir = path.join(libraryRoot, 'shared');
+    const agentRootA = path.join(tmpDir, 'agent-a');
+    const agentRootB = path.join(tmpDir, 'agent-b');
+    await fs.mkdir(targetDir, { recursive: true });
+    await fs.writeFile(path.join(targetDir, 'SKILL.md'), '# Shared');
+
+    const result = await linkSkillToAgents({
+      skillId: 'shared',
+      targetDir,
+      agents: [
+        {
+          id: 'agent-a',
+          name: 'Agent A',
+          pathMac: agentRootA,
+          pathWindows: agentRootA,
+        },
+        {
+          id: 'agent-b',
+          name: 'Agent B',
+          pathMac: agentRootB,
+          pathWindows: agentRootB,
+        },
+      ],
+    });
+
+    expect(result).toEqual(expect.objectContaining({
+      ok: true,
+      results: [
+        expect.objectContaining({ ok: true, agentId: 'agent-a' }),
+        expect.objectContaining({ ok: true, agentId: 'agent-b' }),
+      ],
+    }));
+    const realTargetDir = await fs.realpath(targetDir);
+    await expect(fs.realpath(path.join(agentRootA, 'shared'))).resolves.toBe(realTargetDir);
+    await expect(fs.realpath(path.join(agentRootB, 'shared'))).resolves.toBe(realTargetDir);
+  });
+
+  test('reports partial success without hiding successful agent links', async () => {
+    const libraryRoot = path.join(tmpDir, 'library');
+    const targetDir = path.join(libraryRoot, 'shared');
+    const agentRootA = path.join(tmpDir, 'agent-a');
+    const agentRootB = path.join(tmpDir, 'agent-b');
+    const agentRootC = path.join(tmpDir, 'agent-c');
+    await fs.mkdir(targetDir, { recursive: true });
+    await fs.mkdir(path.join(agentRootB, 'shared'), { recursive: true });
+    await fs.writeFile(path.join(targetDir, 'SKILL.md'), '# Shared');
+    await fs.writeFile(path.join(agentRootB, 'shared', 'SKILL.md'), '# Own Shared');
+
+    const result = await linkSkillToAgents({
+      skillId: 'shared',
+      targetDir,
+      agents: [
+        {
+          id: 'agent-a',
+          name: 'Agent A',
+          pathMac: agentRootA,
+          pathWindows: agentRootA,
+        },
+        {
+          id: 'agent-b',
+          name: 'Agent B',
+          pathMac: agentRootB,
+          pathWindows: agentRootB,
+        },
+        {
+          id: 'agent-c',
+          name: 'Agent C',
+          pathMac: agentRootC,
+          pathWindows: agentRootC,
+        },
+      ],
+    });
+
+    expect(result).toEqual(expect.objectContaining({
+      ok: true,
+      reason: 'partial-failure',
+      results: [
+        expect.objectContaining({ ok: true, agentId: 'agent-a' }),
+        expect.objectContaining({
+          ok: false,
+          agentId: 'agent-b',
+          reason: 'agent-skill-conflict',
+        }),
+        expect.objectContaining({ ok: true, agentId: 'agent-c' }),
+      ],
+    }));
+    const realTargetDir = await fs.realpath(targetDir);
+    await expect(fs.realpath(path.join(agentRootA, 'shared'))).resolves.toBe(realTargetDir);
+    await expect(fs.readFile(path.join(agentRootB, 'shared', 'SKILL.md'), 'utf-8')).resolves.toBe('# Own Shared');
+    await expect(fs.realpath(path.join(agentRootC, 'shared'))).resolves.toBe(realTargetDir);
+  });
+
+  test('deletes an unmanaged agent skill entry', async () => {
+    const agentRoot = path.join(tmpDir, 'agent');
+    const ownSkill = path.join(agentRoot, 'own');
+    await fs.mkdir(ownSkill, { recursive: true });
+    await fs.writeFile(path.join(ownSkill, 'SKILL.md'), '# Own');
+
+    const result = await deleteAgentSkillEntry({
+      agent: {
+        id: 'test-agent',
+        name: 'Test Agent',
+        pathMac: agentRoot,
+        pathWindows: agentRoot,
+      },
+      skillId: 'own',
+    });
+
+    expect(result).toEqual({ ok: true, removed: true, agentId: 'test-agent' });
+    await expect(fs.lstat(ownSkill)).rejects.toThrow();
+  });
+
+  test('deletes a library skill and removes managed links from agents', async () => {
+    const libraryRoot = path.join(tmpDir, 'library');
+    const agentRootA = path.join(tmpDir, 'agent-a');
+    const agentRootB = path.join(tmpDir, 'agent-b');
+    const managedSkill = path.join(libraryRoot, 'shared');
+    const agentLinkA = path.join(agentRootA, 'shared');
+    const agentLinkB = path.join(agentRootB, 'shared');
+    await fs.mkdir(managedSkill, { recursive: true });
+    await fs.mkdir(agentRootA, { recursive: true });
+    await fs.mkdir(agentRootB, { recursive: true });
+    await fs.writeFile(path.join(managedSkill, 'SKILL.md'), '# Shared');
+    await fs.symlink(managedSkill, agentLinkA, 'dir');
+    await fs.symlink(managedSkill, agentLinkB, 'dir');
+
+    const result = await deleteLibrarySkillEntry({
+      installPath: libraryRoot,
+      skillId: 'shared',
+      agents: [
+        {
+          id: 'agent-a',
+          name: 'Agent A',
+          pathMac: agentRootA,
+          pathWindows: agentRootA,
+        },
+        {
+          id: 'agent-b',
+          name: 'Agent B',
+          pathMac: agentRootB,
+          pathWindows: agentRootB,
+        },
+      ],
+    });
+
+    expect(result).toEqual(expect.objectContaining({
+      ok: true,
+      removed: true,
+      results: [
+        expect.objectContaining({ ok: true, removed: true, agentId: 'agent-a' }),
+        expect.objectContaining({ ok: true, removed: true, agentId: 'agent-b' }),
+      ],
+    }));
+    await expect(fs.lstat(managedSkill)).rejects.toThrow();
+    await expect(fs.lstat(agentLinkA)).rejects.toThrow();
+    await expect(fs.lstat(agentLinkB)).rejects.toThrow();
+  });
+
+  test('rejects unsafe skill ids when deleting agent entries', async () => {
+    const agentRoot = path.join(tmpDir, 'agent');
+    const protectedDir = path.join(tmpDir, 'protected');
+    await fs.mkdir(agentRoot, { recursive: true });
+    await fs.mkdir(protectedDir, { recursive: true });
+    await fs.writeFile(path.join(protectedDir, 'SKILL.md'), '# Protected');
+
+    const result = await deleteAgentSkillEntry({
+      agent: {
+        id: 'test-agent',
+        name: 'Test Agent',
+        pathMac: agentRoot,
+        pathWindows: agentRoot,
+      },
+      skillId: '../protected',
+    });
+
+    expect(result).toEqual({ ok: false, reason: 'invalid' });
+    await expect(fs.readFile(path.join(protectedDir, 'SKILL.md'), 'utf-8')).resolves.toBe('# Protected');
   });
 
   test('resolves macOS agent skill paths', () => {

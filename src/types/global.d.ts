@@ -177,7 +177,15 @@ declare global {
           pathWindows: string;
         }>;
         overwrite?: boolean;
-      }) => Promise<{ ok: boolean; reason?: string }>;
+      }) => Promise<{
+        ok: boolean;
+        reason?: string;
+        results?: Array<{
+          agentId?: string;
+          ok: boolean;
+          reason?: string;
+        }>;
+      }>;
       /**
        * 将统一库中已有的多个 Skill 批量安装到 Agents。
        */
@@ -233,6 +241,36 @@ declare global {
         skillId: string;
         installPath?: string;
       }) => Promise<{ ok: boolean; reason?: string; removed?: boolean }>;
+      /**
+       * 删除指定 Agent 下的 Skill 条目。
+       */
+      deleteAgentSkill: (payload: {
+        agentId: string;
+        skillId: string;
+      }) => Promise<{ ok: boolean; reason?: string; removed?: boolean }>;
+      /**
+       * 删除统一库中的 Skill，并卸载指定 Agents 下的托管链接。
+       */
+      deleteLibrarySkill: (payload: {
+        installPath: string;
+        skillId: string;
+        agents: Array<{
+          id: string;
+          name: string;
+          pathMac: string;
+          pathWindows: string;
+        }>;
+      }) => Promise<{
+        ok: boolean;
+        reason?: string;
+        removed?: boolean;
+        results?: Array<{
+          agentId?: string;
+          ok: boolean;
+          reason?: string;
+          removed?: boolean;
+        }>;
+      }>;
       /**
        * 将指定 Agent 下的托管软链接替换为本地副本。
        */

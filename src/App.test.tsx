@@ -1,7 +1,11 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import type { ComponentProps } from 'react';
 import { HashRouter } from 'react-router-dom';
 import App from './App';
 import ImportSkillDropdown from './components/ImportSkillDropdown';
+import SkillDeleteConfirmDialog from './components/SkillDeleteConfirmDialog';
+import SkillsPage from './pages/SkillsPage';
+import type { Skill } from './types/models';
 
 beforeEach(() => {
   window.localStorage.clear();
@@ -95,4 +99,97 @@ test('renders import skill source menu', () => {
   expect(screen.getByText('本地 zip 文件')).toBeInTheDocument();
   expect(screen.getByText('Git 仓库地址')).toBeInTheDocument();
   expect(screen.queryByText('skills.sh URL')).not.toBeInTheDocument();
+});
+
+const baseSkill: Skill = {
+  id: 'demo',
+  name: 'Demo Skill',
+  version: '1.0.0',
+  description: 'Demo description',
+  author: '',
+  tags: [],
+  files: [{ path: 'SKILL.md', content: '# Demo' }],
+};
+
+const renderSkillsPage = (skill: Skill, props: Partial<ComponentProps<typeof SkillsPage>> = {}) => {
+  render(
+    <SkillsPage
+      skills={[skill]}
+      selectedSkillId={skill.id}
+      selectedSkill={skill}
+      selectedFile={skill.files[0]}
+      selectedFilePath="SKILL.md"
+      favorites={new Set()}
+      mode="agents"
+      onSelectSkill={jest.fn()}
+      onToggleFavorite={jest.fn()}
+      onSelectFile={jest.fn()}
+      expandedFolders={new Set()}
+      onToggleFolder={jest.fn()}
+      editing={false}
+      draftValue={undefined}
+      onStartEdit={jest.fn()}
+      onSave={jest.fn()}
+      onCancelEdit={jest.fn()}
+      onChangeDraft={jest.fn()}
+      {...props}
+    />,
+  );
+};
+
+test('agent managed skill uses uninstall action before deletion confirmation', () => {
+  const onDeleteSkill = jest.fn();
+  const onInstallToggle = jest.fn();
+
+  renderSkillsPage(
+    { ...baseSkill, managed: true, source: 'managed', agentId: 'claude' },
+    {
+      installedSkillIds: new Set(['demo']),
+      onDeleteSkill,
+      onInstallToggle,
+    },
+  );
+
+  fireEvent.click(screen.getByRole('button', { name: '卸载' }));
+
+  expect(onDeleteSkill).toHaveBeenCalledWith(expect.objectContaining({ id: 'demo' }));
+  expect(onInstallToggle).not.toHaveBeenCalled();
+});
+
+test('agent unmanaged skill keeps host action and adds delete action', () => {
+  const onDeleteSkill = jest.fn();
+  const onInstallToggle = jest.fn();
+
+  renderSkillsPage(
+    { ...baseSkill, managed: false, source: 'agent', agentId: 'claude' },
+    {
+      onDeleteSkill,
+      onInstallToggle,
+    },
+  );
+
+  fireEvent.click(screen.getByRole('button', { name: '托管' }));
+  fireEvent.click(screen.getByRole('button', { name: '删除' }));
+
+  expect(onInstallToggle).toHaveBeenCalledWith(expect.objectContaining({ id: 'demo' }));
+  expect(onDeleteSkill).toHaveBeenCalledWith(expect.objectContaining({ id: 'demo' }));
+});
+
+test('local delete confirmation lists agents using the skill', () => {
+  render(
+    <SkillDeleteConfirmDialog
+      state={{
+        action: 'library-delete',
+        skill: baseSkill,
+        hostedAgentNames: ['Claude', 'Codex'],
+      }}
+      onClose={jest.fn()}
+      onConfirm={jest.fn()}
+    />,
+  );
+
+  expect(screen.getByText('确认删除本地 Skill')).toBeInTheDocument();
+  expect(screen.getByText('同时会从以下 Agents 中卸载：')).toBeInTheDocument();
+  expect(screen.getByText('Claude')).toBeInTheDocument();
+  expect(screen.getByText('Codex')).toBeInTheDocument();
 });

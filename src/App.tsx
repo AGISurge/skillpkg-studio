@@ -7,6 +7,7 @@ import InstallDialog from './components/InstallDialog';
 import HostConflictDialog from './components/HostConflictDialog';
 import ImportSourceDialog from './components/ImportSourceDialog';
 import BatchInstallDialog from './components/BatchInstallDialog';
+import SkillDeleteConfirmDialog from './components/SkillDeleteConfirmDialog';
 import DiscoverPage from './pages/DiscoverPage';
 import DiscoverDetailPage from './pages/DiscoverDetailPage';
 import LocalPage from './pages/LocalPage';
@@ -33,6 +34,8 @@ const AppDialogs = () => {
     batchInstallSkills,
     batchInstallAgents,
     batchInstallSubmitting,
+    skillDeleteDialog,
+    skillDeleteSubmitting,
     setDialogAgents,
     setBatchInstallAgents,
     setInstallConflict,
@@ -45,6 +48,8 @@ const AppDialogs = () => {
     confirmImportSkill,
     closeBatchInstallDialog,
     confirmBatchInstall,
+    closeSkillDeleteDialog,
+    confirmSkillDelete,
     resolveHostingConflict,
     cancelHostingConflict,
     openSkillLocation,
@@ -111,6 +116,12 @@ const AppDialogs = () => {
         onUseManaged={() => resolveHostingConflict('use-managed')}
         onOverwrite={() => resolveHostingConflict('overwrite')}
         onClose={cancelHostingConflict}
+      />
+      <SkillDeleteConfirmDialog
+        state={skillDeleteDialog}
+        submitting={skillDeleteSubmitting}
+        onClose={closeSkillDeleteDialog}
+        onConfirm={confirmSkillDelete}
       />
     </>
   );

@@ -32,6 +32,7 @@ const AgentsPage = () => {
     setEditing,
     toggleFavorite,
     handleInstallToggle,
+    openAgentSkillDeleteDialog,
     openInstallDialog,
     handleFileSelect,
     loadSkillFileContent,
@@ -135,6 +136,7 @@ const AgentsPage = () => {
       onSelectSkill={handleSelectSkill}
       onToggleFavorite={toggleFavorite}
       onInstallToggle={handleInstallToggle}
+      onDeleteSkill={openAgentSkillDeleteDialog}
       onReinstall={(skill) => openInstallDialog(skill, 'agents')}
       onSelectFile={handleSelectFile}
       expandedFolders={expandedFolders}

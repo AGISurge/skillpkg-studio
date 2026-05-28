@@ -52,6 +52,16 @@ export type PageNotice = {
   scope: NoticeScope;
 };
 
+export type SkillDeleteAction = 'agent-uninstall' | 'agent-delete' | 'library-delete';
+
+export type SkillDeleteDialogState = {
+  action: SkillDeleteAction;
+  skill: Skill;
+  agentId?: string;
+  agentName?: string;
+  hostedAgentNames?: string[];
+};
+
 // --- Toolbar context: pages register their own toolbar actions ---
 
 const ToolbarContext = createContext<ReactNode>(null);
@@ -145,6 +155,8 @@ type AppContextValue = {
   batchInstallSkills: Skill[];
   batchInstallAgents: Set<string>;
   batchInstallSubmitting: boolean;
+  skillDeleteDialog: SkillDeleteDialogState | null;
+  skillDeleteSubmitting: boolean;
   editing: boolean;
   fileDrafts: Record<string, string>;
   theme: ThemeMode;
@@ -177,6 +189,10 @@ type AppContextValue = {
   setBatchInstallAgents: React.Dispatch<React.SetStateAction<Set<string>>>;
   confirmBatchInstall: () => Promise<void>;
   handleInstallToggle: (skill: Skill) => Promise<void>;
+  openAgentSkillDeleteDialog: (skill: Skill) => void;
+  openLocalSkillDeleteDialog: (skill: Skill) => void;
+  closeSkillDeleteDialog: () => void;
+  confirmSkillDelete: () => Promise<void>;
   resolveHostingConflict: (action: 'use-managed' | 'overwrite') => Promise<void>;
   cancelHostingConflict: () => void;
   handleFileSelect: (path: string) => void;
@@ -235,6 +251,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [batchInstallAgents, setBatchInstallAgents] = useState<Set<string>>(new Set());
   const [batchInstallSubmitting, setBatchInstallSubmitting] = useState(false);
   const [batchInstallNoticeScope, setBatchInstallNoticeScope] = useState<NoticeScope>('local');
+  const [skillDeleteDialog, setSkillDeleteDialog] = useState<SkillDeleteDialogState | null>(null);
+  const [skillDeleteSubmitting, setSkillDeleteSubmitting] = useState(false);
   const [editing, setEditing] = useState(false);
   const [fileDrafts, setFileDrafts] = useState<Record<string, string>>({});
   const [theme, setTheme] = useState<ThemeMode>(getInitialTheme);
@@ -439,13 +457,14 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   ]);
 
   const loadLocalSkills = useCallback(async (path: string) => {
-    if (!path) return;
+    if (!path) return [];
     if (!window?.skillpkg?.loadSkills) {
       showNotice('当前环境不支持读取本地路径。', 'local');
-      return;
+      return [];
     }
     const skills = await window.skillpkg.loadSkills(path);
     setLocalSkills(skills);
+    return skills;
   }, [showNotice]);
 
   useEffect(() => {
@@ -584,9 +603,24 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         showNotice('安装失败，请检查 Agent 技能目录权限。', noticeScope);
         return;
       }
+      const installResults = result.results || [];
+      const successfulAgentIds = new Set(
+        installResults
+          .filter((item) => item.ok && item.agentId)
+          .map((item) => item.agentId as string),
+      );
+      const failedCount = installResults.filter((item) => !item.ok).length;
+      const syncedAgents = successfulAgentIds.size
+        ? selectedAgents.filter((agent) => successfulAgentIds.has(agent.id))
+        : selectedAgents;
       await loadLocalSkills(installPath);
-      await syncInstalledByAgent(selectedAgents, installPath);
-      showNotice(`已为 ${dialogAgents.size} 个 Agent 安装 ${dialogSkill.name}。`, noticeScope);
+      await syncInstalledByAgent(syncedAgents, installPath);
+      showNotice(
+        failedCount
+          ? `已为 ${syncedAgents.length} 个 Agent 安装 ${dialogSkill.name}，${failedCount} 个失败。`
+          : `已为 ${syncedAgents.length} 个 Agent 安装 ${dialogSkill.name}。`,
+        noticeScope,
+      );
       setDialogOpen(false);
       setImportStatus('idle');
     } finally {
@@ -982,41 +1016,164 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   const handleInstallToggle = async (skill: Skill) => {
     if (skill.managed) {
-      await unhostAgentSkill(skill);
+      openAgentSkillDeleteDialog(skill);
       return;
     }
     await hostAgentSkill(skill);
   };
 
-  const unhostAgentSkill = async (skill: Skill) => {
-    if (!installPath) {
-      showNotice('请先设置统一路径。', 'agents');
-      return;
-    }
-    if (!window?.skillpkg?.unhostAgentSkill) {
-      showNotice('当前环境不支持取消托管。', 'agents');
-      return;
-    }
+  const openAgentSkillDeleteDialog = (skill: Skill) => {
     const targetAgentId = skill.agentId || selectedAgentId;
-    setPendingSkillIds((prev) => new Set(prev).add(skill.id));
+    const isManaged = Boolean(skill.managed || installedByAgent[targetAgentId]?.has(skill.id));
+    const agentName =
+      agents.find((agent) => agent.id === targetAgentId)?.name ||
+      AGENT_CATALOG[targetAgentId as AgentId]?.name ||
+      targetAgentId ||
+      '当前 Agent';
+
+    setSkillDeleteDialog({
+      action: isManaged ? 'agent-uninstall' : 'agent-delete',
+      skill,
+      agentId: targetAgentId,
+      agentName,
+    });
+  };
+
+  const openLocalSkillDeleteDialog = (skill: Skill) => {
+    const hostedAgentNames = Object.entries(installedByAgent)
+      .filter(([, skillIds]) => skillIds.has(skill.id))
+      .map(([agentId]) =>
+        agents.find((agent) => agent.id === agentId)?.name ||
+        AGENT_CATALOG[agentId as AgentId]?.name ||
+        agentId,
+      );
+
+    setSkillDeleteDialog({
+      action: 'library-delete',
+      skill,
+      hostedAgentNames,
+    });
+  };
+
+  const closeSkillDeleteDialog = () => {
+    if (skillDeleteSubmitting) return;
+    setSkillDeleteDialog(null);
+  };
+
+  const confirmAgentSkillDelete = async (dialog: SkillDeleteDialogState) => {
+    const targetAgentId = dialog.agentId || dialog.skill.agentId || selectedAgentId;
+    if (!targetAgentId) {
+      showNotice('未找到当前 Agent 配置。', 'agents');
+      return;
+    }
+    setPendingSkillIds((prev) => new Set(prev).add(dialog.skill.id));
     try {
-      const result = await window.skillpkg.unhostAgentSkill({
-        agentId: targetAgentId,
-        skillId: skill.id,
-        installPath,
-      });
-      if (!result.ok) {
-        showNotice('取消托管失败：该 Skill 不是有效的托管链接。', 'agents');
+      const result = dialog.action === 'agent-uninstall'
+        ? await window.skillpkg?.uninstallAgentSkill?.({
+            agentId: targetAgentId,
+            skillId: dialog.skill.id,
+            installPath,
+          })
+        : await window.skillpkg?.deleteAgentSkill?.({
+            agentId: targetAgentId,
+            skillId: dialog.skill.id,
+          });
+
+      if (!result?.ok) {
+        showNotice(
+          dialog.action === 'agent-uninstall'
+            ? '卸载失败：该 Skill 不是有效的托管链接。'
+            : '删除失败，请检查 Agent 技能目录权限。',
+          'agents',
+        );
         return;
       }
       await syncInstalledByAgent(agents, installPath);
-      showNotice('已取消托管，并复制到当前 Agent 的 Skill 目录。', 'agents');
+      showNotice(
+        dialog.action === 'agent-uninstall'
+          ? '已从当前 Agent 卸载托管 Skill。'
+          : '已删除当前 Agent 的 Skill。',
+        'agents',
+      );
+      setSkillDeleteDialog(null);
     } finally {
       setPendingSkillIds((prev) => {
         const next = new Set(prev);
-        next.delete(skill.id);
+        next.delete(dialog.skill.id);
         return next;
       });
+    }
+  };
+
+  const confirmLocalSkillDelete = async (dialog: SkillDeleteDialogState) => {
+    if (!installPath) {
+      showNotice('请先设置统一路径。', 'local');
+      return;
+    }
+    if (!window?.skillpkg?.deleteLibrarySkill || !window?.skillpkg?.loadSkills) {
+      showNotice('当前环境不支持删除本地 Skill。', 'local');
+      return;
+    }
+    const hostedAgentIds = Object.entries(installedByAgent)
+      .filter(([, skillIds]) => skillIds.has(dialog.skill.id))
+      .map(([agentId]) => agentId);
+    const hostedAgents = agents.filter((agent) => hostedAgentIds.includes(agent.id));
+    setPendingSkillIds((prev) => new Set(prev).add(dialog.skill.id));
+    try {
+      const result = await window.skillpkg.deleteLibrarySkill({
+        installPath,
+        skillId: dialog.skill.id,
+        agents: hostedAgents,
+      });
+      if (!result.ok) {
+        showNotice('删除失败，请检查统一路径和 Agent 技能目录权限。', 'local');
+        return;
+      }
+      const nextSkills = await loadLocalSkills(installPath);
+      await syncInstalledByAgent(agents, installPath);
+      setFavorites((prev) => {
+        if (!prev.has(dialog.skill.id)) return prev;
+        const next = new Set(prev);
+        next.delete(dialog.skill.id);
+        return next;
+      });
+      setFileDrafts((prev) => {
+        const next = { ...prev };
+        Object.keys(next).forEach((key) => {
+          if (key.startsWith(`${dialog.skill.id}::`)) delete next[key];
+        });
+        return next;
+      });
+      const nextSelectedSkill = nextSkills.find((skill) => skill.id !== dialog.skill.id) || null;
+      setSelectedLibrarySkillId(nextSelectedSkill?.id || '');
+      setSelectedFilePath(nextSelectedSkill ? getDefaultSkillFilePath(nextSelectedSkill) : '');
+      showNotice(
+        hostedAgents.length
+          ? '已删除本地 Skill，并从使用它的 Agents 中卸载。'
+          : '已删除本地 Skill。',
+        'local',
+      );
+      setSkillDeleteDialog(null);
+    } finally {
+      setPendingSkillIds((prev) => {
+        const next = new Set(prev);
+        next.delete(dialog.skill.id);
+        return next;
+      });
+    }
+  };
+
+  const confirmSkillDelete = async () => {
+    if (!skillDeleteDialog || skillDeleteSubmitting) return;
+    setSkillDeleteSubmitting(true);
+    try {
+      if (skillDeleteDialog.action === 'library-delete') {
+        await confirmLocalSkillDelete(skillDeleteDialog);
+        return;
+      }
+      await confirmAgentSkillDelete(skillDeleteDialog);
+    } finally {
+      setSkillDeleteSubmitting(false);
     }
   };
 
@@ -1248,6 +1405,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     batchInstallSkills,
     batchInstallAgents,
     batchInstallSubmitting,
+    skillDeleteDialog,
+    skillDeleteSubmitting,
     editing,
     fileDrafts,
     theme,
@@ -1280,6 +1439,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setBatchInstallAgents,
     confirmBatchInstall,
     handleInstallToggle,
+    openAgentSkillDeleteDialog,
+    openLocalSkillDeleteDialog,
+    closeSkillDeleteDialog,
+    confirmSkillDelete,
     resolveHostingConflict,
     cancelHostingConflict,
     handleFileSelect,

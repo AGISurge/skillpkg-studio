@@ -59,6 +59,39 @@ const ensureAgentSkillLink = async ({ agent, skillId, targetDir }) => {
   return { ok: true, agentId: config.id };
 };
 
+const linkSkillToAgents = async ({ agents, skillId, targetDir }) => {
+  const agentList = Array.isArray(agents) ? agents : [];
+  const results = await Promise.all(
+    agentList.map(async (agent) => {
+      const config = getAgentConfig(agent);
+      try {
+        const result = await ensureAgentSkillLink({
+          agent: config || agent,
+          skillId,
+          targetDir,
+        });
+        return {
+          ...result,
+          agentId: result.agentId || config?.id || agent?.id,
+        };
+      } catch (_error) {
+        return {
+          agentId: config?.id || agent?.id,
+          ok: false,
+          reason: 'link-failed',
+        };
+      }
+    }),
+  );
+  const hasSuccess = results.some((result) => result.ok);
+  const failed = results.find((result) => !result.ok);
+  return {
+    ok: hasSuccess,
+    reason: hasSuccess ? (failed ? 'partial-failure' : undefined) : failed?.reason || 'install-failed',
+    results,
+  };
+};
+
 const uninstallAgentSkillLink = async ({ agent, skillId, installPath }) => {
   const config = getAgentConfig(agent);
   const skillRoot = resolveAgentSkillPath(config);
@@ -113,6 +146,76 @@ const getSymlinkTargetPath = async (linkPath) => {
 const isManagedTarget = (targetPath, managedRootPaths) =>
   Boolean(targetPath && managedRootPaths.some((rootPath) => isPathInside(targetPath, rootPath)));
 
+const isSafeSkillId = (skillId) =>
+  Boolean(skillId) &&
+  typeof skillId === 'string' &&
+  !skillId.includes('/') &&
+  !skillId.includes('\\') &&
+  skillId !== '.' &&
+  skillId !== '..';
+
+const resolveSkillEntryPath = async (rootPath, skillId) => {
+  if (!rootPath || !isSafeSkillId(skillId)) return null;
+  const targetPath = path.normalize(path.join(rootPath, skillId));
+  if (!isPathInside(targetPath, rootPath)) return null;
+  return targetPath;
+};
+
+const skillEntryExists = async (entryPath) => {
+  try {
+    await fs.lstat(entryPath);
+    return true;
+  } catch (_error) {
+    return false;
+  }
+};
+
+const deleteAgentSkillEntry = async ({ agent, skillId }) => {
+  const config = getAgentConfig(agent);
+  const skillRoot = resolveAgentSkillPath(config);
+  const entryPath = await resolveSkillEntryPath(skillRoot, skillId);
+  if (!skillRoot || !entryPath) return { ok: false, reason: 'invalid' };
+  if (!await skillEntryExists(entryPath)) return { ok: true, removed: false, agentId: config.id };
+  await removeIfExists(entryPath);
+  return { ok: true, removed: true, agentId: config.id };
+};
+
+const deleteLibrarySkillEntry = async ({ installPath, skillId, agents }) => {
+  const entryPath = await resolveSkillEntryPath(installPath, skillId);
+  if (!installPath || !entryPath) return { ok: false, reason: 'invalid', results: [] };
+
+  const agentList = Array.isArray(agents) ? agents : [];
+  const results = [];
+  for (const agent of agentList) {
+    const config = getAgentConfig(agent);
+    try {
+      const result = await uninstallAgentSkillLink({
+        agent: config,
+        skillId,
+        installPath,
+      });
+      results.push({ ...result, agentId: config?.id });
+    } catch (_error) {
+      results.push({ ok: false, reason: 'uninstall-failed', agentId: config?.id });
+    }
+  }
+
+  const failed = results.find((result) => !result.ok);
+  if (failed) {
+    return {
+      ok: false,
+      reason: failed.reason || 'uninstall-failed',
+      results,
+    };
+  }
+
+  if (!await skillEntryExists(entryPath)) {
+    return { ok: true, removed: false, results };
+  }
+  await removeIfExists(entryPath);
+  return { ok: true, removed: true, results };
+};
+
 const unhostAgentSkillLink = async ({ agent, skillId, installPath }) => {
   const config = getAgentConfig(agent);
   const skillRoot = resolveAgentSkillPath(config);
@@ -144,7 +247,10 @@ const unhostAgentSkillLink = async ({ agent, skillId, installPath }) => {
 };
 
 module.exports = {
+  deleteAgentSkillEntry,
+  deleteLibrarySkillEntry,
   ensureAgentSkillLink,
+  linkSkillToAgents,
   listInstalledAgents,
   loadAgentSkills,
   unhostAgentSkillLink,

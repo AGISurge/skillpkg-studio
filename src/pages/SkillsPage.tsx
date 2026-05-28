@@ -1,5 +1,6 @@
 import {
   ArrowDownloadRegular,
+  DeleteRegular,
   DismissRegular,
   SearchRegular,
   SettingsRegular,
@@ -66,6 +67,7 @@ type SkillsPageProps = {
   onToggleFavorite: (skillId: string) => void;
   onInstallToggle?: (skill: Skill) => void;
   onReinstall?: (skill: Skill) => void;
+  onDeleteSkill?: (skill: Skill) => void;
   onSelectFile: (path: string) => void;
   expandedFolders: Set<string>;
   onToggleFolder: (path: string) => void;
@@ -95,6 +97,7 @@ const SkillsPage = ({
   onToggleFavorite,
   onInstallToggle,
   onReinstall,
+  onDeleteSkill,
   onSelectFile,
   expandedFolders,
   onToggleFolder,
@@ -211,28 +214,71 @@ const SkillsPage = ({
                     ))}
                   </div>
                 )}
-                {mode === "agents" && onInstallToggle && (
+                {mode === "agents" && (onInstallToggle || onDeleteSkill) && (
                   <div
                     className="skill-card-footer"
                     onClick={(event) => event.stopPropagation()}
                   >
-                    <button
-                      type="button"
-                      className={`btn mini ${isManaged ? "managed" : "primary"} ${isPending ? "loading" : ""}`}
-                      disabled={isPending}
-                      aria-busy={isPending}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        if (!isPending) onInstallToggle(skill);
-                      }}
-                    >
-                      {isPending ? (
-                        <span className="mini-spinner" aria-hidden="true" />
-                      ) : (
-                        <SettingsRegular className="icon" />
-                      )}
-                      {isPending ? "处理中" : isManaged ? "取消托管" : "托管"}
-                    </button>
+                    {isManaged ? (
+                      <button
+                        type="button"
+                        className={`btn mini danger ${isPending ? "loading" : ""}`}
+                        disabled={isPending}
+                        aria-busy={isPending}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          if (!isPending) (onDeleteSkill || onInstallToggle)?.(skill);
+                        }}
+                      >
+                        {isPending ? (
+                          <span className="mini-spinner" aria-hidden="true" />
+                        ) : (
+                          <DeleteRegular className="icon" />
+                        )}
+                        {isPending ? "处理中" : "卸载"}
+                      </button>
+                    ) : (
+                      <>
+                        {onInstallToggle && (
+                          <button
+                            type="button"
+                            className={`btn mini primary ${isPending ? "loading" : ""}`}
+                            disabled={isPending}
+                            aria-busy={isPending}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              if (!isPending) onInstallToggle(skill);
+                            }}
+                          >
+                            {isPending ? (
+                              <span className="mini-spinner" aria-hidden="true" />
+                            ) : (
+                              <SettingsRegular className="icon" />
+                            )}
+                            {isPending ? "处理中" : "托管"}
+                          </button>
+                        )}
+                        {onDeleteSkill && (
+                          <button
+                            type="button"
+                            className={`btn mini danger ${isPending ? "loading" : ""}`}
+                            disabled={isPending}
+                            aria-busy={isPending}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              if (!isPending) onDeleteSkill(skill);
+                            }}
+                          >
+                            {isPending ? (
+                              <span className="mini-spinner" aria-hidden="true" />
+                            ) : (
+                              <DeleteRegular className="icon" />
+                            )}
+                            {isPending ? "处理中" : "删除"}
+                          </button>
+                        )}
+                      </>
+                    )}
                   </div>
                 )}
               </div>
@@ -273,6 +319,17 @@ const SkillsPage = ({
                         onClick={() => onReinstall(selectedSkill)}
                       >
                         <ArrowDownloadRegular className="icon" />
+                      </Button>
+                    )}
+                    {onDeleteSkill && mode !== "favorites" && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        aria-label={mode === "agents" && selectedSkill.managed ? "卸载 Skill" : "删除 Skill"}
+                        onClick={() => onDeleteSkill(selectedSkill)}
+                      >
+                        <DeleteRegular className="icon" />
                       </Button>
                     )}
                   </div>

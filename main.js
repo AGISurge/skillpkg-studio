@@ -12,7 +12,10 @@ const {
 const { getFilePolicy } = require('./electron/filePolicy');
 const { getAgentConfig, resolveAgentSkillPath } = require('./electron/agentCatalog');
 const {
+  deleteAgentSkillEntry,
+  deleteLibrarySkillEntry,
   ensureAgentSkillLink,
+  linkSkillToAgents,
   listInstalledAgents,
   loadAgentSkills,
   unhostAgentSkillLink,
@@ -177,6 +180,18 @@ const deleteSkillInstallRecord = async ({ skillId, agentId }) => {
     skillId,
     agentId,
   ]);
+  await saveDatabase();
+};
+
+const deleteSkillInstallRecordsForSkill = async (skillId) => {
+  if (!db || dbInitError) return;
+  db.run('DELETE FROM skill_agent_link WHERE skillId = ?;', [skillId]);
+  await saveDatabase();
+};
+
+const deleteFavoriteSkillId = async (skillId) => {
+  if (!db || dbInitError) return;
+  db.run('DELETE FROM skill_favorite WHERE skillId = ?;', [skillId]);
   await saveDatabase();
 };
 
@@ -521,23 +536,14 @@ const registerIpcHandlers = () => {
     await ensureDir(installPath);
     const libraryResult = await writeSkillToLibrary({ installPath, skill, overwrite });
     if (!libraryResult.ok) return libraryResult;
-    const installResults = await Promise.all(
-      agentList.map(async (agent) => {
-        try {
-          return await ensureAgentSkillLink({
-            agent,
-            skillId: skill.id,
-            targetDir: libraryResult.skillDir,
-          });
-        } catch (error) {
-          return { agentId: agent.id, ok: false, reason: 'link-failed' };
-        }
-      }),
-    );
-    const failed = installResults.find((result) => !result.ok);
-    if (failed) return { ok: false, reason: failed.reason, results: installResults };
+    const installResult = await linkSkillToAgents({
+      agents: agentList,
+      skillId: skill.id,
+      targetDir: libraryResult.skillDir,
+    });
+    if (!installResult.ok) return installResult;
     const markdownMetadata = await getSkillMarkdownMetadata(libraryResult.skillDir);
-    for (const result of installResults) {
+    for (const result of installResult.results.filter((item) => item.ok)) {
       await upsertSkillInstallRecord({
         skillId: skill.id,
         agentId: result.agentId,
@@ -545,7 +551,7 @@ const registerIpcHandlers = () => {
         description: markdownMetadata.description || skill.description || null,
       });
     }
-    return { ok: true, results: installResults };
+    return installResult;
   });
 
   ipcMain.handle('install-library-skills', async (_event, payload) =>
@@ -554,11 +560,43 @@ const registerIpcHandlers = () => {
   ipcMain.handle('uninstall-agent-skill', async (_event, payload) => {
     const { agentId, skillId, installPath } = payload || {};
     if (!agentId || !skillId) return { ok: false, reason: 'invalid' };
-    return uninstallAgentSkillLink({
+    const result = await uninstallAgentSkillLink({
       agent: getAgentConfig(agentId),
       skillId,
       installPath,
     });
+    if (result.ok) {
+      await deleteSkillInstallRecord({ skillId, agentId });
+    }
+    return result;
+  });
+
+  ipcMain.handle('delete-agent-skill', async (_event, payload) => {
+    const { agentId, skillId } = payload || {};
+    if (!agentId || !skillId) return { ok: false, reason: 'invalid' };
+    const result = await deleteAgentSkillEntry({
+      agent: getAgentConfig(agentId),
+      skillId,
+    });
+    if (result.ok) {
+      await deleteSkillInstallRecord({ skillId, agentId });
+    }
+    return result;
+  });
+
+  ipcMain.handle('delete-library-skill', async (_event, payload) => {
+    const { installPath, skillId, agents } = payload || {};
+    if (!installPath || !skillId) return { ok: false, reason: 'invalid', results: [] };
+    const result = await deleteLibrarySkillEntry({
+      installPath,
+      skillId,
+      agents: Array.isArray(agents) ? agents.map((agent) => getAgentConfig(agent)) : [],
+    });
+    if (result.ok) {
+      await deleteSkillInstallRecordsForSkill(skillId);
+      await deleteFavoriteSkillId(skillId);
+    }
+    return result;
   });
 
   ipcMain.handle('unhost-agent-skill', async (_event, payload) => {

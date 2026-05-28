@@ -1434,6 +1434,12 @@ body:not([data-theme='light']) .discover-type-pill.solution {
   color: var(--success-text);
 }
 
+.btn.mini.danger {
+  background: var(--danger-bg);
+  border-color: transparent;
+  color: var(--danger-text);
+}
+
 .btn.mini.loading {
   pointer-events: none;
 }
@@ -1783,6 +1789,7 @@ body:not([data-theme='light']) .discover-type-pill.solution {
 .skill-card-footer {
   display: flex;
   justify-content: flex-end;
+  gap: 8px;
   margin-top: 10px;
 }
 
@@ -2198,6 +2205,36 @@ body:not([data-theme='light']) .discover-type-pill.solution {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.delete-warning,
+.delete-usage {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-bg);
+  color: var(--text-soft);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.delete-warning {
+  border-color: rgba(255, 103, 103, 0.24);
+  background: var(--danger-bg);
+  color: var(--danger-text);
+}
+
+.delete-agent-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.delete-usage {
+  flex-direction: column;
 }
 
 .import-candidate-list {

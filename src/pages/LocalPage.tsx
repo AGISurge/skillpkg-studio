@@ -29,6 +29,7 @@ const LocalPage = () => {
     setEditing,
     toggleFavorite,
     openInstallDialog,
+    openLocalSkillDeleteDialog,
     openImportSkill,
     handleFileSelect,
     handleToggleFolder,
@@ -96,6 +97,7 @@ const LocalPage = () => {
       }}
       onToggleFavorite={toggleFavorite}
       onReinstall={(skill) => openInstallDialog(skill, 'local')}
+      onDeleteSkill={openLocalSkillDeleteDialog}
       onSelectFile={handleFileSelect}
       expandedFolders={expandedFolders}
       onToggleFolder={handleToggleFolder}
