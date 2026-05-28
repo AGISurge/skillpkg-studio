@@ -8,6 +8,7 @@ import {
   WarningRegular,
 } from '@fluentui/react-icons';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import type { AnchorHTMLAttributes, MouseEvent } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { useLocation, useParams } from 'react-router-dom';
 import rehypeHighlight from 'rehype-highlight';
@@ -55,11 +56,36 @@ const getRiskMeta = (riskLevel?: SkillpkgSkillDetail['riskLevel']) => {
 const getDisplaySource = (detail?: SkillpkgSkillDetail | null) => {
   const source = detail?.homepage || detail?.publisher?.website || '';
   if (!source) return '未知来源';
-  try {
-    return new URL(source).host.replace(/^www\./, '');
-  } catch (_error) {
-    return source;
+  const sourceUrl = getExternalUrl(source);
+  if (sourceUrl) return getExternalLabel(sourceUrl);
+  return source;
+};
+
+const getExternalUrl = (value?: string | null) => {
+  const rawUrl = String(value || '').trim();
+  if (!rawUrl) return '';
+  const candidates = [rawUrl, `https://${rawUrl}`];
+  for (const candidate of candidates) {
+    try {
+      const url = new URL(candidate);
+      if (url.protocol === 'http:' || url.protocol === 'https:') {
+        return url.toString();
+      }
+    } catch (_error) {}
   }
+  return '';
+};
+
+const getExternalLabel = (value: string) => {
+  try {
+    return new URL(value).host.replace(/^www\./, '');
+  } catch (_error) {
+    return value;
+  }
+};
+
+type MarkdownLinkProps = AnchorHTMLAttributes<HTMLAnchorElement> & {
+  node?: unknown;
 };
 
 const getInitialExpandedFolders = (nodes: SkillpkgFileNode[], rootPath: string) => {
@@ -278,7 +304,7 @@ const DiscoverDetailPage = () => {
     fileStructure: [],
     version: null,
     downloadCount: 0,
-    publisher: null,
+    publisher: summary.publisher ?? null,
   } as SkillpkgSkillDetail : null);
 
   const markdownContent = useMemo(() => {
@@ -289,6 +315,43 @@ const DiscoverDetailPage = () => {
   const riskMeta = getRiskMeta(displayDetail?.riskLevel);
   const RiskIcon = riskMeta.icon;
   const packageTypeMeta = getPackageTypeMeta(displayDetail?.type);
+  const publisherUrl = getExternalUrl(displayDetail?.publisher?.website);
+  const sourceUrl = getExternalUrl(displayDetail?.homepage || displayDetail?.publisher?.website);
+
+  const openExternalUrl = useCallback((url: string) => {
+    if (!url || !window?.skillpkg?.openExternalUrl) return;
+    void window.skillpkg.openExternalUrl(url);
+  }, []);
+
+  const renderExternalLink = useCallback(({
+    node: _node,
+    children,
+    href,
+    onClick,
+    ...props
+  }: MarkdownLinkProps) => {
+    const externalUrl = getExternalUrl(href);
+    if (!externalUrl) {
+      return <a href={href} onClick={onClick} {...props}>{children}</a>;
+    }
+    return (
+      <a
+        {...props}
+        href={externalUrl}
+        onClick={(event: MouseEvent<HTMLAnchorElement>) => {
+          onClick?.(event);
+          if (event.defaultPrevented) return;
+          event.preventDefault();
+          openExternalUrl(externalUrl);
+        }}
+      >
+        {children}
+      </a>
+    );
+  }, [openExternalUrl]);
+  const markdownComponents = useMemo(() => ({
+    a: renderExternalLink,
+  }), [renderExternalLink]);
 
   const handleDownload = async () => {
     if (!publicId || importing) return;
@@ -316,6 +379,7 @@ const DiscoverDetailPage = () => {
               <ReactMarkdown
                 remarkPlugins={markdownRemarkPlugins}
                 rehypePlugins={markdownRehypePlugins}
+                components={markdownComponents}
                 className="discover-markdown"
               >
                 {markdownContent}
@@ -338,13 +402,49 @@ const DiscoverDetailPage = () => {
               </div>
               <p>{displayDetail.description || '暂无描述。'}</p>
               <dl className="discover-detail-meta-list">
+                {displayDetail.publisher?.name ? (
+                  <div>
+                    <dt>发布者</dt>
+                    <dd>
+                      {publisherUrl ? (
+                        <a
+                          href={publisherUrl}
+                          className="external-text-link"
+                          onClick={(event) => {
+                            event.preventDefault();
+                            openExternalUrl(publisherUrl);
+                          }}
+                        >
+                          {displayDetail.publisher.name}
+                        </a>
+                      ) : (
+                        displayDetail.publisher.name
+                      )}
+                    </dd>
+                  </div>
+                ) : null}
                 <div>
                   <dt>提交人</dt>
                   <dd>{displayDetail.author?.displayName || displayDetail.author?.slug || 'Unknown'}</dd>
                 </div>
                 <div>
                   <dt>来源</dt>
-                  <dd>{getDisplaySource(displayDetail)}</dd>
+                  <dd>
+                    {sourceUrl ? (
+                      <a
+                        href={sourceUrl}
+                        className="external-text-link"
+                        onClick={(event) => {
+                          event.preventDefault();
+                          openExternalUrl(sourceUrl);
+                        }}
+                      >
+                        {getDisplaySource(displayDetail)}
+                      </a>
+                    ) : (
+                      getDisplaySource(displayDetail)
+                    )}
+                  </dd>
                 </div>
                 <div>
                   <dt>风险等级</dt>

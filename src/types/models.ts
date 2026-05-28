@@ -70,6 +70,7 @@ export type SkillpkgSkillSummary = {
   description?: string | null;
   category: SkillpkgCategory | null;
   author: SkillpkgAuthor;
+  publisher: SkillpkgPublisher | null;
   homepage?: string | null;
   riskLevel?: 'benign' | 'suspicious' | 'malicious' | null;
   isFeatured: boolean;

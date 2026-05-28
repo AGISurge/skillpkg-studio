@@ -54,6 +54,18 @@ const getDefaultInstallPath = () =>
 const getImportTempRoot = () =>
   path.join(app.getPath('temp'), 'skillpkg-studio', 'imports');
 
+const normalizeExternalUrl = (value) => {
+  const rawUrl = String(value || '').trim();
+  if (!rawUrl) return null;
+  try {
+    const url = new URL(rawUrl);
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
+    return url.toString();
+  } catch (_error) {
+    return null;
+  }
+};
+
 let db = null;
 let dbInitError = null;
 let dbSaveQueue = Promise.resolve();
@@ -477,6 +489,13 @@ const registerIpcHandlers = () => {
       kind: 'skillpkg',
       tempRoot: getImportTempRoot(),
     });
+  });
+
+  ipcMain.handle('open-external-url', async (_event, url) => {
+    const externalUrl = normalizeExternalUrl(url);
+    if (!externalUrl) return { ok: false, reason: 'invalid-url' };
+    await shell.openExternal(externalUrl);
+    return { ok: true };
   });
 
   ipcMain.handle('get-agent-skill-counts', async (_event, payload) => {

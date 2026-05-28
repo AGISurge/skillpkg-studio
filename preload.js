@@ -15,6 +15,7 @@ contextBridge.exposeInMainWorld('skillpkg', {
     ipcRenderer.invoke('get-skillpkg-skill-detail', payload),
   downloadSkillpkgSkill: (payload) =>
     ipcRenderer.invoke('download-skillpkg-skill', payload),
+  openExternalUrl: (url) => ipcRenderer.invoke('open-external-url', url),
   loadSkills: (installPath) => ipcRenderer.invoke('load-skills', installPath),
   installSkill: (payload) => ipcRenderer.invoke('install-skill', payload),
   installLibrarySkills: (payload) =>

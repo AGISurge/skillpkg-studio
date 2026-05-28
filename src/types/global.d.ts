@@ -152,6 +152,13 @@ declare global {
         skills?: Skill[];
       }>;
       /**
+       * 使用系统默认浏览器打开第三方链接。
+       */
+      openExternalUrl: (url: string) => Promise<{
+        ok: boolean;
+        reason?: string;
+      }>;
+      /**
        * 从指定路径加载技能列表。
        */
       loadSkills: (installPath: string) => Promise<Skill[]>;

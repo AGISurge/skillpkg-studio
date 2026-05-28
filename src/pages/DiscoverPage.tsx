@@ -393,9 +393,11 @@ const DiscoverPage = () => {
                     <div className="discover-category">
                       {skill.category?.name || '未分类'}
                     </div>
-                    <div className="discover-author">
-                      <span>{skill.author?.displayName || skill.author?.slug || 'Unknown'}</span>
-                    </div>
+                    {skill.publisher?.name ? (
+                      <div className="discover-publisher">
+                        <span>{skill.publisher.name}</span>
+                      </div>
+                    ) : null}
                   </div>
                 </article>
               );

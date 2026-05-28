@@ -750,13 +750,13 @@ body:not([data-theme='light']) .settings-api-key-input:focus-within {
   border-radius: 999px;
   color: #d97706;
   background: rgba(245, 158, 11, 0.08);
-  padding: 4px 13px;
-  font-size: 13px;
+  padding: 2px 10px;
+  font-size: 12px;
   font-weight: 700;
 }
 
 body:not([data-theme='light']) .discover-type-pill {
-  color: #fbbf24;
+  color: #d97706;
 }
 
 .discover-type-pill.solution {
@@ -766,7 +766,7 @@ body:not([data-theme='light']) .discover-type-pill {
 }
 
 body:not([data-theme='light']) .discover-type-pill.solution {
-  color: #5eead4;
+  color: #0f766e;
 }
 
 .discover-card p {
@@ -780,10 +780,12 @@ body:not([data-theme='light']) .discover-type-pill.solution {
   overflow: hidden;
 }
 
-.discover-author {
+.discover-author,
+.discover-publisher {
   margin-top: auto;
   color: var(--text-muted);
   font-size: 14px;
+  text-align: right;
   overflow-wrap: anywhere;
 }
 
@@ -794,7 +796,7 @@ body:not([data-theme='light']) .discover-type-pill.solution {
 
 .discover-category {
   color: #ef6f5c;
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 700;
   overflow-wrap: anywhere;
 }
@@ -1004,6 +1006,29 @@ body:not([data-theme='light']) .discover-type-pill.solution {
 .discover-markdown th {
   color: var(--app-text-strong);
   background: var(--surface-bg-strong);
+}
+
+.discover-markdown a,
+.external-text-link {
+  color: #4b85ff;
+  text-decoration: underline;
+  text-decoration-color: rgba(75, 133, 255, 0.5);
+  text-underline-offset: 3px;
+}
+
+.external-text-link {
+  display: inline;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font: inherit;
+  text-align: right;
+  cursor: pointer;
+}
+
+.discover-markdown a:hover,
+.external-text-link:hover {
+  text-decoration-color: currentColor;
 }
 
 .discover-detail-sidebar {
