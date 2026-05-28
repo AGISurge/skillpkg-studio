@@ -299,7 +299,7 @@ describe('skillpkg external api client', () => {
       isFeatured: true,
       page: 2,
       pageSize: 20,
-    })).toBe('/api/v1/skills?categoryPublicIds=cat_a%2Ccat_b&q=code&isFeatured=true&page=2&pageSize=20');
+    })).toBe('/api/v1/skills?categoryPublicId=cat_a%2Ccat_b&q=code&isFeatured=true&page=2&pageSize=20');
   });
 
   test('builds skill detail and download paths from public id', () => {
@@ -343,7 +343,7 @@ describe('skillpkg external api client', () => {
     });
 
     expect(fetchImpl).toHaveBeenCalledWith(
-      'https://example.test/api/v1/skills?categoryPublicIds=cat_a&page=1&pageSize=20',
+      'https://example.test/api/v1/skills?categoryPublicId=cat_a&page=1&pageSize=20',
       expect.objectContaining({
         headers: {
           Authorization: 'Bearer skp_test',

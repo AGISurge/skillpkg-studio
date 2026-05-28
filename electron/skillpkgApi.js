@@ -24,7 +24,7 @@ const buildSkillpkgSkillsPath = ({
     : [];
 
   if (normalizedCategoryPublicIds.length) {
-    params.set('categoryPublicIds', normalizedCategoryPublicIds.join(','));
+    params.set('categoryPublicId', normalizedCategoryPublicIds.join(','));
   }
   if (String(q || '').trim()) {
     params.set('q', String(q).trim());
