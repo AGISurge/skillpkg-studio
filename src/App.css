@@ -1916,6 +1916,34 @@ body:not([data-theme='light']) .discover-type-pill.solution {
   color: var(--text-muted);
 }
 
+.empty-panel {
+  flex: 1 1 auto;
+  min-height: 0;
+  border: 1px dashed var(--border-soft);
+  border-radius: 18px;
+  background: var(--panel-bg);
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 18px;
+  padding: 48px 24px;
+  text-align: center;
+}
+
+.empty-panel-image {
+  width: min(180px, 42vw);
+  max-height: 180px;
+  object-fit: contain;
+  opacity: 0.92;
+}
+
+.empty-panel-text {
+  max-width: 420px;
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
 
 .detail-body {
   display: grid;

@@ -1,5 +1,6 @@
 import { useEffect, useMemo } from 'react';
 import { useAppContext, useToolbar } from '../AppContext';
+import Empty from '../components/Empty';
 import ImportSkillDropdown from '../components/ImportSkillDropdown';
 import { AGENT_CATALOG } from '../config/agents';
 import SkillsPage from './SkillsPage';
@@ -75,6 +76,10 @@ const LocalPage = () => {
     setSelectedLibrarySkillId(localSkills[0].id);
     setSelectedFilePath(getDefaultSkillFilePath(localSkills[0]));
   }, [localSkills, selectedLibrarySkillId, setSelectedFilePath, setSelectedLibrarySkillId]);
+
+  if (localSkills.length === 0) {
+    return <Empty text="本地还没有任何 Skill。" />;
+  }
 
   return (
     <SkillsPage

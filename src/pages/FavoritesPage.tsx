@@ -1,5 +1,6 @@
 import { useEffect, useMemo } from 'react';
 import { useAppContext } from '../AppContext';
+import Empty from '../components/Empty';
 import { AGENT_CATALOG } from '../config/agents';
 import SkillsPage from './SkillsPage';
 
@@ -67,6 +68,10 @@ const FavoritesPage = () => {
     setSelectedLibrarySkillId(favoriteSkills[0].id);
     setSelectedFilePath(getDefaultSkillFilePath(favoriteSkills[0]));
   }, [favoriteSkills, selectedLibrarySkillId, setSelectedFilePath, setSelectedLibrarySkillId]);
+
+  if (favoriteSkills.length === 0) {
+    return <Empty text="还没有收藏任何 Skill。" />;
+  }
 
   return (
     <SkillsPage

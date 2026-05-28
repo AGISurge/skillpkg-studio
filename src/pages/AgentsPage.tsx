@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useTransition } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAppContext } from '../AppContext';
+import Empty from '../components/Empty';
 import SkillsPage from './SkillsPage';
 
 /**
@@ -113,6 +114,13 @@ const AgentsPage = () => {
     if (!selectedSkill || !selectedFile) return;
     void loadSkillFileContent(selectedSkill, selectedFile.path);
   }, [loadSkillFileContent, selectedFile, selectedSkill]);
+
+  if (agentSkills.length === 0) {
+    const agentName =
+      agents.find((agent) => agent.id === currentAgentId)?.name || '当前 Agent';
+
+    return <Empty text={`${agentName} 还没有任何 Skill。`} />;
+  }
 
   return (
     <SkillsPage
