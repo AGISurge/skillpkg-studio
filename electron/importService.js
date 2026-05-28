@@ -387,26 +387,6 @@ const importFromZip = async ({ zipPath, installPath, tempRoot }) => {
   });
 };
 
-const getPublicIdFromSkillpkgUrl = (url) => {
-  const value = String(url || '').trim();
-  if (!value) return '';
-  try {
-    const parsed = new URL(value);
-    const segments = parsed.pathname.split('/').filter(Boolean);
-    const skillsIndex = segments.indexOf('skills');
-    if (skillsIndex >= 0 && segments[skillsIndex + 1]) {
-      return segments[skillsIndex + 1];
-    }
-    const packagesIndex = segments.indexOf('packages');
-    if (packagesIndex >= 0 && segments[packagesIndex + 1]) {
-      return segments[packagesIndex + 1];
-    }
-    return segments[segments.length - 1] || '';
-  } catch (_error) {
-    return value;
-  }
-};
-
 const writeResponseToFile = async (response, targetPath) => {
   const arrayBuffer = await response.arrayBuffer();
   await fs.writeFile(targetPath, Buffer.from(arrayBuffer));
@@ -450,9 +430,12 @@ const downloadZipFromUrl = async ({
   return { ok: true, zipPath };
 };
 
-const importFromSkillpkg = async (payload) => {
-  const publicId = String(payload.publicId || getPublicIdFromSkillpkgUrl(payload.url)).trim();
+const downloadSkillpkgSkill = async (payload) => {
+  const publicId = String(payload.publicId || '').trim();
   if (!publicId) return { ok: false, reason: 'invalid-public-id' };
+  if (!payload.tempRoot) return { ok: false, reason: 'temp-root-missing' };
+  if (!payload.installPath) return { ok: false, reason: 'install-path-missing' };
+  await ensureDir(payload.tempRoot);
 
   const downloadUrlResult = await getSkillpkgSkillDownloadUrl({
     ...payload,
@@ -533,12 +516,12 @@ const importSkillSource = async (payload) => {
 
   if (kind === 'zip') return importFromZip(payload);
   if (kind === 'git') return importFromGit(payload);
-  if (kind === 'skillpkg') return importFromSkillpkg(payload);
   if (kind === 'session') return importFromSession(payload);
   return { ok: false, reason: 'unsupported-source' };
 };
 
 module.exports = {
+  downloadSkillpkgSkill,
   importSkillSource,
   normalizeGitSource,
   scanImportCandidates,

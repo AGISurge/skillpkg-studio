@@ -24,7 +24,10 @@ const {
   loadSkillsFromPath,
   parseSkillMarkdownMetadata,
 } = require('./electron/skillScanner');
-const { importSkillSource } = require('./electron/importService');
+const {
+  downloadSkillpkgSkill,
+  importSkillSource,
+} = require('./electron/importService');
 const {
   getSkillpkgSkillDetail,
   listSkillpkgCategories,
@@ -484,9 +487,8 @@ const registerIpcHandlers = () => {
     getSkillpkgSkillDetail(payload || {}));
 
   ipcMain.handle('download-skillpkg-skill', async (_event, payload) => {
-    return importSkillSource({
+    return downloadSkillpkgSkill({
       ...(payload || {}),
-      kind: 'skillpkg',
       tempRoot: getImportTempRoot(),
     });
   });

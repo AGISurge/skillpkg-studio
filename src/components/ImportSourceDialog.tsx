@@ -1,4 +1,4 @@
-import { CheckmarkCircleRegular, DismissCircleRegular, KeyRegular } from '@fluentui/react-icons';
+import { CheckmarkCircleRegular, DismissCircleRegular } from '@fluentui/react-icons';
 import type {
   ImportSkillCandidate,
   ImportSkillSourceKind,
@@ -13,7 +13,6 @@ type ImportSourceDialogProps = {
   value: string;
   candidates: ImportSkillCandidate[];
   selectedCandidateIds: Set<string>;
-  apiKeyRequired: boolean;
   onChangeValue: (value: string) => void;
   onToggleCandidate: (id: string) => void;
   onSelectAllCandidates: (selected: boolean) => void;
@@ -29,10 +28,6 @@ const sourceMeta: Record<Exclude<ImportSkillSourceKind, 'zip'>, {
     title: 'Git 仓库地址',
     placeholder: 'https://github.com/owner/repo.git',
   },
-  skillpkg: {
-    title: 'skillpkg.com URL',
-    placeholder: 'https://skillpkg.com/packages/...',
-  },
 };
 
 const busyStatuses: ImportSkillStatus[] = ['resolving', 'downloading', 'scanning'];
@@ -44,7 +39,6 @@ const ImportSourceDialog = ({
   value,
   candidates,
   selectedCandidateIds,
-  apiKeyRequired,
   onChangeValue,
   onToggleCandidate,
   onSelectAllCandidates,
@@ -80,12 +74,7 @@ const ImportSourceDialog = ({
         </div>
 
         <div className="dialog-body">
-          {apiKeyRequired ? (
-            <div className="notice import-api-key-notice">
-              <KeyRegular className="icon" />
-              请先在设置页配置 SkillPKG API Key，再导入 skillpkg.com URL。
-            </div>
-          ) : selectingCandidate ? (
+          {selectingCandidate ? (
             <>
               <div className="import-candidate-toolbar">
                 <span>{selectedCount} / {candidates.length} 已选</span>
@@ -149,17 +138,15 @@ const ImportSourceDialog = ({
           <Button type="button" variant="ghost" onClick={onClose} disabled={busy}>
             取消
           </Button>
-          {!apiKeyRequired ? (
-            <Button
-              type="button"
-              className="btn primary"
-              onClick={onConfirm}
-              disabled={busy || (selectingCandidate ? selectedCount === 0 : !value.trim())}
-            >
-              {busy ? <span className="mini-spinner" aria-hidden="true" /> : <CheckmarkCircleRegular className="icon" />}
-              {selectingCandidate ? '导入已选 Skill' : '开始导入'}
-            </Button>
-          ) : null}
+          <Button
+            type="button"
+            className="btn primary"
+            onClick={onConfirm}
+            disabled={busy || (selectingCandidate ? selectedCount === 0 : !value.trim())}
+          >
+            {busy ? <span className="mini-spinner" aria-hidden="true" /> : <CheckmarkCircleRegular className="icon" />}
+            {selectingCandidate ? '导入已选 Skill' : '开始导入'}
+          </Button>
         </div>
       </div>
     </div>

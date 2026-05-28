@@ -30,12 +30,10 @@ declare global {
        * 从外部来源导入 Skill 到统一库。
        */
       importSkillSource: (payload: {
-        kind: 'zip' | 'git' | 'skillpkg' | 'session';
+        kind: 'zip' | 'git' | 'session';
         installPath?: string;
         zipPath?: string;
         url?: string;
-        publicId?: string;
-        apiKey?: string;
         sessionId?: string;
         candidateId?: string;
         candidateIds?: string[];

@@ -11,6 +11,7 @@ const {
   parseSkillMarkdownMetadata,
 } = require('../../electron/skillScanner');
 const {
+  downloadSkillpkgSkill,
   importSkillSource,
   normalizeGitSource,
   scanImportCandidates,
@@ -651,8 +652,7 @@ describe('electron import service', () => {
           ),
       });
 
-    const result = await importSkillSource({
-      kind: 'skillpkg',
+    const result = await downloadSkillpkgSkill({
       publicId: 'skill_public_1',
       apiKey: 'skp_test',
       baseUrl: 'https://example.test',

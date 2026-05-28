@@ -46,6 +46,5 @@ test('renders import skill source menu', () => {
 
   expect(screen.getByText('本地 zip 文件')).toBeInTheDocument();
   expect(screen.getByText('Git 仓库地址')).toBeInTheDocument();
-  expect(screen.getByText('skillpkg.com URL')).toBeInTheDocument();
   expect(screen.queryByText('skills.sh URL')).not.toBeInTheDocument();
 });

@@ -23,7 +23,6 @@ const AppDialogs = () => {
     installConflict,
     installSubmitting,
     hostingConflictSkill,
-    apiKey,
     importStatus,
     importDialogOpen,
     importDialogKind,
@@ -84,7 +83,6 @@ const AppDialogs = () => {
         value={importDialogValue}
         candidates={importCandidates}
         selectedCandidateIds={selectedImportCandidateIds}
-        apiKeyRequired={importDialogKind === 'skillpkg' && !apiKey.trim()}
         onChangeValue={setImportDialogValue}
         onToggleCandidate={toggleImportCandidate}
         onSelectAllCandidates={setAllImportCandidatesSelected}

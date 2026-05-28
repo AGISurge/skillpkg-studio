@@ -21,7 +21,7 @@ import { AGENT_CATALOG, AGENT_TOOL_IDS } from './config/agents';
 import type { AgentId } from './config/agents';
 
 export type ThemeMode = 'system' | 'light' | 'dark';
-export type ImportSkillSourceKind = 'zip' | 'git' | 'skillpkg';
+export type ImportSkillSourceKind = 'zip' | 'git';
 export type ImportSkillStatus =
   | 'idle'
   | 'picking'
@@ -697,31 +697,14 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     startBatchInstall(skills, noticeScope);
   };
 
-  const runImportSkillSource = async (payload: {
-    kind: 'zip' | 'git' | 'skillpkg' | 'session';
-    installPath?: string;
-    zipPath?: string;
-    url?: string;
-    publicId?: string;
-    apiKey?: string;
-    sessionId?: string;
-    candidateId?: string;
-    candidateIds?: string[];
-  }, noticeScope: NoticeScope = 'local') => {
-    if (!window?.skillpkg?.importSkillSource) {
-      showNotice('当前环境不支持导入 Skill。', noticeScope);
-      setImportStatus('error');
-      return;
-    }
-    setImportStatus(
-      payload.kind === 'zip'
-        ? 'scanning'
-        : payload.kind === 'session'
-          ? 'resolving'
-          : 'downloading',
-    );
-    await waitForNextPaint();
-    const result = await window.skillpkg.importSkillSource(payload);
+  const handleImportResult = async (
+    result: Awaited<ReturnType<NonNullable<typeof window.skillpkg>['importSkillSource']>>,
+    payload: {
+      kind: 'zip' | 'git' | 'session' | 'skillpkg-download';
+      candidateIds?: string[];
+    },
+    noticeScope: NoticeScope,
+  ) => {
     if (result.ok) {
       const requestedMultipleCandidates =
         payload.kind === 'session' && (payload.candidateIds?.length || 0) > 1;
@@ -748,6 +731,32 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
     showNotice(mapImportReason(result.reason), noticeScope);
     setImportStatus('error');
+  };
+
+  const runImportSkillSource = async (payload: {
+    kind: 'zip' | 'git' | 'session';
+    installPath?: string;
+    zipPath?: string;
+    url?: string;
+    sessionId?: string;
+    candidateId?: string;
+    candidateIds?: string[];
+  }, noticeScope: NoticeScope = 'local') => {
+    if (!window?.skillpkg?.importSkillSource) {
+      showNotice('当前环境不支持导入 Skill。', noticeScope);
+      setImportStatus('error');
+      return;
+    }
+    setImportStatus(
+      payload.kind === 'zip'
+        ? 'scanning'
+        : payload.kind === 'session'
+          ? 'resolving'
+          : 'downloading',
+    );
+    await waitForNextPaint();
+    const result = await window.skillpkg.importSkillSource(payload);
+    await handleImportResult(result, payload, noticeScope);
   };
 
   const closeImportDialog = () => {
@@ -787,12 +796,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
 
-    if (kind === 'skillpkg' && !apiKey.trim()) {
-      setImportDialogOpen(true);
-      setImportStatus('idle');
-      return;
-    }
-
     setImportDialogOpen(true);
     setImportStatus('idle');
   };
@@ -819,10 +822,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
     if (importDialogKind === 'git') {
       await runImportSkillSource({ kind: 'git', installPath, url: value });
-      return;
-    }
-    if (importDialogKind === 'skillpkg') {
-      await runImportSkillSource({ kind: 'skillpkg', installPath, url: value, apiKey });
     }
   };
 
@@ -843,15 +842,21 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       showNotice('请先在设置页配置 SkillPKG API Key。', 'discover');
       return;
     }
-    setImportDialogKind('skillpkg');
+    if (!window?.skillpkg?.downloadSkillpkgSkill) {
+      showNotice('当前环境不支持下载 SkillPKG Skill。', 'discover');
+      setImportStatus('error');
+      return;
+    }
     setImportDialogValue('');
     resetImportSelection();
-    await runImportSkillSource({
-      kind: 'skillpkg',
+    setImportStatus('downloading');
+    await waitForNextPaint();
+    const result = await window.skillpkg.downloadSkillpkgSkill({
       installPath,
       publicId,
       apiKey,
-    }, 'discover');
+    });
+    await handleImportResult(result, { kind: 'skillpkg-download' }, 'discover');
   };
 
   const toggleImportCandidate = (id: string) => {

@@ -103,7 +103,7 @@ body[data-theme='light'] {
   --text-faint: rgba(27, 36, 51, 0.45);
   --panel-bg: #ffffff;
   --surface-bg: #ffffff;
-  --surface-bg-strong: rgba(20, 30, 50, 0.06);
+  --surface-bg-strong: rgba(60, 90, 150, 0.02);
   --surface-bg-hover: rgba(20, 30, 50, 0.08);
   --border-subtle: rgba(20, 30, 50, 0.08);
   --border-soft: rgba(20, 30, 50, 0.1);
@@ -161,7 +161,7 @@ body[data-theme='light'] {
     --text-faint: rgba(27, 36, 51, 0.45);
     --panel-bg: #ffffff;
     --surface-bg: #ffffff;
-    --surface-bg-strong: rgba(20, 30, 50, 0.06);
+    --surface-bg-strong: rgba(255, 255, 255, 0.3);
     --surface-bg-hover: rgba(20, 30, 50, 0.08);
     --border-subtle: rgba(20, 30, 50, 0.08);
     --border-soft: rgba(20, 30, 50, 0.1);
@@ -2232,12 +2232,6 @@ body:not([data-theme='light']) .discover-type-pill.solution {
 
 .import-url-field input {
   width: 100%;
-}
-
-.import-api-key-notice {
-  display: flex;
-  align-items: center;
-  gap: 10px;
 }
 
 .migration-meta {

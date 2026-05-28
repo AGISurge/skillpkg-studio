@@ -4,7 +4,6 @@ import {
   ArrowImportRegular,
   BranchForkRegular,
   ChevronDownRegular,
-  CloudRegular,
   FolderZipRegular,
 } from '@fluentui/react-icons';
 import type { ImportSkillSourceKind, ImportSkillStatus } from '../AppContext';
@@ -29,12 +28,6 @@ const IMPORT_SOURCE_OPTIONS: ImportSourceOption[] = [
     label: 'Git 仓库地址',
     description: '从远端仓库拉取',
     icon: BranchForkRegular,
-  },
-  {
-    id: 'skillpkg',
-    label: 'skillpkg.com URL',
-    description: '需要 API Key',
-    icon: CloudRegular,
   },
 ];
 
