@@ -1129,10 +1129,12 @@ body:not([data-theme='light']) .discover-type-pill.solution {
   flex-direction: column;
   gap: 16px;
   padding-right: 4px;
+  overscroll-behavior: contain;
 }
 
 .discover-detail-card {
   position: relative;
+  flex: 0 0 auto;
   border: 1px solid var(--border-subtle);
   border-radius: 18px;
   background: var(--panel-bg);
