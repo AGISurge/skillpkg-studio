@@ -1,6 +1,7 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('skillpkg', {
+  platform: process.platform,
   getDefaultInstallPath: () => ipcRenderer.invoke('get-default-install-path'),
   selectInstallPath: () => ipcRenderer.invoke('select-install-path'),
   selectImportZip: () => ipcRenderer.invoke('select-import-zip'),

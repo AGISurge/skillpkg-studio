@@ -103,7 +103,7 @@ body[data-theme='light'] {
   --text-faint: rgba(27, 36, 51, 0.45);
   --panel-bg: #ffffff;
   --surface-bg: #ffffff;
-  --surface-bg-strong: rgba(60, 90, 150, 0.02);
+  --surface-bg-strong: rgba(255, 255, 255, 0.3);
   --surface-bg-hover: rgba(20, 30, 50, 0.08);
   --border-subtle: rgba(20, 30, 50, 0.08);
   --border-soft: rgba(20, 30, 50, 0.1);
@@ -237,6 +237,10 @@ body[data-theme='light'] {
   z-index: 20;
 }
 
+.app-shell-darwin .sidebar {
+  padding-top: 45px;
+}
+
 .sidebar.floating {
   position: fixed;
   inset: 0 auto 0 0;
@@ -249,6 +253,25 @@ body[data-theme='light'] {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+}
+
+.app-shell-darwin .sidebar-head {
+  -webkit-app-region: drag;
+}
+
+.window-drag-strip {
+  display: none;
+}
+
+.app-shell-darwin .window-drag-strip {
+  display: block;
+  position: fixed;
+  top: 0;
+  right: 0;
+  left: 82px;
+  height: 30px;
+  z-index: 25;
+  -webkit-app-region: drag;
 }
 
 .sidebar-toggle {
@@ -558,11 +581,17 @@ body:not([data-theme='light']) .settings-api-key-input:focus-within {
 }
 
 .topbar {
+  position: relative;
+  z-index: 30;
   display: flex;
   justify-content: space-between;
   align-items: center;
   min-height: 34px;
   gap: 16px;
+}
+
+.app-shell-darwin .topbar {
+  -webkit-app-region: drag;
 }
 
 .topbar-left,
@@ -589,6 +618,20 @@ body:not([data-theme='light']) .settings-api-key-input:focus-within {
   justify-content: center;
   cursor: pointer;
   transition: opacity 0.18s ease, background 0.18s ease, border-color 0.18s ease;
+}
+
+.app-shell-darwin .topbar button,
+.app-shell-darwin .topbar a,
+.app-shell-darwin .topbar input,
+.app-shell-darwin .topbar textarea,
+.app-shell-darwin .topbar select,
+.app-shell-darwin .topbar label,
+.app-shell-darwin .topbar [role='button'],
+.app-shell-darwin .menu,
+.app-shell-darwin .sidebar a,
+.app-shell-darwin .sidebar button,
+.app-shell-darwin .sidebar [role='button'] {
+  -webkit-app-region: no-drag;
 }
 
 .topbar-icon-button:hover,

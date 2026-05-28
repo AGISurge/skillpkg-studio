@@ -15,6 +15,10 @@ declare global {
      */
     skillpkg?: {
       /**
+       * Electron 主进程平台标识。
+       */
+      platform?: NodeJS.Platform;
+      /**
        * 获取默认统一安装路径。
        */
       getDefaultInstallPath: () => Promise<string>;

@@ -46,6 +46,7 @@ const AppLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [sidebarFloating, setSidebarFloating] = useState(false);
 
+  const isDarwinWindow = window.skillpkg?.platform === "darwin";
   const activeSection = getActiveSection(location.pathname);
   const isDiscoverDetail = /^\/discover\/[^/]+/.test(location.pathname);
   const visibleNotice =
@@ -91,8 +92,9 @@ const AppLayout = () => {
 
   return (
     <div
-      className={`app-shell ${sidebarOpen ? "" : "sidebar-collapsed"} ${sidebarFloating ? "sidebar-floating-mode" : ""}`}
+      className={`app-shell ${isDarwinWindow ? "app-shell-darwin" : ""} ${sidebarOpen ? "" : "sidebar-collapsed"} ${sidebarFloating ? "sidebar-floating-mode" : ""}`}
     >
+      {isDarwinWindow ? <div className="window-drag-strip" aria-hidden="true" /> : null}
       {sidebarOpen ? (
         <>
           {sidebarFloating ? (

@@ -39,6 +39,7 @@ const createWindow = () => {
     width: 1280,
     minWidth: 1280,
     height: 600,
+    ...(process.platform === 'darwin' ? { titleBarStyle: 'hiddenInset' } : {}),
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
