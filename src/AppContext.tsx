@@ -1038,6 +1038,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             pathMac: targetAgent.pathMac,
             pathLinux: targetAgent.pathLinux,
             pathWindows: targetAgent.pathWindows,
+            skillPath: targetAgent.skillPath,
             rootPath: skill.rootPath,
           },
         ],
@@ -1111,6 +1112,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   const confirmAgentSkillDelete = async (dialog: SkillDeleteDialogState) => {
     const targetAgentId = dialog.agentId || dialog.skill.agentId || selectedAgentId;
+    const targetAgent = agents.find((agent) => agent.id === targetAgentId);
     if (!targetAgentId) {
       showNotice('未找到当前 Agent 配置。', 'agents');
       return;
@@ -1120,11 +1122,13 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       const result = dialog.action === 'agent-uninstall'
         ? await window.skillpkg?.uninstallAgentSkill?.({
             agentId: targetAgentId,
+            agent: targetAgent,
             skillId: dialog.skill.id,
             installPath,
           })
         : await window.skillpkg?.deleteAgentSkill?.({
             agentId: targetAgentId,
+            agent: targetAgent,
             skillId: dialog.skill.id,
           });
 

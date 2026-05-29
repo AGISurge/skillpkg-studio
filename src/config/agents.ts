@@ -3,7 +3,15 @@ import type { Agent } from '../types/models';
 /**
  * 支持的 Agent 标识列表（固定展示顺序）。
  */
-export const AGENT_TOOL_IDS = ['claude', 'codex', 'cursor', 'qoder', 'codebuddy'] as const;
+export const AGENT_TOOL_IDS = [
+  'claude',
+  'codex',
+  'cursor',
+  'qoder',
+  'codebuddy',
+  'workbuddy',
+  'trae',
+] as const;
 
 /**
  * Agent 标识的联合类型。
@@ -48,5 +56,19 @@ export const AGENT_CATALOG: Record<AgentId, Agent> = {
     pathMac: '~/.codebuddy/skills',
     pathLinux: '~/.codebuddy/skills',
     pathWindows: '%USERPROFILE%\\.codebuddy\\skills',
+  },
+  workbuddy: {
+    id: 'workbuddy',
+    name: 'WorkBuddy',
+    pathMac: '~/.workbuddy/skills',
+    pathLinux: '~/.workbuddy/skills',
+    pathWindows: '%USERPROFILE%\\.workbuddy\\skills',
+  },
+  trae: {
+    id: 'trae',
+    name: 'TRAE',
+    pathMac: '~/.trae/skills',
+    pathLinux: '~/.trae/skills',
+    pathWindows: '%USERPROFILE%\\.trae\\skills',
   },
 };

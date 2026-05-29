@@ -2,6 +2,11 @@ import { CheckmarkCircleRegular, DismissCircleRegular } from '@fluentui/react-ic
 import type { Agent, Skill } from '../types/models';
 import { Button } from './ui/button';
 
+const getAgentPathLabel = (agent: Agent) =>
+  agent.skillPath
+    ? `当前路径: ${agent.skillPath}`
+    : `Mac: ${agent.pathMac} · Linux: ${agent.pathLinux || agent.pathMac} · Windows: ${agent.pathWindows}`;
+
 type BatchInstallDialogProps = {
   open: boolean;
   skills: Skill[];
@@ -60,7 +65,7 @@ const BatchInstallDialog = ({
               <div>
                 <div className="option-title">{agent.name}</div>
                 <div className="option-subtitle">
-                  Mac: {agent.pathMac} · Linux: {agent.pathLinux || agent.pathMac} · Windows: {agent.pathWindows}
+                  {getAgentPathLabel(agent)}
                 </div>
               </div>
             </label>

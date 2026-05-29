@@ -21,6 +21,7 @@ const {
   deleteAgentSkillEntry,
   deleteLibrarySkillEntry,
   linkSkillToAgents,
+  loadAgentSkills,
   unhostAgentSkillLink,
   uninstallAgentSkillLink,
 } = require('../../electron/agentService');
@@ -524,11 +525,69 @@ describe('electron skill services', () => {
     expect(resolveAgentSkillPath('cursor')).toBe(path.join(os.homedir(), '.cursor', 'skills'));
     expect(resolveAgentSkillPath('qoder')).toBe(path.join(os.homedir(), '.qoder', 'skills'));
     expect(resolveAgentSkillPath('codebuddy')).toBe(path.join(os.homedir(), '.codebuddy', 'skills'));
+    expect(resolveAgentSkillPath('workbuddy')).toBe(path.join(os.homedir(), '.workbuddy', 'skills'));
+    expect(resolveAgentSkillPath('trae')).toBe(path.join(os.homedir(), '.trae', 'skills'));
   });
 
-  test('includes qoder and codebuddy in supported agents', () => {
+  test('includes qoder, codebuddy, workbuddy, and trae in supported agents', () => {
     expect(AGENT_TOOL_IDS).toContain('qoder');
     expect(AGENT_TOOL_IDS).toContain('codebuddy');
+    expect(AGENT_TOOL_IDS).toContain('workbuddy');
+    expect(AGENT_TOOL_IDS).toContain('trae');
+  });
+
+  test('uses provided skillPath overrides for known agents', async () => {
+    const libraryRoot = path.join(tmpDir, 'library');
+    const targetDir = path.join(libraryRoot, 'shared');
+    const nestedSkillRoot = path.join(tmpDir, '.trae', 'profiles', 'default', 'agents', 'skills');
+    await fs.mkdir(targetDir, { recursive: true });
+    await fs.writeFile(path.join(targetDir, 'SKILL.md'), '# Shared');
+
+    const agent = {
+      id: 'trae',
+      name: 'TRAE',
+      pathMac: '~/.trae/skills',
+      pathWindows: '%USERPROFILE%/.trae/skills',
+      skillPath: nestedSkillRoot,
+    };
+
+    expect(resolveAgentSkillPath(agent)).toBe(nestedSkillRoot);
+
+    const result = await linkSkillToAgents({
+      skillId: 'shared',
+      targetDir,
+      agents: [agent],
+    });
+
+    expect(result).toEqual(expect.objectContaining({
+      ok: true,
+      results: [expect.objectContaining({ ok: true, agentId: 'trae' })],
+    }));
+    const realTargetDir = await fs.realpath(targetDir);
+    await expect(fs.realpath(path.join(nestedSkillRoot, 'shared'))).resolves.toBe(realTargetDir);
+  });
+
+  test('loads agent skills from a deep configured skillPath', async () => {
+    const nestedSkillRoot = path.join(tmpDir, '.workbuddy', 'workspace', 'agents', 'runtime', 'skills');
+    const ownSkill = path.join(nestedSkillRoot, 'deep-skill');
+    await fs.mkdir(ownSkill, { recursive: true });
+    await fs.writeFile(path.join(ownSkill, 'SKILL.md'), '# Deep Skill');
+
+    const [result] = await loadAgentSkills({
+      agents: [{
+        id: 'workbuddy',
+        name: 'WorkBuddy',
+        pathMac: '~/.workbuddy/skills',
+        pathWindows: '%USERPROFILE%/.workbuddy/skills',
+        skillPath: nestedSkillRoot,
+      }],
+      installPath: path.join(tmpDir, 'library'),
+    });
+
+    expect(result.skillPath).toBe(nestedSkillRoot);
+    expect(result.skills.map((skill) => [skill.id, skill.name])).toEqual([
+      ['deep-skill', 'Deep Skill'],
+    ]);
   });
 
   test('detects agents only from non-empty home directory markers', async () => {
@@ -591,6 +650,8 @@ describe('electron skill services', () => {
       expect(resolveAgentHomePath('cursor')).toBe(path.join(tmpDir, '.cursor'));
       expect(resolveAgentHomePath('qoder')).toBe(path.join(tmpDir, '.qoder'));
       expect(resolveAgentHomePath('codebuddy')).toBe(path.join(tmpDir, '.codebuddy'));
+      expect(resolveAgentHomePath('workbuddy')).toBe(path.join(tmpDir, '.workbuddy'));
+      expect(resolveAgentHomePath('trae')).toBe(path.join(tmpDir, '.trae'));
     } finally {
       if (originalUserProfile === undefined) {
         delete process.env.USERPROFILE;

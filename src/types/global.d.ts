@@ -1,4 +1,5 @@
 import type {
+  Agent,
   AgentDetectionResult,
   AgentSkillsResult,
   Skill,
@@ -32,13 +33,7 @@ declare global {
       prepareInstallPathChange: (payload: {
         fromInstallPath?: string;
         toInstallPath: string;
-        agents?: Array<{
-          id: string;
-          name: string;
-          pathMac: string;
-          pathLinux?: string;
-          pathWindows: string;
-        }>;
+        agents?: Agent[];
       }) => Promise<{
         ok: boolean;
         reason?: string;
@@ -52,13 +47,7 @@ declare global {
       migrateInstallPath: (payload: {
         fromInstallPath?: string;
         toInstallPath: string;
-        agents?: Array<{
-          id: string;
-          name: string;
-          pathMac: string;
-          pathLinux?: string;
-          pathWindows: string;
-        }>;
+        agents?: Agent[];
       }) => Promise<{
         ok: boolean;
         reason?: string;
@@ -210,13 +199,7 @@ declare global {
       installSkill: (payload: {
         installPath: string;
         skill: Skill;
-        agents: Array<{
-          id: string;
-          name: string;
-          pathMac: string;
-          pathLinux?: string;
-          pathWindows: string;
-        }>;
+        agents: Agent[];
         overwrite?: boolean;
       }) => Promise<{
         ok: boolean;
@@ -233,13 +216,7 @@ declare global {
       installLibrarySkills: (payload: {
         installPath: string;
         skillIds: string[];
-        agents: Array<{
-          id: string;
-          name: string;
-          pathMac: string;
-          pathLinux?: string;
-          pathWindows: string;
-        }>;
+        agents: Agent[];
       }) => Promise<{
         ok: boolean;
         reason?: string;
@@ -268,13 +245,7 @@ declare global {
        * 扫描各 Agent 下的技能列表。
        */
       loadAgentSkills: (payload: {
-        agents: Array<{
-          id: string;
-          name: string;
-          pathMac: string;
-          pathLinux?: string;
-          pathWindows: string;
-        }>;
+        agents: Agent[];
         installPath?: string;
       }) => Promise<AgentSkillsResult[]>;
       /**
@@ -282,6 +253,7 @@ declare global {
        */
       uninstallAgentSkill: (payload: {
         agentId: string;
+        agent?: Agent | null;
         skillId: string;
         installPath?: string;
       }) => Promise<{ ok: boolean; reason?: string; removed?: boolean }>;
@@ -290,6 +262,7 @@ declare global {
        */
       deleteAgentSkill: (payload: {
         agentId: string;
+        agent?: Agent | null;
         skillId: string;
       }) => Promise<{ ok: boolean; reason?: string; removed?: boolean }>;
       /**
@@ -298,13 +271,7 @@ declare global {
       deleteLibrarySkill: (payload: {
         installPath: string;
         skillId: string;
-        agents: Array<{
-          id: string;
-          name: string;
-          pathMac: string;
-          pathLinux?: string;
-          pathWindows: string;
-        }>;
+        agents: Agent[];
       }) => Promise<{
         ok: boolean;
         reason?: string;
@@ -321,6 +288,7 @@ declare global {
        */
       unhostAgentSkill: (payload: {
         agentId: string;
+        agent?: Agent | null;
         skillId: string;
         installPath?: string;
       }) => Promise<{ ok: boolean; reason?: string; removed?: boolean }>;
@@ -337,6 +305,7 @@ declare global {
           pathMac: string;
           pathLinux?: string;
           pathWindows: string;
+          skillPath?: string | null;
           rootPath?: string;
         }>;
       }) => Promise<
@@ -409,13 +378,7 @@ declare global {
        * 获取每个 Agent 已安装技能数量统计。
        */
       getAgentSkillCounts: (payload?: {
-        agents?: Array<{
-          id: string;
-          name: string;
-          pathMac: string;
-          pathLinux?: string;
-          pathWindows: string;
-        }>;
+        agents?: Agent[];
         installPath?: string;
       }) => Promise<Record<string, number>>;
     };

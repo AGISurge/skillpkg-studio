@@ -412,7 +412,14 @@ const migrateAgentSkillToLibrary = async ({
   overwrite,
   useExisting,
 }) => {
-  const agentConfig = getAgentConfig(item.agentId);
+  const agentConfig = getAgentConfig({
+    id: item.agentId,
+    name: item.agentName || item.agentId,
+    pathMac: item.pathMac,
+    pathLinux: item.pathLinux,
+    pathWindows: item.pathWindows,
+    skillPath: item.skillPath,
+  }) || getAgentConfig(item.agentId);
   const agentSkillPath = agentConfig ? resolveAgentSkillPath(agentConfig) : null;
   const sourceRoot = item.rootPath || (
     agentSkillPath ? path.join(agentSkillPath, item.skillId) : null
@@ -593,10 +600,10 @@ const registerIpcHandlers = () => {
     installLibrarySkillsToAgents(payload || {}));
 
   ipcMain.handle('uninstall-agent-skill', async (_event, payload) => {
-    const { agentId, skillId, installPath } = payload || {};
+    const { agent, agentId, skillId, installPath } = payload || {};
     if (!agentId || !skillId) return { ok: false, reason: 'invalid' };
     const result = await uninstallAgentSkillLink({
-      agent: getAgentConfig(agentId),
+      agent: getAgentConfig(agent || agentId),
       skillId,
       installPath,
     });
@@ -607,10 +614,10 @@ const registerIpcHandlers = () => {
   });
 
   ipcMain.handle('delete-agent-skill', async (_event, payload) => {
-    const { agentId, skillId } = payload || {};
+    const { agent, agentId, skillId } = payload || {};
     if (!agentId || !skillId) return { ok: false, reason: 'invalid' };
     const result = await deleteAgentSkillEntry({
-      agent: getAgentConfig(agentId),
+      agent: getAgentConfig(agent || agentId),
       skillId,
     });
     if (result.ok) {
@@ -635,10 +642,10 @@ const registerIpcHandlers = () => {
   });
 
   ipcMain.handle('unhost-agent-skill', async (_event, payload) => {
-    const { agentId, skillId, installPath } = payload || {};
+    const { agent, agentId, skillId, installPath } = payload || {};
     if (!agentId || !skillId) return { ok: false, reason: 'invalid' };
     const result = await unhostAgentSkillLink({
-      agent: getAgentConfig(agentId),
+      agent: getAgentConfig(agent || agentId),
       skillId,
       installPath,
     });

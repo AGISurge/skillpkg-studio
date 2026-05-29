@@ -74,6 +74,34 @@ const AGENT_CATALOG = {
       other: '~/.codebuddy/skills',
     },
   },
+  workbuddy: {
+    id: 'workbuddy',
+    name: 'WorkBuddy',
+    homePath: {
+      darwin: '~/.workbuddy',
+      win32: '%USERPROFILE%/.workbuddy',
+      other: '~/.workbuddy',
+    },
+    skillPath: {
+      darwin: '~/.workbuddy/skills',
+      win32: '%USERPROFILE%/.workbuddy/skills',
+      other: '~/.workbuddy/skills',
+    },
+  },
+  trae: {
+    id: 'trae',
+    name: 'TRAE',
+    homePath: {
+      darwin: '~/.trae',
+      win32: '%USERPROFILE%/.trae',
+      other: '~/.trae',
+    },
+    skillPath: {
+      darwin: '~/.trae/skills',
+      win32: '%USERPROFILE%/.trae/skills',
+      other: '~/.trae/skills',
+    },
+  },
 };
 
 const AGENT_TOOL_IDS = Object.keys(AGENT_CATALOG);
@@ -84,6 +112,13 @@ const getPlatformKey = () => {
   return 'other';
 };
 
+const resolveConfiguredPath = (configured) => {
+  if (!configured) return null;
+  if (typeof configured === 'string') return resolveTemplatePath(configured);
+  const platformKey = getPlatformKey();
+  return resolveTemplatePath(configured[platformKey] || configured.other);
+};
+
 const resolveAgentSkillPath = (agentOrId) => {
   const agent = typeof agentOrId === 'string' ? AGENT_CATALOG[agentOrId] : agentOrId;
   if (!agent) return null;
@@ -92,7 +127,7 @@ const resolveAgentSkillPath = (agentOrId) => {
     win32: agent.pathWindows,
     other: agent.pathMac,
   };
-  return resolveTemplatePath(configured[getPlatformKey()] || configured.other);
+  return resolveConfiguredPath(configured);
 };
 
 const resolveAgentHomePath = (agentOrId) => {
@@ -103,7 +138,7 @@ const resolveAgentHomePath = (agentOrId) => {
     win32: agent.pathWindows ? path.dirname(agent.pathWindows) : null,
     other: agent.pathLinux || (agent.pathMac ? path.dirname(agent.pathMac) : null),
   };
-  return resolveTemplatePath(configured[getPlatformKey()] || configured.other);
+  return resolveConfiguredPath(configured);
 };
 
 const isNonEmptyDirectory = async (targetPath) => {
@@ -145,13 +180,21 @@ const detectAgent = async (agentId) => {
 const getAgentConfig = (agentOrId) => {
   if (typeof agentOrId === 'string') return AGENT_CATALOG[agentOrId] || null;
   if (!agentOrId?.id) return null;
-  return AGENT_CATALOG[agentOrId.id] || {
+  const fallback = {
     ...agentOrId,
-    skillPath: {
+    skillPath: agentOrId.skillPath || {
       darwin: agentOrId.pathMac,
       win32: agentOrId.pathWindows,
       other: agentOrId.pathLinux || agentOrId.pathMac,
     },
+  };
+  const catalogAgent = AGENT_CATALOG[agentOrId.id];
+  if (!catalogAgent) return fallback;
+  return {
+    ...catalogAgent,
+    ...agentOrId,
+    homePath: agentOrId.homePath || catalogAgent.homePath,
+    skillPath: agentOrId.skillPath || catalogAgent.skillPath,
   };
 };
 
