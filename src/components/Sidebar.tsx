@@ -137,7 +137,7 @@ const Sidebar = ({
           </div>
         )}
       </nav>
-      <div className="flex-grow" />
+      <div className="grow" />
       <div className="flex justify-between items-center">
         <div>&nbsp;</div>
         <NavLink to="/settings" className="" aria-label="设置">
