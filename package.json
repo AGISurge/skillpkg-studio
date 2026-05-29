@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "main": "main.js",
+  "productName": "Skillpkg Studio",
   "dependencies": {
     "@fluentui/react-icons": "^2.0.0",
     "@testing-library/dom": "^10.4.1",
@@ -28,10 +29,44 @@
   "scripts": {
     "start": "craco start",
     "build": "craco build",
+    "dist": "npm run build && electron-builder",
+    "dist:mac": "npm run build && electron-builder --mac",
+    "dist:win": "npm run build && electron-builder --win",
+    "dist:linux": "npm run build && electron-builder --linux",
     "test": "craco test",
     "eject": "react-scripts eject",
     "elec": "electron .",
     "dev": "concurrently -k \"cross-env BROWSER=none npm start\" \"wait-on http://localhost:3000 && electron .\""
+  },
+  "build": {
+    "extends": null,
+    "appId": "com.agisurge.skillpkgstudio",
+    "productName": "Skillpkg Studio",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "build/**/*",
+      "electron/**/*",
+      "assets/icons/**/*",
+      "main.js",
+      "preload.js",
+      "package.json"
+    ],
+    "mac": {
+      "icon": "assets/icons/macos/icon.icns"
+    },
+    "win": {
+      "icon": "assets/icons/windows/icon.ico"
+    },
+    "linux": {
+      "icon": "assets/icons/linux",
+      "category": "Development",
+      "target": [
+        "AppImage",
+        "deb"
+      ]
+    }
   },
   "eslintConfig": {
     "extends": [
@@ -66,6 +101,7 @@
     "concurrently": "^9.2.1",
     "cross-env": "^7.0.3",
     "electron": "^41.2.1",
+    "electron-builder": "^26.8.1",
     "electron-is-dev": "^3.0.1",
     "postcss": "^8.5.12",
     "tailwindcss": "^3.4.19",

@@ -62,6 +62,14 @@ export type SkillDeleteDialogState = {
   hostedAgentNames?: string[];
 };
 
+export type InstallPathChangePreview = {
+  fromInstallPath: string;
+  toInstallPath: string;
+  migratedCount: number;
+  relinkedCount: number;
+  conflicts: Array<{ skillId: string; path: string }>;
+};
+
 // --- Toolbar context: pages register their own toolbar actions ---
 
 const ToolbarContext = createContext<ReactNode>(null);
@@ -138,6 +146,8 @@ type AppContextValue = {
   apiKey: string;
   notice: PageNotice | null;
   installPath: string;
+  installPathChangePreview: InstallPathChangePreview | null;
+  installPathChanging: boolean;
   dialogOpen: boolean;
   dialogSkill: Skill | null;
   dialogAgents: Set<string>;
@@ -203,6 +213,8 @@ type AppContextValue = {
   handleSaveFile: (skill?: Skill | null, file?: SkillFile | null) => Promise<void>;
   handleCancelEdit: (skill?: Skill | null, file?: SkillFile | null) => void;
   handleSelectInstallPath: () => Promise<void>;
+  confirmInstallPathChange: () => Promise<void>;
+  closeInstallPathChangeDialog: () => void;
   handleToggleFolder: (path: string) => void;
   refreshAgents: () => Promise<void>;
   setDialogAgents: React.Dispatch<React.SetStateAction<Set<string>>>;
@@ -234,6 +246,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [apiKey, setApiKeyState] = useState(getInitialApiKey);
   const [notice, setNotice] = useState<PageNotice | null>(null);
   const [installPath, setInstallPath] = useState('');
+  const [installPathChangePreview, setInstallPathChangePreview] =
+    useState<InstallPathChangePreview | null>(null);
+  const [installPathChanging, setInstallPathChanging] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogSkill, setDialogSkill] = useState<Skill | null>(null);
   const [dialogNoticeScope, setDialogNoticeScope] = useState<NoticeScope>('local');
@@ -1383,19 +1398,91 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setEditing(false);
   };
 
+  const mapInstallPathChangeReason = (reason?: string, conflictsCount = 0) => {
+    const messages: Record<string, string> = {
+      'agent-directory': '不能将 Agent 自己的目录设置为统一路径。',
+      'conflicts': conflictsCount
+        ? `目标路径中已有 ${conflictsCount} 个同名 Skill，请先处理冲突。`
+        : '目标路径中已有同名 Skill，请先处理冲突。',
+      'copy-failed': '迁移失败，请检查统一路径读写权限。',
+      'invalid-path': '选择的路径无效。',
+      'nested-path': '新旧路径不能互相包含，请选择独立目录。',
+      'relink-failed': '更新 Agent 软链接失败，请检查 Agent 技能目录权限。',
+      'same-path': '选择的路径没有变化。',
+    };
+    return messages[reason || ''] || '切换路径失败，请检查目录权限。';
+  };
+
   const handleSelectInstallPath = async () => {
     try {
       if (!window?.skillpkg?.selectInstallPath) {
         showNotice('当前环境不支持选择本地路径。', 'settings');
         return;
       }
-      const selectedPath = await window.skillpkg.selectInstallPath();
-      if (selectedPath) {
-        setInstallPath(selectedPath);
-        showNotice('已更新统一路径。', 'settings');
+      if (!window?.skillpkg?.prepareInstallPathChange) {
+        showNotice('当前环境不支持迁移统一路径。', 'settings');
+        return;
       }
+      const selectedPath = await window.skillpkg.selectInstallPath();
+      if (!selectedPath) return;
+
+      const result = await window.skillpkg.prepareInstallPathChange({
+        fromInstallPath: installPath,
+        toInstallPath: selectedPath,
+        agents,
+      });
+      if (!result.ok) {
+        showNotice(mapInstallPathChangeReason(result.reason, result.conflicts?.length || 0), 'settings');
+        return;
+      }
+      setInstallPathChangePreview({
+        fromInstallPath: installPath,
+        toInstallPath: selectedPath,
+        migratedCount: result.migratedCount,
+        relinkedCount: result.relinkedCount,
+        conflicts: result.conflicts || [],
+      });
     } catch (error) {
       showNotice('选择路径失败，请重试。', 'settings');
+    }
+  };
+
+  const closeInstallPathChangeDialog = () => {
+    if (installPathChanging) return;
+    setInstallPathChangePreview(null);
+  };
+
+  const confirmInstallPathChange = async () => {
+    if (!installPathChangePreview || installPathChanging) return;
+    if (!window?.skillpkg?.migrateInstallPath) {
+      showNotice('当前环境不支持迁移统一路径。', 'settings');
+      return;
+    }
+
+    setInstallPathChanging(true);
+    try {
+      const result = await window.skillpkg.migrateInstallPath({
+        fromInstallPath: installPathChangePreview.fromInstallPath,
+        toInstallPath: installPathChangePreview.toInstallPath,
+        agents,
+      });
+      if (!result.ok) {
+        showNotice(mapInstallPathChangeReason(result.reason, result.conflicts?.length || 0), 'settings');
+        return;
+      }
+
+      setInstallPath(installPathChangePreview.toInstallPath);
+      await loadLocalSkills(installPathChangePreview.toInstallPath);
+      await syncInstalledByAgent(agents, installPathChangePreview.toInstallPath, { replace: true });
+      showNotice(
+        `已迁移 ${result.migratedCount} 个 Skill，并更新 ${result.relinkedCount} 个 Agent 链接。`,
+        'settings',
+      );
+      setInstallPathChangePreview(null);
+    } catch (error) {
+      showNotice('迁移失败，请检查目录权限。', 'settings');
+    } finally {
+      setInstallPathChanging(false);
     }
   };
 
@@ -1422,6 +1509,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     apiKey,
     notice,
     installPath,
+    installPathChangePreview,
+    installPathChanging,
     dialogOpen,
     dialogSkill,
     dialogAgents,
@@ -1487,6 +1576,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     handleSaveFile,
     handleCancelEdit,
     handleSelectInstallPath,
+    confirmInstallPathChange,
+    closeInstallPathChangeDialog,
     handleToggleFolder,
     refreshAgents,
     setDialogAgents,

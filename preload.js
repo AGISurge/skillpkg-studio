@@ -4,6 +4,10 @@ contextBridge.exposeInMainWorld('skillpkg', {
   platform: process.platform,
   getDefaultInstallPath: () => ipcRenderer.invoke('get-default-install-path'),
   selectInstallPath: () => ipcRenderer.invoke('select-install-path'),
+  prepareInstallPathChange: (payload) =>
+    ipcRenderer.invoke('prepare-install-path-change', payload),
+  migrateInstallPath: (payload) =>
+    ipcRenderer.invoke('migrate-install-path', payload),
   selectImportZip: () => ipcRenderer.invoke('select-import-zip'),
   importSkillSource: (payload) => ipcRenderer.invoke('import-skill-source', payload),
   scanImportCandidates: (payload) =>

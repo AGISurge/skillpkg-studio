@@ -25,6 +25,12 @@ const {
   uninstallAgentSkillLink,
 } = require('../../electron/agentService');
 const {
+  getInstallPathDialogOptions,
+  migrateInstallPath,
+  prepareInstallPathChange,
+  validateInstallPathChange,
+} = require('../../electron/installPathService');
+const {
   AGENT_TOOL_IDS,
   detectAgent,
   resolveAgentHomePath,
@@ -39,6 +45,12 @@ const {
   getSkillpkgSkillDownloadUrl,
   listSkillpkgSkills,
 } = require('../../electron/skillpkgApi');
+const {
+  APP_ID,
+  APP_NAME,
+  getDockIconPath,
+  getPlatformIconPath,
+} = require('../../electron/appIcon');
 
 describe('electron skill services', () => {
   let tmpDir;
@@ -63,6 +75,17 @@ describe('electron skill services', () => {
 
     await expect(hasSkillMarkdown(validDir)).resolves.toBe(true);
     await expect(hasSkillMarkdown(invalidDir)).resolves.toBe(false);
+  });
+
+  test('resolves bundled app icon assets per desktop platform', () => {
+    const normalizeIconPath = (iconPath) => iconPath.split(path.sep).join('/');
+
+    expect(APP_ID).toBe('com.agisurge.skillpkgstudio');
+    expect(APP_NAME).toBe('Skillpkg Studio');
+    expect(normalizeIconPath(getPlatformIconPath('win32'))).toMatch(/assets\/icons\/windows\/icon\.ico$/);
+    expect(normalizeIconPath(getPlatformIconPath('darwin'))).toMatch(/assets\/icons\/macos\/icon\.icns$/);
+    expect(normalizeIconPath(getPlatformIconPath('linux'))).toMatch(/assets\/icons\/linux\/512x512\.png$/);
+    expect(normalizeIconPath(getDockIconPath())).toMatch(/assets\/icons\/macos\/512x512\.png$/);
   });
 
   test('parses frontmatter and heading metadata from SKILL.md', () => {
@@ -595,6 +618,118 @@ describe('electron skill services', () => {
     } finally {
       homeDirSpy.mockRestore();
     }
+  });
+
+  test('rejects install paths inside dynamically resolved agent directories', async () => {
+    const homeDirSpy = jest.spyOn(os, 'homedir').mockReturnValue(tmpDir);
+    try {
+      await expect(validateInstallPathChange({
+        fromInstallPath: path.join(tmpDir, '.skillpkg', 'skills'),
+        toInstallPath: path.join(tmpDir, '.claude'),
+      })).resolves.toEqual({ ok: false, reason: 'agent-directory' });
+
+      await expect(validateInstallPathChange({
+        fromInstallPath: path.join(tmpDir, '.skillpkg', 'skills'),
+        toInstallPath: path.join(tmpDir, '.qoder', 'skills', 'nested'),
+      })).resolves.toEqual({ ok: false, reason: 'agent-directory' });
+    } finally {
+      homeDirSpy.mockRestore();
+    }
+  });
+
+  test('install path picker shows hidden directories', () => {
+    expect(getInstallPathDialogOptions()).toEqual({
+      properties: ['openDirectory', 'createDirectory'],
+      showHiddenFiles: true,
+    });
+  });
+
+  test('migrates library skills and relinks managed agent symlinks', async () => {
+    const oldLibrary = path.join(tmpDir, 'old-library');
+    const newLibrary = path.join(tmpDir, 'new-library');
+    const agentSkillRoot = path.join(tmpDir, 'agent-home', 'skills');
+    const managedSkill = path.join(oldLibrary, 'managed');
+    const agentLink = path.join(agentSkillRoot, 'managed');
+    const ownSkill = path.join(agentSkillRoot, 'own');
+
+    await fs.mkdir(managedSkill, { recursive: true });
+    await fs.mkdir(ownSkill, { recursive: true });
+    await fs.writeFile(path.join(managedSkill, 'SKILL.md'), '# Managed');
+    await fs.writeFile(path.join(managedSkill, 'notes.txt'), 'old-copy');
+    await fs.writeFile(path.join(ownSkill, 'SKILL.md'), '# Own');
+    await fs.symlink(managedSkill, agentLink, 'dir');
+
+    const agent = {
+      id: 'test-agent',
+      name: 'Test Agent',
+      pathMac: agentSkillRoot,
+      pathWindows: agentSkillRoot,
+    };
+
+    await expect(prepareInstallPathChange({
+      fromInstallPath: oldLibrary,
+      toInstallPath: newLibrary,
+      agents: [agent],
+    })).resolves.toEqual(expect.objectContaining({
+      ok: true,
+      migratedCount: 1,
+      relinkedCount: 1,
+      conflicts: [],
+    }));
+
+    const result = await migrateInstallPath({
+      fromInstallPath: oldLibrary,
+      toInstallPath: newLibrary,
+      agents: [agent],
+    });
+
+    expect(result).toEqual(expect.objectContaining({
+      ok: true,
+      migratedCount: 1,
+      relinkedCount: 1,
+    }));
+    await expect(fs.readFile(path.join(newLibrary, 'managed', 'notes.txt'), 'utf-8')).resolves.toBe('old-copy');
+    await expect(fs.readFile(path.join(oldLibrary, 'managed', 'SKILL.md'), 'utf-8')).resolves.toBe('# Managed');
+    const newManagedRealPath = await fs.realpath(path.join(newLibrary, 'managed'));
+    await expect(fs.realpath(agentLink)).resolves.toBe(newManagedRealPath);
+    const ownStats = await fs.lstat(ownSkill);
+    expect(ownStats.isSymbolicLink()).toBe(false);
+  });
+
+  test('reports target conflicts without copying or relinking', async () => {
+    const oldLibrary = path.join(tmpDir, 'old-library');
+    const newLibrary = path.join(tmpDir, 'new-library');
+    const agentSkillRoot = path.join(tmpDir, 'agent-home', 'skills');
+    const oldSkill = path.join(oldLibrary, 'managed');
+    const newSkill = path.join(newLibrary, 'managed');
+    const agentLink = path.join(agentSkillRoot, 'managed');
+
+    await fs.mkdir(oldSkill, { recursive: true });
+    await fs.mkdir(newSkill, { recursive: true });
+    await fs.mkdir(agentSkillRoot, { recursive: true });
+    await fs.writeFile(path.join(oldSkill, 'SKILL.md'), '# Old Managed');
+    await fs.writeFile(path.join(newSkill, 'SKILL.md'), '# New Managed');
+    await fs.symlink(oldSkill, agentLink, 'dir');
+
+    const result = await migrateInstallPath({
+      fromInstallPath: oldLibrary,
+      toInstallPath: newLibrary,
+      agents: [{
+        id: 'test-agent',
+        name: 'Test Agent',
+        pathMac: agentSkillRoot,
+        pathWindows: agentSkillRoot,
+      }],
+    });
+
+    expect(result).toEqual(expect.objectContaining({
+      ok: false,
+      reason: 'conflicts',
+      conflicts: [expect.objectContaining({ skillId: 'managed' })],
+    }));
+    await expect(fs.readFile(path.join(newSkill, 'SKILL.md'), 'utf-8')).resolves.toBe('# New Managed');
+    const oldManagedRealPath = await fs.realpath(oldSkill);
+    await expect(fs.realpath(agentLink)).resolves.toBe(oldManagedRealPath);
   });
 });
 

@@ -2205,6 +2205,61 @@ body:not([data-theme='light']) .discover-type-pill.solution {
   width: min(640px, 92vw);
 }
 
+.install-path-dialog {
+  width: min(620px, 92vw);
+}
+
+.path-change-summary {
+  display: grid;
+  gap: 10px;
+}
+
+.path-change-summary > div {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-bg);
+}
+
+.path-change-summary .label {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.path-change-summary .value {
+  font-family: var(--mono-font);
+  font-size: 12px;
+  color: var(--text-main);
+  overflow-wrap: anywhere;
+}
+
+.path-change-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.path-change-stats > div {
+  display: grid;
+  gap: 2px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-bg);
+}
+
+.stat-value {
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.stat-label {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
 .dialog-header {
   display: flex;
   justify-content: space-between;

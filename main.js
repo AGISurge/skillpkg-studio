@@ -32,16 +32,46 @@ const {
   importSkillSource,
 } = require('./electron/importService');
 const {
+  getInstallPathDialogOptions,
+  migrateInstallPath,
+  prepareInstallPathChange,
+} = require('./electron/installPathService');
+const {
+  APP_ID,
+  APP_NAME,
+  getDockIconPath,
+  getPlatformIconPath,
+} = require('./electron/appIcon');
+const {
   getSkillpkgSkillDetail,
   listSkillpkgCategories,
   listSkillpkgSkills,
 } = require('./electron/skillpkgApi');
 
+app.setName(APP_NAME);
+if (process.platform === 'win32') {
+  app.setAppUserModelId(APP_ID);
+}
+
+const getRendererIndexPath = () => {
+  const buildIndexPath = path.join(__dirname, 'build', 'index.html');
+  if (require('fs').existsSync(buildIndexPath)) return buildIndexPath;
+  return path.join(__dirname, 'index.html');
+};
+
+const configureDockIcon = () => {
+  if (process.platform !== 'darwin' || !app.dock) return;
+  const dockIconPath = getDockIconPath();
+  if (dockIconPath) app.dock.setIcon(dockIconPath);
+};
+
 const createWindow = () => {
+  const iconPath = getPlatformIconPath();
   const win = new BrowserWindow({
     width: 1280,
     minWidth: 1280,
     height: 600,
+    ...(iconPath ? { icon: iconPath } : {}),
     ...(process.platform === 'darwin' ? { titleBarStyle: 'hiddenInset' } : {}),
     webPreferences: {
       nodeIntegration: false,
@@ -49,10 +79,11 @@ const createWindow = () => {
       preload: path.join(__dirname, 'preload.js'),
     },
   });
-  const urlLocation = isDev
-    ? 'http://localhost:3000'
-    : `file://${__dirname}/index.html`;
-  win.loadURL(urlLocation);
+  if (isDev) {
+    win.loadURL('http://localhost:3000');
+  } else {
+    win.loadFile(getRendererIndexPath());
+  }
 };
 
 const getDefaultInstallPath = () =>
@@ -466,12 +497,16 @@ const registerIpcHandlers = () => {
   ipcMain.handle('get-default-install-path', async () => getDefaultInstallPath());
 
   ipcMain.handle('select-install-path', async () => {
-    const result = await dialog.showOpenDialog({
-      properties: ['openDirectory', 'createDirectory'],
-    });
+    const result = await dialog.showOpenDialog(getInstallPathDialogOptions());
     if (result.canceled) return null;
     return result.filePaths?.[0] || null;
   });
+
+  ipcMain.handle('prepare-install-path-change', async (_event, payload) =>
+    prepareInstallPathChange(payload || {}));
+
+  ipcMain.handle('migrate-install-path', async (_event, payload) =>
+    migrateInstallPath(payload || {}));
 
   ipcMain.handle('select-import-zip', async () => {
     const result = await dialog.showOpenDialog({
@@ -727,6 +762,7 @@ const registerIpcHandlers = () => {
 };
 
 app.on('ready', async () => {
+  configureDockIcon();
   await initDatabase();
   createWindow();
   registerIpcHandlers();

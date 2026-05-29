@@ -193,3 +193,138 @@ test('local delete confirmation lists agents using the skill', () => {
   expect(screen.getByText('Claude')).toBeInTheDocument();
   expect(screen.getByText('Codex')).toBeInTheDocument();
 });
+
+test('selecting a new install path opens migration confirmation before changing path', async () => {
+  window.location.hash = '#/settings';
+  window.localStorage.setItem('skillpkg.installPath', '/tmp/old-skills');
+  const migrateInstallPath = jest.fn(async () => ({
+    ok: true,
+    migratedCount: 2,
+    relinkedCount: 1,
+    conflicts: [],
+  }));
+  window.skillpkg = {
+    detectAgents: async () => [],
+    loadSkills: async () => [],
+    selectInstallPath: async () => '/tmp/new-skills',
+    prepareInstallPathChange: async () => ({
+      ok: true,
+      migratedCount: 2,
+      relinkedCount: 1,
+      conflicts: [],
+    }),
+    migrateInstallPath,
+  } as unknown as typeof window.skillpkg;
+
+  render(
+    <HashRouter>
+      <App />
+    </HashRouter>
+  );
+
+  await screen.findByText('/tmp/old-skills');
+  fireEvent.click(await screen.findByRole('button', { name: /选择文件夹/i }));
+
+  expect(await screen.findByText('确认切换存放路径')).toBeInTheDocument();
+  expect(screen.getAllByText('/tmp/old-skills').length).toBeGreaterThan(0);
+  expect(screen.getByText('/tmp/new-skills')).toBeInTheDocument();
+  expect(migrateInstallPath).not.toHaveBeenCalled();
+});
+
+test('canceling install path migration keeps current path', async () => {
+  window.location.hash = '#/settings';
+  window.localStorage.setItem('skillpkg.installPath', '/tmp/old-skills');
+  const migrateInstallPath = jest.fn();
+  window.skillpkg = {
+    detectAgents: async () => [],
+    loadSkills: async () => [],
+    selectInstallPath: async () => '/tmp/new-skills',
+    prepareInstallPathChange: async () => ({
+      ok: true,
+      migratedCount: 1,
+      relinkedCount: 0,
+      conflicts: [],
+    }),
+    migrateInstallPath,
+  } as unknown as typeof window.skillpkg;
+
+  render(
+    <HashRouter>
+      <App />
+    </HashRouter>
+  );
+
+  await screen.findByText('/tmp/old-skills');
+  fireEvent.click(await screen.findByRole('button', { name: /选择文件夹/i }));
+  fireEvent.click(await screen.findByRole('button', { name: '取消' }));
+
+  expect(migrateInstallPath).not.toHaveBeenCalled();
+  expect(screen.getByText('/tmp/old-skills')).toBeInTheDocument();
+  expect(screen.queryByText('确认切换存放路径')).not.toBeInTheDocument();
+});
+
+test('confirming install path migration updates the settings path', async () => {
+  window.location.hash = '#/settings';
+  window.localStorage.setItem('skillpkg.installPath', '/tmp/old-skills');
+  const migrateInstallPath = jest.fn(async () => ({
+    ok: true,
+    migratedCount: 2,
+    relinkedCount: 1,
+    conflicts: [],
+  }));
+  window.skillpkg = {
+    detectAgents: async () => [],
+    loadSkills: async () => [],
+    selectInstallPath: async () => '/tmp/new-skills',
+    prepareInstallPathChange: async () => ({
+      ok: true,
+      migratedCount: 2,
+      relinkedCount: 1,
+      conflicts: [],
+    }),
+    migrateInstallPath,
+  } as unknown as typeof window.skillpkg;
+
+  render(
+    <HashRouter>
+      <App />
+    </HashRouter>
+  );
+
+  await screen.findByText('/tmp/old-skills');
+  fireEvent.click(await screen.findByRole('button', { name: /选择文件夹/i }));
+  fireEvent.click(await screen.findByRole('button', { name: '确认迁移' }));
+
+  await waitFor(() => expect(migrateInstallPath).toHaveBeenCalled());
+  expect(await screen.findByText('/tmp/new-skills')).toBeInTheDocument();
+  expect(await screen.findByText('已迁移 2 个 Skill，并更新 1 个 Agent 链接。')).toBeInTheDocument();
+});
+
+test('invalid install path selection shows validation notice', async () => {
+  window.location.hash = '#/settings';
+  window.localStorage.setItem('skillpkg.installPath', '/tmp/old-skills');
+  window.skillpkg = {
+    detectAgents: async () => [],
+    loadSkills: async () => [],
+    selectInstallPath: async () => '/tmp/.claude',
+    prepareInstallPathChange: async () => ({
+      ok: false,
+      reason: 'agent-directory',
+      migratedCount: 0,
+      relinkedCount: 0,
+      conflicts: [],
+    }),
+  } as unknown as typeof window.skillpkg;
+
+  render(
+    <HashRouter>
+      <App />
+    </HashRouter>
+  );
+
+  await screen.findByText('/tmp/old-skills');
+  fireEvent.click(await screen.findByRole('button', { name: /选择文件夹/i }));
+
+  expect(await screen.findByText('不能将 Agent 自己的目录设置为统一路径。')).toBeInTheDocument();
+  expect(screen.queryByText('确认切换存放路径')).not.toBeInTheDocument();
+});

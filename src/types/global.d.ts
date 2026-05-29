@@ -27,6 +27,46 @@ declare global {
        */
       selectInstallPath: () => Promise<string | null>;
       /**
+       * 预检统一安装路径切换。
+       */
+      prepareInstallPathChange: (payload: {
+        fromInstallPath?: string;
+        toInstallPath: string;
+        agents?: Array<{
+          id: string;
+          name: string;
+          pathMac: string;
+          pathLinux?: string;
+          pathWindows: string;
+        }>;
+      }) => Promise<{
+        ok: boolean;
+        reason?: string;
+        migratedCount: number;
+        relinkedCount: number;
+        conflicts: Array<{ skillId: string; path: string }>;
+      }>;
+      /**
+       * 迁移统一安装路径并更新托管软链接。
+       */
+      migrateInstallPath: (payload: {
+        fromInstallPath?: string;
+        toInstallPath: string;
+        agents?: Array<{
+          id: string;
+          name: string;
+          pathMac: string;
+          pathLinux?: string;
+          pathWindows: string;
+        }>;
+      }) => Promise<{
+        ok: boolean;
+        reason?: string;
+        migratedCount: number;
+        relinkedCount: number;
+        conflicts: Array<{ skillId: string; path: string }>;
+      }>;
+      /**
        * 选择用于导入的 zip 文件。
        */
       selectImportZip: () => Promise<string | null>;
