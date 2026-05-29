@@ -87,14 +87,14 @@ const SettingsPage = () => {
           <InputGroupInput
             type={apiKeyVisible ? "text" : "password"}
             value={apiKey}
-            className="px-2 focus:outline-none focus:ring-0 focus-visible:ring-0"
+            className="px-2 focus:outline-none focus:ring-0 focus-visible:ring-0 "
             onChange={(event) => setApiKey(event.target.value)}
             placeholder="输入 API Key"
             autoComplete="off"
           />
           <InputGroupAddon align="inline-end">
             <Button
-              variant="ghost"
+              variant="link"
               onClick={() => setApiKeyVisible((current) => !current)}
               aria-label={apiKeyVisible ? "隐藏 API Key" : "显示 API Key"}
             >

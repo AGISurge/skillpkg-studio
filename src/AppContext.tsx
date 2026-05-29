@@ -103,6 +103,7 @@ export const useToolbarContent = () => useContext(ToolbarContext);
 const THEME_STORAGE_KEY = 'skillpkg.theme';
 const API_KEY_STORAGE_KEY = 'skillpkg.apiKey';
 const NOTICE_DURATION_MS = 3000;
+const DARK_SCHEME_QUERY = '(prefers-color-scheme: dark)';
 
 const getDefaultSkillFilePath = (skill: Skill): string =>
   skill.files.find((file) => file.path === 'SKILL.md')?.path ||
@@ -548,8 +549,23 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     if (!document?.body) return;
-    document.body.dataset.theme = theme;
+    const mediaQuery = window?.matchMedia?.(DARK_SCHEME_QUERY);
+    const applyTheme = () => {
+      const prefersDark = mediaQuery?.matches ?? false;
+      document.documentElement.classList.toggle(
+        'dark',
+        theme === 'dark' || (theme === 'system' && prefersDark),
+      );
+      document.body.dataset.theme = theme;
+    };
+
+    applyTheme();
     window?.localStorage?.setItem(THEME_STORAGE_KEY, theme);
+
+    if (theme !== 'system' || !mediaQuery) return;
+
+    mediaQuery.addEventListener('change', applyTheme);
+    return () => mediaQuery.removeEventListener('change', applyTheme);
   }, [theme]);
 
   useEffect(() => {

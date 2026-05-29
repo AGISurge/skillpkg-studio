@@ -473,66 +473,14 @@ body[data-theme='light'] {
   color: var(--app-text-strong);
 }
 
-.settings-input-group {
-  min-height: 46px;
-  border: 1px solid var(--border-subtle);
-  border-radius: 12px;
-  background: var(--surface-bg-strong);
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 0 8px 0 14px;
-}
-
-.input-group-addon,
-.input-group-text {
-  display: inline-flex;
-  align-items: center;
-  color: var(--text-muted);
-}
-
 .settings-input-group input {
   min-width: 0;
   flex: 1;
   border: none;
   outline: none;
-  background: transparent;
   color: inherit;
   font-size: 13px;
   font-family: "JetBrains Mono", monospace;
-}
-
-.settings-api-key-input {
-  min-height: 46px;
-  border: 1px solid rgba(20, 30, 50, 0.14);
-  background: var(--surface-bg-strong);
-}
-
-.settings-api-key-input:focus-within {
-  border-color: var(--brand-border);
-  box-shadow: 0 0 0 3px var(--brand-soft);
-}
-
-body:not([data-theme='light']) .settings-api-key-input {
-  border: 1px solid rgba(255, 255, 255, 0.055);
-  background: rgba(255, 255, 255, 0.035);
-}
-
-body:not([data-theme='light']) .settings-api-key-input:focus-within {
-  border-color: var(--brand-border);
-  box-shadow: 0 0 0 3px rgba(217, 93, 63, 0.12);
-}
-
-@media (prefers-color-scheme: light) {
-  body[data-theme='system'] .settings-api-key-input {
-    border: 1px solid rgba(20, 30, 50, 0.14);
-    background: var(--surface-bg-strong);
-  }
-
-  body[data-theme='system'] .settings-api-key-input:focus-within {
-    border-color: var(--brand-border);
-    box-shadow: 0 0 0 3px var(--brand-soft);
-  }
 }
 
 .input-icon-btn {
