@@ -5,13 +5,13 @@ import { Slot } from "radix-ui"
 import { cn } from "@/lib/utils"
 
 const buttonVariants = cva(
-  "group/button inline-flex shrink-0 items-center justify-center rounded-lg border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-[var(--accent-border-strong)] focus-visible:ring-2 focus-visible:ring-[var(--brand-muted)] active:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-[var(--danger-text)] aria-invalid:ring-2 aria-invalid:ring-[var(--danger-bg)] [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  "group/button inline-flex shrink-0 items-center justify-center rounded-lg bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:ring-2 focus-visible:ring-[var(--brand-muted)] active:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border aria-invalid:border-[var(--danger-text)] aria-invalid:ring-2 aria-invalid:ring-[var(--danger-bg)] [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {
     variants: {
       variant: {
         default: "bg-[var(--brand)] text-[var(--primary-text)] hover:bg-[var(--brand-hover)]",
         outline:
-          "border-[var(--border-subtle)] bg-[var(--surface-bg)] hover:bg-[var(--surface-bg-hover)] hover:text-[var(--app-text-strong)] aria-expanded:bg-[var(--surface-bg-hover)] aria-expanded:text-[var(--app-text-strong)]",
+          "border border-[var(--border-subtle)] bg-[var(--surface-bg)] hover:bg-[var(--surface-bg-hover)] hover:text-[var(--app-text-strong)] aria-expanded:bg-[var(--surface-bg-hover)] aria-expanded:text-[var(--app-text-strong)]",
         secondary:
           "bg-[var(--surface-bg-strong)] text-[var(--app-text)] hover:bg-[var(--surface-bg-hover)] aria-expanded:bg-[var(--surface-bg-hover)] aria-expanded:text-[var(--app-text-strong)]",
         ghost:
