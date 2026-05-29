@@ -583,7 +583,6 @@ body:not([data-theme='light']) .settings-api-key-input:focus-within {
   overflow: hidden;
 }
 
-.topbar,
 .page-notice,
 .content > .settings-page {
   width: min(100%, var(--main-content-max-width));
@@ -593,6 +592,7 @@ body:not([data-theme='light']) .settings-api-key-input:focus-within {
 .topbar {
   position: relative;
   z-index: 30;
+  width: 100%;
   display: flex;
   justify-content: space-between;
   align-items: center;
