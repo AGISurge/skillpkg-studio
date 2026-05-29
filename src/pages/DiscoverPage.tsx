@@ -8,6 +8,7 @@ import type { KeyboardEvent } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import type { SkillpkgCategory, SkillpkgListMeta, SkillpkgSkillSummary } from '../types/models';
 import { useAppContext, useToolbar } from '../AppContext';
+import { Button } from '@/components/ui/button';
 
 const DISCOVER_PAGE_SIZE = 20;
 const SEARCH_DEBOUNCE_MS = 260;
@@ -526,6 +527,12 @@ const DiscoverPage = () => {
     setDebouncedSearchValue('');
   }, []);
 
+  const openSkillpkgSite = useCallback((event: React.MouseEvent<HTMLAnchorElement>) => {
+    event.preventDefault();
+    if (!window?.skillpkg?.openExternalUrl) return;
+    void window.skillpkg.openExternalUrl('https://skillpkg.com');
+  }, []);
+
   const toolbar = useMemo(() => (
     <div className="discover-toolbar">
       <div className="discover-category-strip" aria-label="分类筛选">
@@ -632,13 +639,41 @@ const DiscoverPage = () => {
             })}
           </div>
         ) : (
-          <div className="empty-state discover-empty">
-            {error || '未找到匹配的 Skill。'}
+          <div className="empty-state discover-empty flex flex-col h-full">
+            <div>
+              <img src="/robot.webp" alt="" className="w-32 h-32" />
+            </div>
+            <p>{error || '未找到匹配的 Skill。'}</p>
+            {!normalizedApiKey && (
+              <div>
+               
+              <p className="mt-2 text-xs text-muted-foreground">
+                 没有 API Key? 请先前往
+                 <a
+                   href="https://skillpkg.com"
+                   onClick={openSkillpkgSite}
+                   className="mx-1 underline"
+                 >
+                   技能包
+                 </a>
+                 注册或登录，然后在个人中心创建 API Key。
+              </p>
+               <Button
+                variant="default"
+                className="mt-6"
+                onClick={() => navigate('/settings')}
+              >
+                去设置 API Key
+              </Button>
+              </div>
+            )}
           </div>
         )}
 
         {error && skills.length > 0 ? (
-          <div className="notice discover-inline-error">{error}</div>
+          <div className="notice discover-inline-error">
+            <p>{error}</p>
+          </div>
         ) : null}
 
         {loadingMore ? (
