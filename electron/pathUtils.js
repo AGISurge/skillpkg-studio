@@ -67,6 +67,8 @@ const resolveTemplatePath = (template) => {
   const replacements = {
     '%USERPROFILE%': process.env.USERPROFILE || '',
     '%APPDATA%': process.env.APPDATA || '',
+    '%LOCALAPPDATA%': process.env.LOCALAPPDATA || '',
+    '%PROGRAMFILES%': process.env.PROGRAMFILES || '',
   };
   Object.entries(replacements).forEach(([token, value]) => {
     if (value) {

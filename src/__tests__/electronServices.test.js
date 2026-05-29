@@ -1,7 +1,8 @@
 const fs = require('fs/promises');
 const os = require('os');
 const path = require('path');
-const { execFileSync } = require('child_process');
+const childProcess = require('child_process');
+const { execFileSync } = childProcess;
 
 global.setImmediate = global.setImmediate || ((callback, ...args) => setTimeout(callback, 0, ...args));
 
@@ -24,7 +25,7 @@ const {
   unhostAgentSkillLink,
   uninstallAgentSkillLink,
 } = require('../../electron/agentService');
-const { resolveAgentSkillPath } = require('../../electron/agentCatalog');
+const { AGENT_TOOL_IDS, detectAgent, resolveAgentSkillPath } = require('../../electron/agentCatalog');
 const { getDefaultSkillLibraryPath } = require('../../electron/pathUtils');
 const {
   buildSkillpkgSkillDetailPath,
@@ -494,6 +495,115 @@ describe('electron skill services', () => {
     expect(resolveAgentSkillPath('claude')).toBe(path.join(os.homedir(), '.claude', 'skills'));
     expect(resolveAgentSkillPath('codex')).toBe(path.join(os.homedir(), '.codex', 'skills'));
     expect(resolveAgentSkillPath('cursor')).toBe(path.join(os.homedir(), '.cursor', 'skills'));
+    expect(resolveAgentSkillPath('qoder')).toBe(path.join(os.homedir(), '.qoder', 'skills'));
+  });
+
+  test('includes qoder in supported agents', () => {
+    expect(AGENT_TOOL_IDS).toContain('qoder');
+  });
+
+  test('detects qoder from home directory marker', async () => {
+    const homeDirSpy = jest.spyOn(os, 'homedir').mockReturnValue(tmpDir);
+    try {
+      await fs.mkdir(path.join(tmpDir, '.qoder'), { recursive: true });
+
+      await expect(detectAgent('qoder')).resolves.toEqual(
+        expect.objectContaining({
+          id: 'qoder',
+          name: 'Qoder',
+          installed: true,
+          skillPath: path.join(tmpDir, '.qoder', 'skills'),
+        }),
+      );
+    } finally {
+      homeDirSpy.mockRestore();
+    }
+  });
+
+  test('detects qoder from Linux desktop app installation', async () => {
+    const platformSpy = jest.spyOn(os, 'platform').mockReturnValue('linux');
+    const homeDirSpy = jest.spyOn(os, 'homedir').mockReturnValue(tmpDir);
+    const desktopEntry = path.join(tmpDir, '.local', 'share', 'applications', 'qoder.desktop');
+
+    try {
+      await fs.mkdir(path.dirname(desktopEntry), { recursive: true });
+      await fs.writeFile(desktopEntry, '[Desktop Entry]\nName=Qoder\n');
+
+      await expect(detectAgent('qoder')).resolves.toEqual(
+        expect.objectContaining({
+          id: 'qoder',
+          installed: true,
+          reason: desktopEntry,
+        }),
+      );
+    } finally {
+      platformSpy.mockRestore();
+      homeDirSpy.mockRestore();
+    }
+  });
+
+  test('detects qoder from Windows desktop app installation', async () => {
+    const platformSpy = jest.spyOn(os, 'platform').mockReturnValue('win32');
+    const homeDirSpy = jest.spyOn(os, 'homedir').mockReturnValue(tmpDir);
+    const originalLocalAppData = process.env.LOCALAPPDATA;
+    const localAppData = path.join(tmpDir, 'AppData', 'Local');
+    const appPath = path.join(localAppData, 'Programs', 'Qoder', 'Qoder.exe');
+
+    try {
+      process.env.LOCALAPPDATA = localAppData;
+      await fs.mkdir(path.dirname(appPath), { recursive: true });
+      await fs.writeFile(appPath, '');
+
+      await expect(detectAgent('qoder')).resolves.toEqual(
+        expect.objectContaining({
+          id: 'qoder',
+          installed: true,
+          reason: appPath,
+        }),
+      );
+    } finally {
+      if (originalLocalAppData === undefined) {
+        delete process.env.LOCALAPPDATA;
+      } else {
+        process.env.LOCALAPPDATA = originalLocalAppData;
+      }
+      platformSpy.mockRestore();
+      homeDirSpy.mockRestore();
+    }
+  });
+
+  test('does not detect qoder through a qoder command', async () => {
+    const execFileSpy = jest.spyOn(childProcess, 'execFile');
+    const homeDirSpy = jest.spyOn(os, 'homedir').mockReturnValue(tmpDir);
+    execFileSpy.mockImplementation((command, _args, _options, callback) => {
+      callback(Object.assign(new Error('unavailable'), { code: 'ENOENT' }), '', '');
+    });
+
+    try {
+      await detectAgent('qoder');
+
+      expect(execFileSpy).not.toHaveBeenCalledWith(
+        'qoder',
+        expect.any(Array),
+        expect.any(Object),
+        expect.any(Function),
+      );
+      expect(execFileSpy).toHaveBeenCalledWith(
+        'qodercli',
+        expect.any(Array),
+        expect.any(Object),
+        expect.any(Function),
+      );
+      expect(execFileSpy).toHaveBeenCalledWith(
+        'qordercli',
+        expect.any(Array),
+        expect.any(Object),
+        expect.any(Function),
+      );
+    } finally {
+      execFileSpy.mockRestore();
+      homeDirSpy.mockRestore();
+    }
   });
 });
 

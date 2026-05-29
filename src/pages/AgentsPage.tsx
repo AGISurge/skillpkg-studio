@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useTransition } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { useAppContext } from '../AppContext';
+import { useAppContext, useToolbar } from '../AppContext';
 import Empty from '../components/Empty';
+import OpenDirectoryButton from '../components/OpenDirectoryButton';
 import SkillsPage from './SkillsPage';
 
 /**
@@ -33,6 +34,8 @@ const AgentsPage = () => {
     toggleFavorite,
     handleInstallToggle,
     openAgentSkillDeleteDialog,
+    openDirectoryPath,
+    openSkillDirectory,
     openInstallDialog,
     handleFileSelect,
     loadSkillFileContent,
@@ -68,6 +71,10 @@ const AgentsPage = () => {
 
   const currentAgentId =
     agentId && agents.some((agent) => agent.id === agentId) ? agentId : selectedAgentId;
+  const currentAgent = useMemo(
+    () => agents.find((agent) => agent.id === currentAgentId) || null,
+    [agents, currentAgentId],
+  );
   const installedSkillIds = useMemo(
     () => installedByAgent[currentAgentId] || new Set<string>(),
     [currentAgentId, installedByAgent]
@@ -90,6 +97,17 @@ const AgentsPage = () => {
       null,
     [selectedFilePath, selectedSkill],
   );
+  const toolbar = useMemo(
+    () => (
+      <OpenDirectoryButton
+        disabled={!currentAgent?.skillPath}
+        onClick={() => openDirectoryPath(currentAgent?.skillPath, 'agents')}
+      />
+    ),
+    [currentAgent?.skillPath, openDirectoryPath],
+  );
+  useToolbar(toolbar);
+
   const fileKey = selectedSkill && selectedFile ? `${selectedSkill.id}::${selectedFile.path}` : '';
 
   const handleSelectSkill = useCallback((skill: (typeof agentSkills)[number]) => {
@@ -117,8 +135,7 @@ const AgentsPage = () => {
   }, [loadSkillFileContent, selectedFile, selectedSkill]);
 
   if (agentSkills.length === 0) {
-    const agentName =
-      agents.find((agent) => agent.id === currentAgentId)?.name || '当前 Agent';
+    const agentName = currentAgent?.name || '当前 Agent';
 
     return <Empty text={`${agentName} 还没有任何 Skill。`} />;
   }
@@ -135,6 +152,7 @@ const AgentsPage = () => {
       pendingSkillIds={pendingSkillIds}
       onSelectSkill={handleSelectSkill}
       onToggleFavorite={toggleFavorite}
+      onOpenSkillDirectory={(skill) => openSkillDirectory(skill, 'agents')}
       onInstallToggle={handleInstallToggle}
       onDeleteSkill={openAgentSkillDeleteDialog}
       onReinstall={(skill) => openInstallDialog(skill, 'agents')}

@@ -718,8 +718,8 @@ const registerIpcHandlers = () => {
     const { installPath, skillId, rootPath } = payload || {};
     const targetDir = rootPath || (installPath && skillId ? path.join(installPath, skillId) : null);
     if (!targetDir || !await pathExists(targetDir)) return false;
-    shell.showItemInFolder(targetDir);
-    return true;
+    const errorMessage = await shell.openPath(targetDir);
+    return !errorMessage;
   });
 
   ipcMain.handle('detect-agents', async (_event, names) =>

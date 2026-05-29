@@ -2,6 +2,7 @@ import {
   ArrowDownloadRegular,
   DeleteRegular,
   DismissRegular,
+  OpenFolderRegular,
   SearchRegular,
   SettingsRegular,
   StarFilled,
@@ -65,6 +66,7 @@ type SkillsPageProps = {
   hostedAgentNamesBySkillId?: Record<string, string[]>;
   onSelectSkill: (skill: Skill) => void;
   onToggleFavorite: (skillId: string) => void;
+  onOpenSkillDirectory?: (skill: Skill) => void;
   onInstallToggle?: (skill: Skill) => void;
   onReinstall?: (skill: Skill) => void;
   onDeleteSkill?: (skill: Skill) => void;
@@ -95,6 +97,7 @@ const SkillsPage = ({
   hostedAgentNamesBySkillId,
   onSelectSkill,
   onToggleFavorite,
+  onOpenSkillDirectory,
   onInstallToggle,
   onReinstall,
   onDeleteSkill,
@@ -299,6 +302,18 @@ const SkillsPage = ({
                 <div className="flex justify-between items-center">
                   <div className="detail-title">{selectedSkill.name}</div>
                   <div className="detail-actions">
+                    {onOpenSkillDirectory && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        aria-label="打开当前 Skill 目录"
+                        title="打开当前 Skill 目录"
+                        onClick={() => onOpenSkillDirectory(selectedSkill)}
+                      >
+                        <OpenFolderRegular className="icon" />
+                      </Button>
+                    )}
                     <Button
                       type="button"
                       variant="ghost"

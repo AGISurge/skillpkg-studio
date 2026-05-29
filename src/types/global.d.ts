@@ -212,8 +212,9 @@ declare global {
        * 打开指定技能的本地路径。
        */
       openSkillPath: (payload: {
-        installPath: string;
-        skillId: string;
+        installPath?: string;
+        skillId?: string;
+        rootPath?: string;
       }) => Promise<boolean>;
       /**
        * 检测指定 Agent 是否已安装。

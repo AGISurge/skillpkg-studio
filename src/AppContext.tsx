@@ -178,6 +178,8 @@ type AppContextValue = {
   openInstallDialog: (skill: Skill, noticeScope?: NoticeScope) => void;
   confirmInstall: (overwrite?: boolean) => Promise<void>;
   openSkillLocation: () => Promise<void>;
+  openDirectoryPath: (path: string | null | undefined, noticeScope?: NoticeScope) => Promise<void>;
+  openSkillDirectory: (skill: Skill | null, noticeScope?: NoticeScope) => Promise<void>;
   openImportSkill: (kind: ImportSkillSourceKind) => Promise<void> | void;
   importSkillpkgSkill: (publicId: string) => Promise<void>;
   closeImportDialog: () => void;
@@ -629,9 +631,35 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const openSkillLocation = async () => {
-    const noticeScope = dialogNoticeScope;
-    if (!dialogSkill || !installPath) {
+  const openDirectoryPath = useCallback(async (
+    targetPath: string | null | undefined,
+    noticeScope: NoticeScope = 'global',
+  ) => {
+    if (!targetPath) {
+      showNotice('未找到可打开的目录。', noticeScope);
+      return;
+    }
+    if (!window?.skillpkg?.openSkillPath) {
+      showNotice('当前环境不支持打开路径。', noticeScope);
+      return;
+    }
+    const ok = await window.skillpkg.openSkillPath({
+      rootPath: targetPath,
+    });
+    if (!ok) {
+      showNotice('未找到该目录。', noticeScope);
+    }
+  }, [showNotice]);
+
+  const openSkillDirectory = useCallback(async (
+    skill: Skill | null,
+    noticeScope: NoticeScope = getSkillNoticeScope(skill),
+  ) => {
+    if (!skill) {
+      showNotice('请选择一个 Skill。', noticeScope);
+      return;
+    }
+    if (!skill.rootPath && !installPath) {
       showNotice('请先设置统一路径。', noticeScope);
       return;
     }
@@ -641,11 +669,16 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
     const ok = await window.skillpkg.openSkillPath({
       installPath,
-      skillId: dialogSkill.id,
+      skillId: skill.id,
+      rootPath: skill.rootPath,
     });
     if (!ok) {
       showNotice('未找到该 Skill 的本地路径。', noticeScope);
     }
+  }, [getSkillNoticeScope, installPath, showNotice]);
+
+  const openSkillLocation = async () => {
+    await openSkillDirectory(dialogSkill, dialogNoticeScope);
   };
 
   const mapImportReason = (reason?: string) => {
@@ -1428,6 +1461,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     openInstallDialog,
     confirmInstall,
     openSkillLocation,
+    openDirectoryPath,
+    openSkillDirectory,
     openImportSkill,
     importSkillpkgSkill,
     closeImportDialog,

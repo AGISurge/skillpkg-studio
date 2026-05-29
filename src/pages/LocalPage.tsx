@@ -2,6 +2,7 @@ import { useEffect, useMemo } from 'react';
 import { useAppContext, useToolbar } from '../AppContext';
 import Empty from '../components/Empty';
 import ImportSkillDropdown from '../components/ImportSkillDropdown';
+import OpenDirectoryButton from '../components/OpenDirectoryButton';
 import { AGENT_CATALOG } from '../config/agents';
 import SkillsPage from './SkillsPage';
 
@@ -23,6 +24,7 @@ const LocalPage = () => {
     editing,
     fileDrafts,
     installedByAgent,
+    installPath,
     importStatus,
     setSelectedLibrarySkillId,
     setSelectedFilePath,
@@ -30,6 +32,8 @@ const LocalPage = () => {
     toggleFavorite,
     openInstallDialog,
     openLocalSkillDeleteDialog,
+    openDirectoryPath,
+    openSkillDirectory,
     openImportSkill,
     handleFileSelect,
     handleToggleFolder,
@@ -37,14 +41,6 @@ const LocalPage = () => {
     handleCancelEdit,
     updateDraft,
   } = useAppContext();
-
-  const toolbar = useMemo(
-    () => (
-      <ImportSkillDropdown status={importStatus} onSelect={openImportSkill} />
-    ),
-    [importStatus, openImportSkill],
-  );
-  useToolbar(toolbar);
 
   const hostedAgentNamesBySkillId = useMemo(() => {
     const next: Record<string, string[]> = {};
@@ -65,6 +61,21 @@ const LocalPage = () => {
     localSkills.find((skill) => skill.id === selectedLibrarySkillId) ||
     localSkills[0] ||
     null;
+
+  const toolbar = useMemo(
+    () => (
+      <>
+        <OpenDirectoryButton
+          disabled={!installPath}
+          onClick={() => openDirectoryPath(installPath, 'local')}
+        />
+        <ImportSkillDropdown status={importStatus} onSelect={openImportSkill} />
+      </>
+    ),
+    [importStatus, installPath, openDirectoryPath, openImportSkill],
+  );
+  useToolbar(toolbar);
+
   const selectedFile =
     selectedSkill?.files.find((file) => file.path === selectedFilePath) ||
     selectedSkill?.files[0] ||
@@ -96,6 +107,7 @@ const LocalPage = () => {
         setSelectedFilePath(getDefaultSkillFilePath(skill));
       }}
       onToggleFavorite={toggleFavorite}
+      onOpenSkillDirectory={(skill) => openSkillDirectory(skill, 'local')}
       onReinstall={(skill) => openInstallDialog(skill, 'local')}
       onDeleteSkill={openLocalSkillDeleteDialog}
       onSelectFile={handleFileSelect}

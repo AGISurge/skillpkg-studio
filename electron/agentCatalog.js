@@ -1,6 +1,6 @@
 const path = require('path');
 const os = require('os');
-const { execFile } = require('child_process');
+const childProcess = require('child_process');
 const { pathExists, resolveTemplatePath } = require('./pathUtils');
 
 const AGENT_CATALOG = {
@@ -46,6 +46,39 @@ const AGENT_CATALOG = {
       { type: 'app', bundles: ['Cursor.app'] },
     ],
   },
+  qoder: {
+    id: 'qoder',
+    name: 'Qoder',
+    skillPath: {
+      darwin: '~/.qoder/skills',
+      win32: '%USERPROFILE%\\.qoder\\skills',
+      other: '~/.qoder/skills',
+    },
+    detect: [
+      { type: 'path', path: os.platform() === 'win32' ? '%USERPROFILE%\\.qoder' : '~/.qoder' },
+      {
+        type: 'app',
+        bundles: ['Qoder.app'],
+        paths: {
+          linux: [
+            '/usr/share/applications/qoder.desktop',
+            '~/.local/share/applications/qoder.desktop',
+            '/opt/Qoder/qoder',
+            '/opt/Qoder/Qoder',
+            '~/Applications/Qoder.AppImage',
+          ],
+          win32: [
+            '%LOCALAPPDATA%/Programs/Qoder/Qoder.exe',
+            '%LOCALAPPDATA%/Programs/qoder/Qoder.exe',
+            '%LOCALAPPDATA%/Programs/Qoder/resources/app/resources/bin/Qoder.exe',
+            '%PROGRAMFILES%/Qoder/Qoder.exe',
+          ],
+        },
+      },
+      { type: 'cli', command: 'qodercli', args: ['--version'] },
+      { type: 'cli', command: 'qordercli', args: ['--version'] },
+    ],
+  },
 };
 
 const AGENT_TOOL_IDS = Object.keys(AGENT_CATALOG);
@@ -67,12 +100,25 @@ const resolveAgentSkillPath = (agentOrId) => {
   return resolveTemplatePath(configured[getPlatformKey()] || configured.other);
 };
 
-const getAppBundleCandidates = (bundles) => {
-  if (os.platform() !== 'darwin') return [];
+const getAppBundleCandidates = (criterion) => {
+  const platform = os.platform();
+  const platformKey = platform === 'linux' ? 'linux' : getPlatformKey();
+  const configuredPaths = Array.isArray(criterion.paths)
+    ? criterion.paths
+    : criterion.paths?.[platformKey] || [];
+  const appPaths = configuredPaths
+    .map((candidate) => resolveTemplatePath(candidate))
+    .filter(Boolean);
+  if (platform !== 'darwin') return appPaths;
+
+  const bundles = criterion.bundles || [];
   const homeDir = os.homedir();
   const roots = ['/Applications'];
   if (homeDir) roots.push(path.join(homeDir, 'Applications'));
-  return roots.flatMap((root) => bundles.map((bundle) => path.join(root, bundle)));
+  return [
+    ...appPaths,
+    ...roots.flatMap((root) => bundles.map((bundle) => path.join(root, bundle))),
+  ];
 };
 
 const detectCli = (criterion) =>
@@ -86,7 +132,7 @@ const detectCli = (criterion) =>
         path.join(os.homedir(), '.local', 'bin'),
       ].join(path.delimiter),
     };
-    execFile(
+    childProcess.execFile(
       criterion.command,
       criterion.args || ['--version'],
       { env, timeout: 2500, windowsHide: true },
@@ -111,7 +157,7 @@ const detectCriterion = async (criterion) => {
     };
   }
   if (criterion.type === 'app') {
-    const candidates = getAppBundleCandidates(criterion.bundles || []);
+    const candidates = getAppBundleCandidates(criterion);
     for (const candidate of candidates) {
       if (await pathExists(candidate)) return { ok: true, reason: candidate };
     }
