@@ -28,8 +28,7 @@ const normalizeMaybeRealPath = async (targetPath) => {
 const uniqPaths = (paths) => Array.from(new Set(paths.filter(Boolean).map(normalizePath)));
 
 const getInstallPathDialogOptions = () => ({
-  properties: ['openDirectory', 'createDirectory'],
-  showHiddenFiles: true,
+  properties: ['openDirectory', 'createDirectory', 'showHiddenFiles'],
 });
 
 const getProtectedAgentPaths = (agents = []) => {

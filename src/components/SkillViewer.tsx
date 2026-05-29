@@ -104,7 +104,7 @@ const SkillViewer = ({
             {editing ? (
               <>
                 <Button
-                  type="button"
+                  variant="default"
                   size="sm"
                   onClick={onSave}
                   disabled={loadingContent || !hasChanges}
@@ -113,7 +113,7 @@ const SkillViewer = ({
                   保存
                 </Button>
                 <Button
-                  type="button"
+                 variant="ghost"
                   size="sm"
                   onClick={onCancel}
                   disabled={loadingContent}
@@ -124,7 +124,7 @@ const SkillViewer = ({
               </>
             ) : (
               <Button
-                type="button"
+                variant="ghost"
                 size="sm"
                 onClick={onStartEdit}
                 disabled={!canEdit}

@@ -700,8 +700,7 @@ describe('electron skill services', () => {
 
   test('install path picker shows hidden directories', () => {
     expect(getInstallPathDialogOptions()).toEqual({
-      properties: ['openDirectory', 'createDirectory'],
-      showHiddenFiles: true,
+      properties: ['openDirectory', 'createDirectory', 'showHiddenFiles'],
     });
   });
 

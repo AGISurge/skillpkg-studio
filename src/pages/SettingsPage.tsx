@@ -94,6 +94,7 @@ const SettingsPage = () => {
           />
           <InputGroupAddon align="inline-end">
             <Button
+              variant="ghost"
               onClick={() => setApiKeyVisible((current) => !current)}
               aria-label={apiKeyVisible ? "隐藏 API Key" : "显示 API Key"}
             >
