@@ -1,8 +1,7 @@
 const fs = require('fs/promises');
 const os = require('os');
 const path = require('path');
-const childProcess = require('child_process');
-const { execFileSync } = childProcess;
+const { execFileSync } = require('child_process');
 
 global.setImmediate = global.setImmediate || ((callback, ...args) => setTimeout(callback, 0, ...args));
 
@@ -25,7 +24,12 @@ const {
   unhostAgentSkillLink,
   uninstallAgentSkillLink,
 } = require('../../electron/agentService');
-const { AGENT_TOOL_IDS, detectAgent, resolveAgentSkillPath } = require('../../electron/agentCatalog');
+const {
+  AGENT_TOOL_IDS,
+  detectAgent,
+  resolveAgentHomePath,
+  resolveAgentSkillPath,
+} = require('../../electron/agentCatalog');
 const { getDefaultSkillLibraryPath } = require('../../electron/pathUtils');
 const {
   buildSkillpkgSkillDetailPath,
@@ -496,16 +500,28 @@ describe('electron skill services', () => {
     expect(resolveAgentSkillPath('codex')).toBe(path.join(os.homedir(), '.codex', 'skills'));
     expect(resolveAgentSkillPath('cursor')).toBe(path.join(os.homedir(), '.cursor', 'skills'));
     expect(resolveAgentSkillPath('qoder')).toBe(path.join(os.homedir(), '.qoder', 'skills'));
+    expect(resolveAgentSkillPath('codebuddy')).toBe(path.join(os.homedir(), '.codebuddy', 'skills'));
   });
 
-  test('includes qoder in supported agents', () => {
+  test('includes qoder and codebuddy in supported agents', () => {
     expect(AGENT_TOOL_IDS).toContain('qoder');
+    expect(AGENT_TOOL_IDS).toContain('codebuddy');
   });
 
-  test('detects qoder from home directory marker', async () => {
+  test('detects agents only from non-empty home directory markers', async () => {
     const homeDirSpy = jest.spyOn(os, 'homedir').mockReturnValue(tmpDir);
     try {
       await fs.mkdir(path.join(tmpDir, '.qoder'), { recursive: true });
+
+      await expect(detectAgent('qoder')).resolves.toEqual(
+        expect.objectContaining({
+          id: 'qoder',
+          installed: false,
+          reason: path.join(tmpDir, '.qoder'),
+        }),
+      );
+
+      await fs.writeFile(path.join(tmpDir, '.qoder', 'settings.json'), '{}');
 
       await expect(detectAgent('qoder')).resolves.toEqual(
         expect.objectContaining({
@@ -520,88 +536,63 @@ describe('electron skill services', () => {
     }
   });
 
-  test('detects qoder from Linux desktop app installation', async () => {
-    const platformSpy = jest.spyOn(os, 'platform').mockReturnValue('linux');
+  test('detects codebuddy from home directory marker', async () => {
     const homeDirSpy = jest.spyOn(os, 'homedir').mockReturnValue(tmpDir);
-    const desktopEntry = path.join(tmpDir, '.local', 'share', 'applications', 'qoder.desktop');
-
     try {
-      await fs.mkdir(path.dirname(desktopEntry), { recursive: true });
-      await fs.writeFile(desktopEntry, '[Desktop Entry]\nName=Qoder\n');
+      await fs.mkdir(path.join(tmpDir, '.codebuddy', 'skills'), { recursive: true });
 
-      await expect(detectAgent('qoder')).resolves.toEqual(
+      await expect(detectAgent('codebuddy')).resolves.toEqual(
         expect.objectContaining({
-          id: 'qoder',
+          id: 'codebuddy',
+          name: 'CodeBuddy',
           installed: true,
-          reason: desktopEntry,
+          reason: path.join(tmpDir, '.codebuddy'),
+          skillPath: path.join(tmpDir, '.codebuddy', 'skills'),
         }),
       );
     } finally {
-      platformSpy.mockRestore();
       homeDirSpy.mockRestore();
     }
   });
 
-  test('detects qoder from Windows desktop app installation', async () => {
+  test('resolves Windows agent home paths through USERPROFILE', () => {
     const platformSpy = jest.spyOn(os, 'platform').mockReturnValue('win32');
     const homeDirSpy = jest.spyOn(os, 'homedir').mockReturnValue(tmpDir);
-    const originalLocalAppData = process.env.LOCALAPPDATA;
-    const localAppData = path.join(tmpDir, 'AppData', 'Local');
-    const appPath = path.join(localAppData, 'Programs', 'Qoder', 'Qoder.exe');
+    const originalUserProfile = process.env.USERPROFILE;
 
     try {
-      process.env.LOCALAPPDATA = localAppData;
-      await fs.mkdir(path.dirname(appPath), { recursive: true });
-      await fs.writeFile(appPath, '');
+      process.env.USERPROFILE = tmpDir;
 
-      await expect(detectAgent('qoder')).resolves.toEqual(
-        expect.objectContaining({
-          id: 'qoder',
-          installed: true,
-          reason: appPath,
-        }),
-      );
+      expect(resolveAgentHomePath('claude')).toBe(path.join(tmpDir, '.claude'));
+      expect(resolveAgentHomePath('codex')).toBe(path.join(tmpDir, '.codex'));
+      expect(resolveAgentHomePath('cursor')).toBe(path.join(tmpDir, '.cursor'));
+      expect(resolveAgentHomePath('qoder')).toBe(path.join(tmpDir, '.qoder'));
+      expect(resolveAgentHomePath('codebuddy')).toBe(path.join(tmpDir, '.codebuddy'));
     } finally {
-      if (originalLocalAppData === undefined) {
-        delete process.env.LOCALAPPDATA;
+      if (originalUserProfile === undefined) {
+        delete process.env.USERPROFILE;
       } else {
-        process.env.LOCALAPPDATA = originalLocalAppData;
+        process.env.USERPROFILE = originalUserProfile;
       }
       platformSpy.mockRestore();
       homeDirSpy.mockRestore();
     }
   });
 
-  test('does not detect qoder through a qoder command', async () => {
-    const execFileSpy = jest.spyOn(childProcess, 'execFile');
+  test('uses the unified Claude (Code) label', async () => {
     const homeDirSpy = jest.spyOn(os, 'homedir').mockReturnValue(tmpDir);
-    execFileSpy.mockImplementation((command, _args, _options, callback) => {
-      callback(Object.assign(new Error('unavailable'), { code: 'ENOENT' }), '', '');
-    });
-
     try {
-      await detectAgent('qoder');
+      await fs.mkdir(path.join(tmpDir, '.claude'), { recursive: true });
+      await fs.writeFile(path.join(tmpDir, '.claude', 'settings.json'), '{}');
 
-      expect(execFileSpy).not.toHaveBeenCalledWith(
-        'qoder',
-        expect.any(Array),
-        expect.any(Object),
-        expect.any(Function),
-      );
-      expect(execFileSpy).toHaveBeenCalledWith(
-        'qodercli',
-        expect.any(Array),
-        expect.any(Object),
-        expect.any(Function),
-      );
-      expect(execFileSpy).toHaveBeenCalledWith(
-        'qordercli',
-        expect.any(Array),
-        expect.any(Object),
-        expect.any(Function),
+      await expect(detectAgent('claude')).resolves.toEqual(
+        expect.objectContaining({
+          id: 'claude',
+          name: 'Claude (Code)',
+          installed: true,
+        }),
       );
     } finally {
-      execFileSpy.mockRestore();
       homeDirSpy.mockRestore();
     }
   });

@@ -100,6 +100,7 @@ export type Agent = {
   id: string;
   name: string;
   pathMac: string;
+  pathLinux?: string;
   pathWindows: string;
   installed?: boolean;
   reason?: string;

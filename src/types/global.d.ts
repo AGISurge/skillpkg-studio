@@ -174,6 +174,7 @@ declare global {
           id: string;
           name: string;
           pathMac: string;
+          pathLinux?: string;
           pathWindows: string;
         }>;
         overwrite?: boolean;
@@ -196,6 +197,7 @@ declare global {
           id: string;
           name: string;
           pathMac: string;
+          pathLinux?: string;
           pathWindows: string;
         }>;
       }) => Promise<{
@@ -230,6 +232,7 @@ declare global {
           id: string;
           name: string;
           pathMac: string;
+          pathLinux?: string;
           pathWindows: string;
         }>;
         installPath?: string;
@@ -259,6 +262,7 @@ declare global {
           id: string;
           name: string;
           pathMac: string;
+          pathLinux?: string;
           pathWindows: string;
         }>;
       }) => Promise<{
@@ -291,6 +295,7 @@ declare global {
           agentId: string;
           skillId: string;
           pathMac: string;
+          pathLinux?: string;
           pathWindows: string;
           rootPath?: string;
         }>;
@@ -368,6 +373,7 @@ declare global {
           id: string;
           name: string;
           pathMac: string;
+          pathLinux?: string;
           pathWindows: string;
         }>;
         installPath?: string;

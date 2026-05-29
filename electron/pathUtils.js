@@ -65,7 +65,7 @@ const resolveTemplatePath = (template) => {
     resolved = path.join(homeDir, resolved.slice(2));
   }
   const replacements = {
-    '%USERPROFILE%': process.env.USERPROFILE || '',
+    '%USERPROFILE%': process.env.USERPROFILE || homeDir || '',
     '%APPDATA%': process.env.APPDATA || '',
     '%LOCALAPPDATA%': process.env.LOCALAPPDATA || '',
     '%PROGRAMFILES%': process.env.PROGRAMFILES || '',

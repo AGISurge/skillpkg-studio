@@ -1,83 +1,78 @@
 const path = require('path');
 const os = require('os');
-const childProcess = require('child_process');
-const { pathExists, resolveTemplatePath } = require('./pathUtils');
+const fs = require('fs/promises');
+const { resolveTemplatePath } = require('./pathUtils');
 
 const AGENT_CATALOG = {
   claude: {
     id: 'claude',
-    name: 'Claude',
+    name: 'Claude (Code)',
+    homePath: {
+      darwin: '~/.claude',
+      win32: '%USERPROFILE%/.claude',
+      other: '~/.claude',
+    },
     skillPath: {
       darwin: '~/.claude/skills',
-      win32: '%USERPROFILE%\\.claude\\skills',
+      win32: '%USERPROFILE%/.claude/skills',
       other: '~/.claude/skills',
     },
-    detect: [
-      { type: 'cli', command: 'claude', args: ['--version'] },
-      { type: 'path', path: '~/.claude' },
-      { type: 'app', bundles: ['Claude.app'] },
-    ],
   },
   codex: {
     id: 'codex',
     name: 'Codex',
+    homePath: {
+      darwin: '~/.codex',
+      win32: '%USERPROFILE%/.codex',
+      other: '~/.codex',
+    },
     skillPath: {
       darwin: '~/.codex/skills',
-      win32: '%USERPROFILE%\\.codex\\skills',
+      win32: '%USERPROFILE%/.codex/skills',
       other: '~/.codex/skills',
     },
-    detect: [
-      { type: 'cli', command: 'codex', args: ['--version'] },
-      { type: 'path', path: '~/.codex' },
-      { type: 'app', bundles: ['Codex.app'] },
-    ],
   },
   cursor: {
     id: 'cursor',
     name: 'Cursor',
+    homePath: {
+      darwin: '~/.cursor',
+      win32: '%USERPROFILE%/.cursor',
+      other: '~/.cursor',
+    },
     skillPath: {
       darwin: '~/.cursor/skills',
-      win32: '%USERPROFILE%\\.cursor\\skills',
+      win32: '%USERPROFILE%/.cursor/skills',
       other: '~/.cursor/skills',
     },
-    detect: [
-      { type: 'cli', command: 'cursor', args: ['--version'] },
-      { type: 'path', path: '~/.cursor' },
-      { type: 'app', bundles: ['Cursor.app'] },
-    ],
   },
   qoder: {
     id: 'qoder',
     name: 'Qoder',
+    homePath: {
+      darwin: '~/.qoder',
+      win32: '%USERPROFILE%/.qoder',
+      other: '~/.qoder',
+    },
     skillPath: {
       darwin: '~/.qoder/skills',
-      win32: '%USERPROFILE%\\.qoder\\skills',
+      win32: '%USERPROFILE%/.qoder/skills',
       other: '~/.qoder/skills',
     },
-    detect: [
-      { type: 'path', path: os.platform() === 'win32' ? '%USERPROFILE%\\.qoder' : '~/.qoder' },
-      {
-        type: 'app',
-        bundles: ['Qoder.app'],
-        paths: {
-          linux: [
-            '/usr/share/applications/qoder.desktop',
-            '~/.local/share/applications/qoder.desktop',
-            '/opt/Qoder/qoder',
-            '/opt/Qoder/Qoder',
-            '~/Applications/Qoder.AppImage',
-          ],
-          win32: [
-            '%LOCALAPPDATA%/Programs/Qoder/Qoder.exe',
-            '%LOCALAPPDATA%/Programs/qoder/Qoder.exe',
-            '%LOCALAPPDATA%/Programs/Qoder/resources/app/resources/bin/Qoder.exe',
-            '%PROGRAMFILES%/Qoder/Qoder.exe',
-          ],
-        },
-      },
-      { type: 'cli', command: 'qodercli', args: ['--version'] },
-      { type: 'cli', command: 'qordercli', args: ['--version'] },
-    ],
+  },
+  codebuddy: {
+    id: 'codebuddy',
+    name: 'CodeBuddy',
+    homePath: {
+      darwin: '~/.codebuddy',
+      win32: '%USERPROFILE%/.codebuddy',
+      other: '~/.codebuddy',
+    },
+    skillPath: {
+      darwin: '~/.codebuddy/skills',
+      win32: '%USERPROFILE%/.codebuddy/skills',
+      other: '~/.codebuddy/skills',
+    },
   },
 };
 
@@ -100,70 +95,27 @@ const resolveAgentSkillPath = (agentOrId) => {
   return resolveTemplatePath(configured[getPlatformKey()] || configured.other);
 };
 
-const getAppBundleCandidates = (criterion) => {
-  const platform = os.platform();
-  const platformKey = platform === 'linux' ? 'linux' : getPlatformKey();
-  const configuredPaths = Array.isArray(criterion.paths)
-    ? criterion.paths
-    : criterion.paths?.[platformKey] || [];
-  const appPaths = configuredPaths
-    .map((candidate) => resolveTemplatePath(candidate))
-    .filter(Boolean);
-  if (platform !== 'darwin') return appPaths;
-
-  const bundles = criterion.bundles || [];
-  const homeDir = os.homedir();
-  const roots = ['/Applications'];
-  if (homeDir) roots.push(path.join(homeDir, 'Applications'));
-  return [
-    ...appPaths,
-    ...roots.flatMap((root) => bundles.map((bundle) => path.join(root, bundle))),
-  ];
+const resolveAgentHomePath = (agentOrId) => {
+  const agent = typeof agentOrId === 'string' ? AGENT_CATALOG[agentOrId] : agentOrId;
+  if (!agent) return null;
+  const configured = agent.homePath || {
+    darwin: agent.pathMac ? path.dirname(agent.pathMac) : null,
+    win32: agent.pathWindows ? path.dirname(agent.pathWindows) : null,
+    other: agent.pathLinux || (agent.pathMac ? path.dirname(agent.pathMac) : null),
+  };
+  return resolveTemplatePath(configured[getPlatformKey()] || configured.other);
 };
 
-const detectCli = (criterion) =>
-  new Promise((resolve) => {
-    const env = {
-      ...process.env,
-      PATH: [
-        process.env.PATH || '',
-        '/opt/homebrew/bin',
-        '/usr/local/bin',
-        path.join(os.homedir(), '.local', 'bin'),
-      ].join(path.delimiter),
-    };
-    childProcess.execFile(
-      criterion.command,
-      criterion.args || ['--version'],
-      { env, timeout: 2500, windowsHide: true },
-      (error, stdout, stderr) => {
-        if (error) {
-          resolve({ ok: false, reason: `${criterion.command} command unavailable` });
-          return;
-        }
-        const output = `${stdout || ''}${stderr || ''}`.trim();
-        resolve({ ok: true, reason: output || `${criterion.command} command responded` });
-      },
-    );
-  });
-
-const detectCriterion = async (criterion) => {
-  if (criterion.type === 'cli') return detectCli(criterion);
-  if (criterion.type === 'path') {
-    const resolvedPath = resolveTemplatePath(criterion.path);
-    return {
-      ok: Boolean(resolvedPath) && await pathExists(resolvedPath),
-      reason: resolvedPath || criterion.path,
-    };
+const isNonEmptyDirectory = async (targetPath) => {
+  if (!targetPath) return false;
+  try {
+    const stats = await fs.stat(targetPath);
+    if (!stats.isDirectory()) return false;
+    const entries = await fs.readdir(targetPath);
+    return entries.length > 0;
+  } catch (_error) {
+    return false;
   }
-  if (criterion.type === 'app') {
-    const candidates = getAppBundleCandidates(criterion);
-    for (const candidate of candidates) {
-      if (await pathExists(candidate)) return { ok: true, reason: candidate };
-    }
-    return { ok: false, reason: candidates[0] || 'app bundle not configured' };
-  }
-  return { ok: false, reason: 'unknown detector' };
 };
 
 const detectAgent = async (agentId) => {
@@ -171,23 +123,21 @@ const detectAgent = async (agentId) => {
   if (!agent) {
     return { id: agentId, name: agentId, installed: false, reason: 'unsupported-agent', skillPath: null };
   }
-  for (const criterion of agent.detect || []) {
-    const result = await detectCriterion(criterion);
-    if (result.ok) {
-      return {
-        id: agent.id,
-        name: agent.name,
-        installed: true,
-        reason: result.reason,
-        skillPath: resolveAgentSkillPath(agent),
-      };
-    }
+  const homePath = resolveAgentHomePath(agent);
+  if (await isNonEmptyDirectory(homePath)) {
+    return {
+      id: agent.id,
+      name: agent.name,
+      installed: true,
+      reason: homePath,
+      skillPath: resolveAgentSkillPath(agent),
+    };
   }
   return {
     id: agent.id,
     name: agent.name,
     installed: false,
-    reason: 'not-detected',
+    reason: homePath || 'agent-home-path-missing',
     skillPath: resolveAgentSkillPath(agent),
   };
 };
@@ -200,7 +150,7 @@ const getAgentConfig = (agentOrId) => {
     skillPath: {
       darwin: agentOrId.pathMac,
       win32: agentOrId.pathWindows,
-      other: agentOrId.pathMac,
+      other: agentOrId.pathLinux || agentOrId.pathMac,
     },
   };
 };
@@ -210,5 +160,6 @@ module.exports = {
   AGENT_TOOL_IDS,
   detectAgent,
   getAgentConfig,
+  resolveAgentHomePath,
   resolveAgentSkillPath,
 };

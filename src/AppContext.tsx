@@ -1021,6 +1021,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             agentId: targetAgent.id,
             skillId: skill.id,
             pathMac: targetAgent.pathMac,
+            pathLinux: targetAgent.pathLinux,
             pathWindows: targetAgent.pathWindows,
             rootPath: skill.rootPath,
           },

@@ -62,7 +62,7 @@ const InstallDialog = ({
               <div>
                 <div className="option-title">{agent.name}</div>
                 <div className="option-subtitle">
-                  Mac: {agent.pathMac} · Windows: {agent.pathWindows}
+                  Mac: {agent.pathMac} · Linux: {agent.pathLinux || agent.pathMac} · Windows: {agent.pathWindows}
                 </div>
               </div>
             </label>
