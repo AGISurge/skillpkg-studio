@@ -16,6 +16,7 @@ import type {
   Skill,
   SkillFile,
 } from './types/models';
+import type { AppUpdateState } from './types/global';
 import { getFilePolicy, validateSkill } from './utils/skillUtils';
 import { AGENT_CATALOG, AGENT_TOOL_IDS } from './config/agents';
 import type { AgentId } from './config/agents';
@@ -172,6 +173,8 @@ type AppContextValue = {
   fileDrafts: Record<string, string>;
   theme: ThemeMode;
   refreshingAgents: boolean;
+  appUpdateState: AppUpdateState | null;
+  updateReadyDialogOpen: boolean;
   agentSkillCounts: Record<string, number>;
   installedByAgent: Record<string, Set<string>>;
   agentSkillsByAgent: Record<string, Skill[]>;
@@ -218,6 +221,9 @@ type AppContextValue = {
   closeInstallPathChangeDialog: () => void;
   handleToggleFolder: (path: string) => void;
   refreshAgents: () => Promise<void>;
+  downloadAppUpdate: () => Promise<void>;
+  installAppUpdateNow: () => Promise<void>;
+  dismissUpdateReadyDialog: () => void;
   setDialogAgents: React.Dispatch<React.SetStateAction<Set<string>>>;
   setDialogOpen: (open: boolean) => void;
   setInstallConflict: (conflict: boolean) => void;
@@ -275,6 +281,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [fileDrafts, setFileDrafts] = useState<Record<string, string>>({});
   const [theme, setTheme] = useState<ThemeMode>(getInitialTheme);
   const [refreshingAgents, setRefreshingAgents] = useState(false);
+  const [appUpdateState, setAppUpdateState] = useState<AppUpdateState | null>(null);
+  const [dismissedUpdateReadyKey, setDismissedUpdateReadyKey] = useState('');
+  const [lastUpdateErrorKey, setLastUpdateErrorKey] = useState('');
   const [agentSkillCounts, setAgentSkillCounts] = useState<
     Record<string, number>
   >({});
@@ -332,6 +341,15 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     });
   }, []);
 
+  const getUpdateReadyKey = (state: AppUpdateState | null) =>
+    state?.status === 'downloaded'
+      ? `${state.version || 'unknown'}:${state.currentVersion}`
+      : '';
+
+  const updateReadyDialogOpen =
+    appUpdateState?.status === 'downloaded' &&
+    getUpdateReadyKey(appUpdateState) !== dismissedUpdateReadyKey;
+
   const getSkillNoticeScope = useCallback((skill?: Skill | null): NoticeScope => {
     if (skill?.agentId) return 'agents';
     if (skill && discoverSkills.some((item) => item.id === skill.id)) return 'discover';
@@ -345,6 +363,35 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }, NOTICE_DURATION_MS);
     return () => window.clearTimeout(timer);
   }, [notice]);
+
+  useEffect(() => {
+    let active = true;
+    const loadUpdateState = async () => {
+      try {
+        const state = await window?.skillpkg?.getAppUpdateState?.();
+        if (active && state) setAppUpdateState(state);
+      } catch (_error) {}
+    };
+    const unsubscribe = window?.skillpkg?.onAppUpdateState?.((state) => {
+      setAppUpdateState(state);
+      if (state.status !== 'downloaded') {
+        setDismissedUpdateReadyKey('');
+      }
+    });
+    void loadUpdateState();
+    return () => {
+      active = false;
+      unsubscribe?.();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!appUpdateState?.error || appUpdateState.status !== 'available') return;
+    const key = `${appUpdateState.version || ''}:${appUpdateState.error}`;
+    if (key === lastUpdateErrorKey) return;
+    setLastUpdateErrorKey(key);
+    showNotice('更新下载失败，请稍后重试。', 'global');
+  }, [appUpdateState, lastUpdateErrorKey, showNotice]);
 
   const resolveInstalledAgents = useCallback(async (): Promise<Agent[]> => {
     if (!window?.skillpkg?.detectAgents) return [];
@@ -473,6 +520,34 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     startAgentTransition,
     syncInstalledByAgent,
   ]);
+
+  const downloadAppUpdate = useCallback(async () => {
+    if (!window?.skillpkg?.downloadAppUpdate) {
+      showNotice('当前环境不支持应用更新。', 'global');
+      return;
+    }
+    try {
+      const state = await window.skillpkg.downloadAppUpdate();
+      setAppUpdateState(state);
+      if (state.error) {
+        showNotice('更新下载失败，请稍后重试。', 'global');
+      }
+    } catch (_error) {
+      showNotice('更新下载失败，请稍后重试。', 'global');
+    }
+  }, [showNotice]);
+
+  const installAppUpdateNow = useCallback(async () => {
+    if (!window?.skillpkg?.installAppUpdateNow) {
+      showNotice('当前环境不支持应用更新。', 'global');
+      return;
+    }
+    await window.skillpkg.installAppUpdateNow();
+  }, [showNotice]);
+
+  const dismissUpdateReadyDialog = useCallback(() => {
+    setDismissedUpdateReadyKey(getUpdateReadyKey(appUpdateState));
+  }, [appUpdateState]);
 
   const loadLocalSkills = useCallback(async (path: string) => {
     if (!path) return [];
@@ -1554,6 +1629,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     fileDrafts,
     theme,
     refreshingAgents,
+    appUpdateState,
+    updateReadyDialogOpen,
     agentSkillCounts,
     installedByAgent,
     agentSkillsByAgent,
@@ -1600,6 +1677,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     closeInstallPathChangeDialog,
     handleToggleFolder,
     refreshAgents,
+    downloadAppUpdate,
+    installAppUpdateNow,
+    dismissUpdateReadyDialog,
     setDialogAgents,
     setDialogOpen,
     setInstallConflict,

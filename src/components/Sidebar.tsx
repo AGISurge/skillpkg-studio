@@ -1,5 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import {
+  ArrowDownloadRegular,
   ChevronDownRegular,
   ChevronRightRegular,
   SettingsRegular,
@@ -7,6 +8,7 @@ import {
 } from '@fluentui/react-icons';
 import type { Agent } from '../types/models';
 import type { RouteConfig } from '../routes';
+import type { AppUpdateState } from '../types/global';
 
 /**
  * 侧边栏参数。
@@ -23,7 +25,26 @@ type SidebarProps = {
   onSelectAgent: (id: string) => void;
   onRefreshAgents: () => void;
   refreshingAgents: boolean;
+  appUpdateState: AppUpdateState | null;
+  onDownloadAppUpdate: () => void;
   isFloating?: boolean;
+};
+
+const getDisplayVersion = (version: string | null | undefined) => {
+  if (!version) return '';
+  return version.startsWith('v') ? version : `v${version}`;
+};
+
+const getUpdateButtonLabel = (state: AppUpdateState) => {
+  const version = getDisplayVersion(state.version);
+  if (state.status === 'downloading') {
+    const percent = Math.round(state.percent || 0);
+    return percent > 0 ? `下载中 ${percent}%` : '下载中';
+  }
+  if (state.status === 'downloaded') {
+    return version ? `已下载 ${version}` : '已下载';
+  }
+  return version ? `更新 ${version}` : '更新';
 };
 
 /**
@@ -41,8 +62,18 @@ const Sidebar = ({
   onSelectAgent,
   onRefreshAgents,
   refreshingAgents,
+  appUpdateState,
+  onDownloadAppUpdate,
   isFloating = false,
 }: SidebarProps) => {
+  const showUpdateButton =
+    appUpdateState?.status === 'available' ||
+    appUpdateState?.status === 'downloading' ||
+    appUpdateState?.status === 'downloaded';
+  const updateButtonDisabled =
+    appUpdateState?.status === 'downloading' ||
+    appUpdateState?.status === 'downloaded';
+
   return (
     <aside className={`sidebar ${isFloating ? 'floating' : ''}`}>
       <div className="sidebar-head">
@@ -138,9 +169,23 @@ const Sidebar = ({
         )}
       </nav>
       <div className="grow" />
-      <div className="flex justify-between items-center">
-        <div>&nbsp;</div>
-        <NavLink to="/settings" className="" aria-label="设置">
+      <div className="sidebar-footer">
+        {showUpdateButton && appUpdateState ? (
+          <button
+            type="button"
+            className="sidebar-update-button"
+            aria-label={getUpdateButtonLabel(appUpdateState)}
+            title={getUpdateButtonLabel(appUpdateState)}
+            onClick={onDownloadAppUpdate}
+            disabled={updateButtonDisabled}
+          >
+            <ArrowDownloadRegular className="icon" />
+            <span>{getUpdateButtonLabel(appUpdateState)}</span>
+          </button>
+        ) : (
+          <div />
+        )}
+        <NavLink to="/settings" className="sidebar-settings-link" aria-label="设置">
           <SettingsRegular className="icon" />
         </NavLink>
       </div>

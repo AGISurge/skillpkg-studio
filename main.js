@@ -47,6 +47,10 @@ const {
   listSkillpkgCategories,
   listSkillpkgSkills,
 } = require('./electron/skillpkgApi');
+const {
+  createUpdateService,
+  registerUpdateIpcHandlers,
+} = require('./electron/updateService');
 
 app.setName(APP_NAME);
 if (process.platform === 'win32') {
@@ -771,8 +775,11 @@ const registerIpcHandlers = () => {
 app.on('ready', async () => {
   configureDockIcon();
   await initDatabase();
-  createWindow();
   registerIpcHandlers();
+  const updateService = createUpdateService({ app, BrowserWindow });
+  registerUpdateIpcHandlers({ ipcMain, updateService });
+  createWindow();
+  updateService.startChecking();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {

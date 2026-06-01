@@ -191,6 +191,68 @@
   color: var(--app-text-strong);
 }
 
+.sidebar-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 34px;
+}
+
+.sidebar-update-button,
+.sidebar-settings-link {
+  border: 1px solid transparent;
+  background: transparent;
+  color: inherit;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+.sidebar-update-button {
+  min-width: 0;
+  max-width: 142px;
+  height: 34px;
+  gap: 6px;
+  border-radius: 10px;
+  padding: 0 9px;
+  font-size: 12px;
+  color: var(--app-text-strong);
+  background: var(--accent-bg);
+  border-color: var(--accent-border);
+}
+
+.sidebar-update-button span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-update-button:hover {
+  background: var(--accent-bg-strong);
+}
+
+.sidebar-update-button:disabled {
+  cursor: default;
+  opacity: 0.78;
+}
+
+.sidebar-settings-link {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  border-radius: 10px;
+}
+
+.sidebar-settings-link:hover {
+  background: var(--surface-bg-hover);
+  border-color: var(--border-subtle);
+}
+
 
 .settings-page {
   display: flex;
@@ -2075,6 +2137,10 @@ body:not([data-theme='light']) .discover-type-pill.solution {
 
 .install-path-dialog {
   width: min(620px, 92vw);
+}
+
+.update-ready-dialog {
+  width: min(520px, 92vw);
 }
 
 .path-change-summary {

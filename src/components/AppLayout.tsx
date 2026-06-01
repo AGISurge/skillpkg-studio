@@ -35,7 +35,9 @@ const AppLayout = () => {
     agentSkillsByAgent,
     notice,
     refreshingAgents,
+    appUpdateState,
     refreshAgents,
+    downloadAppUpdate,
     setSelectedAgentId,
     setSelectedLibrarySkillId,
     setSelectedFilePath,
@@ -117,6 +119,8 @@ const AppLayout = () => {
             onSelectAgent={handleSelectAgent}
             onRefreshAgents={refreshAgents}
             refreshingAgents={refreshingAgents}
+            appUpdateState={appUpdateState}
+            onDownloadAppUpdate={downloadAppUpdate}
             isFloating={sidebarFloating}
           />
         </>

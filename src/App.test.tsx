@@ -27,6 +27,112 @@ test('renders app shell', async () => {
   });
 });
 
+test('does not show update button when no app update is available', async () => {
+  window.skillpkg = {
+    detectAgents: async () => [],
+    loadSkills: async () => [],
+    getAppUpdateState: async () => ({
+      enabled: true,
+      platform: 'darwin',
+      status: 'not-available',
+      currentVersion: '0.1.0',
+      version: null,
+      percent: 0,
+      error: null,
+    }),
+    onAppUpdateState: () => jest.fn(),
+  } as unknown as typeof window.skillpkg;
+
+  render(
+    <HashRouter>
+      <App />
+    </HashRouter>
+  );
+
+  await waitFor(() => {
+    expect(screen.getByText(/SkillPkg Studio/i)).toBeInTheDocument();
+  });
+  expect(screen.queryByRole('button', { name: /更新 v/i })).not.toBeInTheDocument();
+});
+
+test('shows update button with version and starts download when clicked', async () => {
+  const downloadAppUpdate = jest.fn(async () => ({
+    enabled: true,
+    platform: 'darwin',
+    status: 'downloading',
+    currentVersion: '0.1.0',
+    version: '0.2.0',
+    percent: 0,
+    error: null,
+  }));
+  window.skillpkg = {
+    detectAgents: async () => [],
+    loadSkills: async () => [],
+    getAppUpdateState: async () => ({
+      enabled: true,
+      platform: 'darwin',
+      status: 'available',
+      currentVersion: '0.1.0',
+      version: '0.2.0',
+      percent: 0,
+      error: null,
+    }),
+    downloadAppUpdate,
+    onAppUpdateState: () => jest.fn(),
+  } as unknown as typeof window.skillpkg;
+
+  render(
+    <HashRouter>
+      <App />
+    </HashRouter>
+  );
+
+  const updateButton = await screen.findByRole('button', { name: '更新 v0.2.0' });
+  await act(async () => {
+    fireEvent.click(updateButton);
+  });
+
+  expect(downloadAppUpdate).toHaveBeenCalledTimes(1);
+});
+
+test('shows update ready dialog and installs when confirmed', async () => {
+  const installAppUpdateNow = jest.fn(async () => ({
+    enabled: true,
+    platform: 'darwin',
+    status: 'downloaded',
+    currentVersion: '0.1.0',
+    version: '0.2.0',
+    percent: 100,
+    error: null,
+  }));
+  window.skillpkg = {
+    detectAgents: async () => [],
+    loadSkills: async () => [],
+    getAppUpdateState: async () => ({
+      enabled: true,
+      platform: 'darwin',
+      status: 'downloaded',
+      currentVersion: '0.1.0',
+      version: '0.2.0',
+      percent: 100,
+      error: null,
+    }),
+    installAppUpdateNow,
+    onAppUpdateState: () => jest.fn(),
+  } as unknown as typeof window.skillpkg;
+
+  render(
+    <HashRouter>
+      <App />
+    </HashRouter>
+  );
+
+  expect(await screen.findByText('更新已下载')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: '关闭并更新' }));
+
+  expect(installAppUpdateNow).toHaveBeenCalledTimes(1);
+});
+
 test('shows discover api key prompt when no api key is configured', async () => {
   window.skillpkg = {
     detectAgents: async () => [],

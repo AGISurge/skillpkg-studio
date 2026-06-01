@@ -9,6 +9,26 @@ import type {
   SkillpkgSkillSummary,
 } from './models';
 
+export type AppUpdateStatus =
+  | 'idle'
+  | 'disabled'
+  | 'checking'
+  | 'not-available'
+  | 'available'
+  | 'downloading'
+  | 'downloaded'
+  | 'error';
+
+export type AppUpdateState = {
+  enabled: boolean;
+  platform: NodeJS.Platform;
+  status: AppUpdateStatus;
+  currentVersion: string;
+  version: string | null;
+  percent: number;
+  error: string | null;
+};
+
 declare global {
   interface Window {
     /**
@@ -381,6 +401,22 @@ declare global {
         agents?: Agent[];
         installPath?: string;
       }) => Promise<Record<string, number>>;
+      /**
+       * 获取应用更新状态。
+       */
+      getAppUpdateState: () => Promise<AppUpdateState>;
+      /**
+       * 开始后台下载应用更新。
+       */
+      downloadAppUpdate: () => Promise<AppUpdateState>;
+      /**
+       * 立即退出并安装已下载的应用更新。
+       */
+      installAppUpdateNow: () => Promise<AppUpdateState>;
+      /**
+       * 订阅应用更新状态变更。
+       */
+      onAppUpdateState: (callback: (state: AppUpdateState) => void) => () => void;
     };
   }
 }

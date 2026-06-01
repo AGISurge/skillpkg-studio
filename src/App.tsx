@@ -9,6 +9,7 @@ import ImportSourceDialog from './components/ImportSourceDialog';
 import BatchInstallDialog from './components/BatchInstallDialog';
 import SkillDeleteConfirmDialog from './components/SkillDeleteConfirmDialog';
 import InstallPathChangeDialog from './components/InstallPathChangeDialog';
+import UpdateReadyDialog from './components/UpdateReadyDialog';
 import DiscoverPage from './pages/DiscoverPage';
 import DiscoverDetailPage from './pages/DiscoverDetailPage';
 import LocalPage from './pages/LocalPage';
@@ -39,6 +40,8 @@ const AppDialogs = () => {
     skillDeleteSubmitting,
     installPathChangePreview,
     installPathChanging,
+    appUpdateState,
+    updateReadyDialogOpen,
     setDialogAgents,
     setBatchInstallAgents,
     setInstallConflict,
@@ -55,6 +58,8 @@ const AppDialogs = () => {
     confirmSkillDelete,
     closeInstallPathChangeDialog,
     confirmInstallPathChange,
+    installAppUpdateNow,
+    dismissUpdateReadyDialog,
     resolveHostingConflict,
     cancelHostingConflict,
     openSkillLocation,
@@ -133,6 +138,12 @@ const AppDialogs = () => {
         submitting={installPathChanging}
         onClose={closeInstallPathChangeDialog}
         onConfirm={confirmInstallPathChange}
+      />
+      <UpdateReadyDialog
+        open={updateReadyDialogOpen}
+        state={appUpdateState}
+        onInstallNow={installAppUpdateNow}
+        onLater={dismissUpdateReadyDialog}
       />
     </>
   );
