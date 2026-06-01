@@ -6,7 +6,7 @@ import {
   PanelLeftExpandRegular,
 } from "@fluentui/react-icons";
 import Sidebar from "./Sidebar";
-import { menuRoutes } from "../routes";
+import { menuRoutes, routePaths } from "../routes";
 import { useAppContext, useToolbarContent } from "../AppContext";
 
 const SIDEBAR_FLOATING_WIDTH = 900;
@@ -51,10 +51,21 @@ const AppLayout = () => {
   const isDarwinWindow = window.skillpkg?.platform === "darwin";
   const activeSection = getActiveSection(location.pathname);
   const isDiscoverDetail = /^\/discover\/[^/]+/.test(location.pathname);
+  const isLocalOrganize = location.pathname === routePaths.localOrganize;
+  const backTarget = isDiscoverDetail ? routePaths.discover : isLocalOrganize ? routePaths.local : '';
+  const backLabel = isDiscoverDetail ? '返回发现列表' : '返回本机';
   const visibleNotice =
     notice && (notice.scope === "global" || notice.scope === activeSection)
       ? notice
       : null;
+  const handleBack = useCallback(() => {
+    if (!backTarget) return;
+    if (isDiscoverDetail) {
+      navigate(backTarget, { state: { fromDiscoverDetail: true } });
+      return;
+    }
+    navigate(backTarget);
+  }, [backTarget, isDiscoverDetail, navigate]);
 
   const handleSelectAgent = useCallback(
     (agentId: string) => {
@@ -142,13 +153,13 @@ const AppLayout = () => {
                 <PanelLeftExpandRegular className="size-5" />
               )}
             </button>
-            {isDiscoverDetail ? (
+            {backTarget ? (
               <button
                 type="button"
                 className="topbar-icon-button"
-                aria-label="返回发现列表"
-                title="返回发现列表"
-                onClick={() => navigate("/discover", { state: { fromDiscoverDetail: true } })}
+                aria-label={backLabel}
+                title={backLabel}
+                onClick={handleBack}
               >
                 <ArrowLeftRegular className="size-4" />
               </button>
@@ -160,9 +171,23 @@ const AppLayout = () => {
         </header>
 
         {visibleNotice ? (
-          <div className="notice page-notice" key={visibleNotice.id}>
-            {visibleNotice.text}
-          </div>
+          visibleNotice.action ? (
+            <button
+              type="button"
+              className="notice page-notice notice-action"
+              key={visibleNotice.id}
+              onClick={() => {
+                navigate(visibleNotice.action?.path || routePaths.localOrganize);
+              }}
+            >
+              <span>{visibleNotice.text}</span>
+              <span className="notice-action-label">{visibleNotice.action.label || '查看'}</span>
+            </button>
+          ) : (
+            <div className="notice page-notice" key={visibleNotice.id}>
+              {visibleNotice.text}
+            </div>
+          )
         ) : null}
         <Outlet />
       </main>

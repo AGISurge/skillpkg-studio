@@ -9,6 +9,7 @@ import type { Skill } from './types/models';
 
 beforeEach(() => {
   window.localStorage.clear();
+  window.location.hash = '#/';
 });
 
 // 验证应用外壳是否渲染成功。
@@ -215,6 +216,16 @@ const baseSkill: Skill = {
   author: '',
   tags: [],
   files: [{ path: 'SKILL.md', content: '# Demo' }],
+};
+
+const createDeferred = <T,>() => {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((promiseResolve, promiseReject) => {
+    resolve = promiseResolve;
+    reject = promiseReject;
+  });
+  return { promise, resolve, reject };
 };
 
 const renderSkillsPage = (skill: Skill, props: Partial<ComponentProps<typeof SkillsPage>> = {}) => {
@@ -433,4 +444,227 @@ test('invalid install path selection shows validation notice', async () => {
 
   expect(await screen.findByText('不能将 Agent 自己的目录设置为统一路径。')).toBeInTheDocument();
   expect(screen.queryByText('确认切换存放路径')).not.toBeInTheDocument();
+});
+
+test('local page opens organize task page from toolbar', async () => {
+  window.location.hash = '#/local';
+  window.localStorage.setItem('skillpkg.installPath', '/tmp/skills');
+  window.skillpkg = {
+    detectAgents: async () => [],
+    loadSkills: async () => [],
+    loadAgentSkills: async () => [],
+  } as unknown as typeof window.skillpkg;
+
+  render(
+    <HashRouter>
+      <App />
+    </HashRouter>
+  );
+
+  fireEvent.click(await screen.findByRole('button', { name: /整理/i }));
+
+  expect(await screen.findByRole('heading', { name: '整理' })).toBeInTheDocument();
+  expect(window.location.hash).toBe('#/local/organize');
+});
+
+test('organize scan lists only unmanaged skills and enables hosting after completion', async () => {
+  window.location.hash = '#/local/organize';
+  window.localStorage.setItem('skillpkg.installPath', '/tmp/skills');
+  const agent = {
+    id: 'claude',
+    name: 'Claude (Code)',
+    installed: true,
+    skillPath: '/tmp/agent',
+  };
+  const scan = createDeferred<any[]>();
+  const loadAgentSkills = jest.fn(({ agents }: any) => {
+    if (agents.length === 1) return scan.promise;
+    return Promise.resolve([]);
+  });
+  window.skillpkg = {
+    detectAgents: async () => [agent],
+    loadSkills: async () => [],
+    loadAgentSkills,
+  } as unknown as typeof window.skillpkg;
+
+  render(
+    <HashRouter>
+      <App />
+    </HashRouter>
+  );
+
+  const hostButton = await screen.findByRole('button', { name: '托管选中' });
+  expect(hostButton).toBeDisabled();
+
+  await act(async () => {
+    scan.resolve([
+      {
+        agentId: 'claude',
+        agentName: 'Claude (Code)',
+        skills: [
+          { ...baseSkill, id: 'own', name: 'Own Skill', managed: false, agentId: 'claude', rootPath: '/tmp/agent/own' },
+          { ...baseSkill, id: 'managed', name: 'Managed Skill', managed: true, agentId: 'claude' },
+        ],
+      },
+    ]);
+  });
+
+  expect(await screen.findByText('扫描完成')).toBeInTheDocument();
+  expect(screen.getByText('Own Skill')).toBeInTheDocument();
+  expect(screen.queryByText('Managed Skill')).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: '托管选中' })).toBeEnabled();
+  expect(screen.getByRole('button', { name: '重新扫描' })).toBeInTheDocument();
+});
+
+test('organize hosting requires confirmation and migrates selected skills', async () => {
+  window.location.hash = '#/local/organize';
+  window.localStorage.setItem('skillpkg.installPath', '/tmp/skills');
+  const agent = {
+    id: 'claude',
+    name: 'Claude (Code)',
+    installed: true,
+    skillPath: '/tmp/agent',
+  };
+  const migrateSkills = jest.fn(async () => ([
+    { agentId: 'claude', skillId: 'own', ok: true },
+  ]));
+  const confirmSpy = jest.spyOn(window, 'confirm').mockReturnValue(true);
+  window.skillpkg = {
+    detectAgents: async () => [agent],
+    loadSkills: async () => [],
+    loadAgentSkills: async ({ agents }: any) => (
+      agents.length === 1
+        ? [{
+            agentId: 'claude',
+            agentName: 'Claude (Code)',
+            skills: [
+              { ...baseSkill, id: 'own', name: 'Own Skill', managed: false, agentId: 'claude', rootPath: '/tmp/agent/own' },
+            ],
+          }]
+        : []
+    ),
+    migrateSkills,
+  } as unknown as typeof window.skillpkg;
+
+  render(
+    <HashRouter>
+      <App />
+    </HashRouter>
+  );
+
+  await screen.findByText('扫描完成');
+  fireEvent.click(screen.getByRole('button', { name: '托管选中' }));
+
+  await waitFor(() => expect(confirmSpy).toHaveBeenCalled());
+  await waitFor(() => expect(migrateSkills).toHaveBeenCalledWith(expect.objectContaining({
+    installPath: '/tmp/skills',
+    overwrite: false,
+    useExisting: false,
+    items: [expect.objectContaining({
+      agentId: 'claude',
+      skillId: 'own',
+      rootPath: '/tmp/agent/own',
+    })],
+  })));
+  expect((await screen.findAllByText('已托管 1 项。')).length).toBeGreaterThan(0);
+
+  confirmSpy.mockRestore();
+});
+
+test('organize hosting reuses existing managed skill on name conflict', async () => {
+  window.location.hash = '#/local/organize';
+  window.localStorage.setItem('skillpkg.installPath', '/tmp/skills');
+  const agent = {
+    id: 'claude',
+    name: 'Claude (Code)',
+    installed: true,
+    skillPath: '/tmp/agent',
+  };
+  const migrateSkills = jest
+    .fn()
+    .mockResolvedValueOnce([{ agentId: 'claude', skillId: 'own', ok: false, reason: 'exists' }])
+    .mockResolvedValueOnce([{ agentId: 'claude', skillId: 'own', ok: true }]);
+  const confirmSpy = jest.spyOn(window, 'confirm').mockReturnValue(true);
+  window.skillpkg = {
+    detectAgents: async () => [agent],
+    loadSkills: async () => [],
+    loadAgentSkills: async ({ agents }: any) => (
+      agents.length === 1
+        ? [{
+            agentId: 'claude',
+            agentName: 'Claude (Code)',
+            skills: [
+              { ...baseSkill, id: 'own', name: 'Own Skill', managed: false, agentId: 'claude', rootPath: '/tmp/agent/own' },
+            ],
+          }]
+        : []
+    ),
+    migrateSkills,
+  } as unknown as typeof window.skillpkg;
+
+  render(
+    <HashRouter>
+      <App />
+    </HashRouter>
+  );
+
+  await screen.findByText('扫描完成');
+  fireEvent.click(screen.getByRole('button', { name: '托管选中' }));
+
+  await waitFor(() => expect(migrateSkills).toHaveBeenCalledTimes(2));
+  expect(migrateSkills).toHaveBeenLastCalledWith(expect.objectContaining({
+    overwrite: false,
+    useExisting: true,
+    items: [expect.objectContaining({ agentId: 'claude', skillId: 'own' })],
+  }));
+
+  confirmSpy.mockRestore();
+});
+
+test('organize scan continues after leaving page and notice returns to organize page', async () => {
+  window.location.hash = '#/local/organize';
+  window.localStorage.setItem('skillpkg.installPath', '/tmp/skills');
+  const agent = {
+    id: 'claude',
+    name: 'Claude (Code)',
+    installed: true,
+    skillPath: '/tmp/agent',
+  };
+  const scan = createDeferred<any[]>();
+  window.skillpkg = {
+    detectAgents: async () => [agent],
+    loadSkills: async () => [],
+    loadAgentSkills: ({ agents }: any) => (
+      agents.length === 1
+        ? scan.promise
+        : Promise.resolve([])
+    ),
+  } as unknown as typeof window.skillpkg;
+
+  render(
+    <HashRouter>
+      <App />
+    </HashRouter>
+  );
+
+  fireEvent.click(await screen.findByRole('button', { name: '返回本机' }));
+  expect(window.location.hash).toBe('#/local');
+
+  await act(async () => {
+    scan.resolve([
+      {
+        agentId: 'claude',
+        agentName: 'Claude (Code)',
+        skills: [
+          { ...baseSkill, id: 'own', name: 'Own Skill', managed: false, agentId: 'claude', rootPath: '/tmp/agent/own' },
+        ],
+      },
+    ]);
+  });
+
+  const notice = await screen.findByRole('button', { name: /整理扫描已完成，点击查看。/ });
+  fireEvent.click(notice);
+
+  expect(window.location.hash).toBe('#/local/organize');
+  expect(await screen.findByText('Own Skill')).toBeInTheDocument();
 });

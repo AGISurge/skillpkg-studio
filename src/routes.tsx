@@ -25,6 +25,7 @@ export const routePaths = {
   discover: '/discover',
   discoverDetail: '/discover/:publicId',
   local: '/local',
+  localOrganize: '/local/organize',
   favorites: '/favorites',
   agents: '/agents/:agentId?',
   settings: '/settings',

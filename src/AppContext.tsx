@@ -51,6 +51,10 @@ export type PageNotice = {
   id: number;
   text: string;
   scope: NoticeScope;
+  action?: {
+    path: string;
+    label?: string;
+  };
 };
 
 export type SkillDeleteAction = 'agent-uninstall' | 'agent-delete' | 'library-delete';
@@ -69,6 +73,85 @@ export type InstallPathChangePreview = {
   migratedCount: number;
   relinkedCount: number;
   conflicts: Array<{ skillId: string; path: string }>;
+};
+
+export type LocalOrganizeStatus =
+  | 'idle'
+  | 'scanning'
+  | 'completed'
+  | 'canceled'
+  | 'hosting'
+  | 'error';
+
+export type LocalOrganizeAgentEntry = {
+  agentId: string;
+  agentName: string;
+  agent: Agent;
+  skill: Skill;
+};
+
+export type LocalOrganizeCandidate = {
+  skillId: string;
+  name: string;
+  agents: LocalOrganizeAgentEntry[];
+};
+
+export type LocalOrganizeResult = {
+  successCount: number;
+  failedCount: number;
+};
+
+export type LocalOrganizeTask = {
+  status: LocalOrganizeStatus;
+  candidates: LocalOrganizeCandidate[];
+  selectedSkillIds: Set<string>;
+  scannedAgentCount: number;
+  totalAgentCount: number;
+  error: string;
+  result: LocalOrganizeResult | null;
+};
+
+const createInitialLocalOrganizeTask = (): LocalOrganizeTask => ({
+  status: 'idle',
+  candidates: [],
+  selectedSkillIds: new Set(),
+  scannedAgentCount: 0,
+  totalAgentCount: 0,
+  error: '',
+  result: null,
+});
+
+const mergeOrganizeCandidates = (
+  candidates: LocalOrganizeCandidate[],
+  agent: Agent,
+  skills: Skill[],
+) => {
+  const bySkillId = new Map(candidates.map((candidate) => [candidate.skillId, {
+    ...candidate,
+    agents: [...candidate.agents],
+  }]));
+
+  skills.forEach((skill) => {
+    if (skill.managed) return;
+    const current = bySkillId.get(skill.id);
+    const entry = {
+      agentId: agent.id,
+      agentName: agent.name,
+      agent,
+      skill,
+    };
+    if (current) {
+      current.agents.push(entry);
+      return;
+    }
+    bySkillId.set(skill.id, {
+      skillId: skill.id,
+      name: skill.name,
+      agents: [entry],
+    });
+  });
+
+  return Array.from(bySkillId.values()).sort((a, b) => a.name.localeCompare(b.name));
 };
 
 // --- Toolbar context: pages register their own toolbar actions ---
@@ -179,6 +262,7 @@ type AppContextValue = {
   installedByAgent: Record<string, Set<string>>;
   agentSkillsByAgent: Record<string, Skill[]>;
   pendingSkillIds: Set<string>;
+  localOrganizeTask: LocalOrganizeTask;
   fileInputRef: React.RefObject<HTMLInputElement | null>;
   setTheme: (theme: ThemeMode) => void;
   setApiKey: (apiKey: string) => void;
@@ -224,6 +308,11 @@ type AppContextValue = {
   downloadAppUpdate: () => Promise<void>;
   installAppUpdateNow: () => Promise<void>;
   dismissUpdateReadyDialog: () => void;
+  startLocalOrganizeScan: () => Promise<void>;
+  cancelLocalOrganizeScan: () => void;
+  toggleLocalOrganizeCandidate: (skillId: string) => void;
+  setAllLocalOrganizeCandidatesSelected: (selected: boolean) => void;
+  confirmLocalOrganizeHosting: () => Promise<void>;
   setDialogAgents: React.Dispatch<React.SetStateAction<Set<string>>>;
   setDialogOpen: (open: boolean) => void;
   setInstallConflict: (conflict: boolean) => void;
@@ -234,6 +323,7 @@ const AppContext = createContext<AppContextValue | null>(null);
 export const AppProvider = ({ children }: { children: ReactNode }) => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const refreshRequestRef = useRef(0);
+  const localOrganizeRequestRef = useRef(0);
   const noticeIdRef = useRef(0);
   const [, startAgentTransition] = useTransition();
 
@@ -291,6 +381,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     Record<string, Skill[]>
   >({});
   const [pendingSkillIds, setPendingSkillIds] = useState<Set<string>>(new Set());
+  const [localOrganizeTask, setLocalOrganizeTask] = useState<LocalOrganizeTask>(
+    createInitialLocalOrganizeTask,
+  );
 
   const [installedByAgent, setInstalledByAgent] = useState<
     Record<string, Set<string>>
@@ -332,12 +425,17 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     window?.localStorage?.setItem(API_KEY_STORAGE_KEY, nextApiKey);
   }, []);
 
-  const showNotice = useCallback((text: string, scope: NoticeScope = 'global') => {
+  const showNotice = useCallback((
+    text: string,
+    scope: NoticeScope = 'global',
+    action?: PageNotice['action'],
+  ) => {
     noticeIdRef.current += 1;
     setNotice({
       id: noticeIdRef.current,
       text,
       scope,
+      action,
     });
   }, []);
 
@@ -360,7 +458,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     if (!notice) return;
     const timer = window.setTimeout(() => {
       setNotice((current) => (current?.id === notice.id ? null : current));
-    }, NOTICE_DURATION_MS);
+    }, notice.action ? 8000 : NOTICE_DURATION_MS);
     return () => window.clearTimeout(timer);
   }, [notice]);
 
@@ -559,6 +657,252 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setLocalSkills(skills);
     return skills;
   }, [showNotice]);
+
+  const startLocalOrganizeScan = useCallback(async () => {
+    if (localOrganizeTask.status === 'scanning' || localOrganizeTask.status === 'hosting') {
+      return;
+    }
+    const requestId = localOrganizeRequestRef.current + 1;
+    localOrganizeRequestRef.current = requestId;
+
+    if (!installPath) {
+      setLocalOrganizeTask({
+        ...createInitialLocalOrganizeTask(),
+        status: 'error',
+        error: '请先设置统一路径。',
+      });
+      showNotice('请先设置统一路径。', 'local');
+      return;
+    }
+    if (!window?.skillpkg?.loadAgentSkills) {
+      setLocalOrganizeTask({
+        ...createInitialLocalOrganizeTask(),
+        status: 'error',
+        error: '当前环境不支持扫描 Agents。',
+      });
+      showNotice('当前环境不支持扫描 Agents。', 'local');
+      return;
+    }
+
+    setLocalOrganizeTask({
+      ...createInitialLocalOrganizeTask(),
+      status: 'scanning',
+    });
+    await waitForNextPaint();
+
+    try {
+      const agentList = agents.length ? agents : await resolveInstalledAgents();
+      if (localOrganizeRequestRef.current !== requestId) return;
+      if (!agents.length && agentList.length) {
+        startAgentTransition(() => setAgents(agentList));
+      }
+      setLocalOrganizeTask((current) => (
+        localOrganizeRequestRef.current === requestId
+          ? { ...current, totalAgentCount: agentList.length }
+          : current
+      ));
+
+      for (const agent of agentList) {
+        if (localOrganizeRequestRef.current !== requestId) return;
+        const [result] = await window.skillpkg.loadAgentSkills({
+          agents: [agent],
+          installPath,
+        });
+        if (localOrganizeRequestRef.current !== requestId) return;
+
+        setLocalOrganizeTask((current) => {
+          if (current.status !== 'scanning') return current;
+          const previousIds = new Set(current.candidates.map((candidate) => candidate.skillId));
+          const candidates = mergeOrganizeCandidates(current.candidates, agent, result?.skills || []);
+          const selectedSkillIds = new Set(current.selectedSkillIds);
+          candidates.forEach((candidate) => {
+            if (!previousIds.has(candidate.skillId)) {
+              selectedSkillIds.add(candidate.skillId);
+            }
+          });
+          return {
+            ...current,
+            candidates,
+            selectedSkillIds,
+            scannedAgentCount: current.scannedAgentCount + 1,
+          };
+        });
+      }
+
+      if (localOrganizeRequestRef.current !== requestId) return;
+      setLocalOrganizeTask((current) => ({
+        ...current,
+        status: 'completed',
+        scannedAgentCount: current.totalAgentCount,
+      }));
+      showNotice('整理扫描已完成，点击查看。', 'global', {
+        path: '/local/organize',
+        label: '查看',
+      });
+    } catch (_error) {
+      if (localOrganizeRequestRef.current !== requestId) return;
+      setLocalOrganizeTask((current) => ({
+        ...current,
+        status: 'error',
+        error: '整理扫描失败，请检查 Agent 技能目录权限。',
+      }));
+      showNotice('整理扫描失败，请检查 Agent 技能目录权限。', 'global');
+    }
+  }, [
+    agents,
+    installPath,
+    localOrganizeTask.status,
+    resolveInstalledAgents,
+    showNotice,
+    startAgentTransition,
+  ]);
+
+  const cancelLocalOrganizeScan = useCallback(() => {
+    if (localOrganizeTask.status !== 'scanning') return;
+    localOrganizeRequestRef.current += 1;
+    setLocalOrganizeTask((current) => ({
+      ...current,
+      status: 'canceled',
+      error: '',
+    }));
+  }, [localOrganizeTask.status]);
+
+  const toggleLocalOrganizeCandidate = useCallback((skillId: string) => {
+    setLocalOrganizeTask((current) => {
+      const selectedSkillIds = new Set(current.selectedSkillIds);
+      if (selectedSkillIds.has(skillId)) selectedSkillIds.delete(skillId);
+      else selectedSkillIds.add(skillId);
+      return { ...current, selectedSkillIds };
+    });
+  }, []);
+
+  const setAllLocalOrganizeCandidatesSelected = useCallback((selected: boolean) => {
+    setLocalOrganizeTask((current) => ({
+      ...current,
+      selectedSkillIds: selected
+        ? new Set(current.candidates.map((candidate) => candidate.skillId))
+        : new Set(),
+    }));
+  }, []);
+
+  const confirmLocalOrganizeHosting = useCallback(async () => {
+    if (localOrganizeTask.status === 'hosting' || localOrganizeTask.status === 'scanning') {
+      return;
+    }
+    if (!installPath) {
+      showNotice('请先设置统一路径。', 'local');
+      return;
+    }
+    if (!window?.skillpkg?.migrateSkills) {
+      showNotice('当前环境不支持托管 Agent Skill。', 'local');
+      return;
+    }
+    const selectedCandidates = localOrganizeTask.candidates.filter((candidate) =>
+      localOrganizeTask.selectedSkillIds.has(candidate.skillId),
+    );
+    const items = selectedCandidates.flatMap((candidate) =>
+      candidate.agents.map((entry) => ({
+        agentId: entry.agentId,
+        skillId: candidate.skillId,
+        pathMac: entry.agent.pathMac,
+        pathLinux: entry.agent.pathLinux,
+        pathWindows: entry.agent.pathWindows,
+        skillPath: entry.agent.skillPath,
+        rootPath: entry.skill.rootPath,
+      })),
+    );
+    if (!items.length) {
+      showNotice('请至少选择一个 Skill。', 'local');
+      return;
+    }
+    if (!window.confirm(`确认托管选中的 ${selectedCandidates.length} 个 Skill？`)) {
+      return;
+    }
+
+    setLocalOrganizeTask((current) => ({
+      ...current,
+      status: 'hosting',
+      result: null,
+      error: '',
+    }));
+
+    try {
+      const firstResults = await window.skillpkg.migrateSkills({
+        installPath,
+        overwrite: false,
+        useExisting: false,
+        items,
+      });
+      const existingItems = firstResults
+        .map((result, index) => ({ result, item: items[index] }))
+        .filter(({ result }) => !result.ok && result.reason === 'exists')
+        .map(({ item }) => item);
+      const retryResults = existingItems.length
+        ? await window.skillpkg.migrateSkills({
+            installPath,
+            overwrite: false,
+            useExisting: true,
+            items: existingItems,
+          })
+        : [];
+      const finalResults = [
+        ...firstResults.filter((result) => result.ok || result.reason !== 'exists'),
+        ...retryResults,
+      ];
+      const successCount = finalResults.filter((result) => result.ok).length;
+      const failedCount = finalResults.length - successCount;
+
+      await loadLocalSkills(installPath);
+      await syncInstalledByAgent(agents, installPath, { replace: true });
+      setLocalOrganizeTask((current) => {
+        const hostedEntryIds = new Set(
+          finalResults
+            .filter((result) => result.ok)
+            .map((result) => `${result.agentId}::${result.skillId}`),
+        );
+        const candidates = current.candidates
+          .map((candidate) => ({
+            ...candidate,
+            agents: candidate.agents.filter((entry) =>
+              !hostedEntryIds.has(`${entry.agentId}::${candidate.skillId}`),
+            ),
+          }))
+          .filter((candidate) => candidate.agents.length > 0);
+        return {
+          ...current,
+          status: 'completed',
+          candidates,
+          selectedSkillIds: new Set(
+            [...current.selectedSkillIds].filter((skillId) =>
+              candidates.some((candidate) => candidate.skillId === skillId),
+            ),
+          ),
+          result: { successCount, failedCount },
+          error: failedCount ? '部分 Skill 托管失败，请检查 Agent 技能目录和统一路径权限。' : '',
+        };
+      });
+      showNotice(
+        failedCount
+          ? `已托管 ${successCount} 项，${failedCount} 项失败。`
+          : `已托管 ${successCount} 项。`,
+        'local',
+      );
+    } catch (_error) {
+      setLocalOrganizeTask((current) => ({
+        ...current,
+        status: 'error',
+        error: '托管失败，请检查 Agent 技能目录和统一路径权限。',
+      }));
+      showNotice('托管失败，请检查 Agent 技能目录和统一路径权限。', 'local');
+    }
+  }, [
+    agents,
+    installPath,
+    loadLocalSkills,
+    localOrganizeTask,
+    showNotice,
+    syncInstalledByAgent,
+  ]);
 
   useEffect(() => {
     let active = true;
@@ -1635,6 +1979,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     installedByAgent,
     agentSkillsByAgent,
     pendingSkillIds,
+    localOrganizeTask,
     fileInputRef,
     setTheme,
     setApiKey,
@@ -1680,6 +2025,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     downloadAppUpdate,
     installAppUpdateNow,
     dismissUpdateReadyDialog,
+    startLocalOrganizeScan,
+    cancelLocalOrganizeScan,
+    toggleLocalOrganizeCandidate,
+    setAllLocalOrganizeCandidatesSelected,
+    confirmLocalOrganizeHosting,
     setDialogAgents,
     setDialogOpen,
     setInstallConflict,

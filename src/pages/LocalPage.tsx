@@ -1,10 +1,14 @@
+import { BroomRegular, SettingsRegular } from '@fluentui/react-icons';
 import { useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAppContext, useToolbar } from '../AppContext';
 import Empty from '../components/Empty';
 import ImportSkillDropdown from '../components/ImportSkillDropdown';
 import OpenDirectoryButton from '../components/OpenDirectoryButton';
 import { AGENT_CATALOG } from '../config/agents';
+import { routePaths } from '../routes';
 import SkillsPage from './SkillsPage';
+import { Button } from '@/components/ui/button';
 
 const getDefaultSkillFilePath = (skill: { files: Array<{ path: string }> }) =>
   skill.files.find((file) => file.path === 'SKILL.md')?.path ||
@@ -15,6 +19,7 @@ const getDefaultSkillFilePath = (skill: { files: Array<{ path: string }> }) =>
  * 本地技能页封装，复用 SkillsPage。
  */
 const LocalPage = () => {
+  const navigate = useNavigate();
   const {
     localSkills,
     selectedLibrarySkillId,
@@ -69,10 +74,17 @@ const LocalPage = () => {
           disabled={!installPath}
           onClick={() => openDirectoryPath(installPath, 'local')}
         />
+        <Button
+          className="btn ghost"
+          onClick={() => navigate(routePaths.localOrganize)}
+        >
+          <BroomRegular className="icon" />
+          整理
+        </Button>
         <ImportSkillDropdown status={importStatus} onSelect={openImportSkill} />
       </>
     ),
-    [importStatus, installPath, openDirectoryPath, openImportSkill],
+    [importStatus, installPath, navigate, openDirectoryPath, openImportSkill],
   );
   useToolbar(toolbar);
 
