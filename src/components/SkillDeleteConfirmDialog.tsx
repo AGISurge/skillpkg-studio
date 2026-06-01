@@ -57,9 +57,8 @@ const SkillDeleteConfirmDialog = ({
           </button>
         </div>
         <div className="dialog-body">
-          <div className="delete-warning">
-            <DeleteRegular className="icon" />
-            <span>{copy.body}</span>
+          <div>
+            <p className='text-sm'>{copy.body}</p>
           </div>
           {state.action === 'library-delete' && (
             <div className="delete-usage">

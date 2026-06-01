@@ -1163,8 +1163,7 @@ body:not([data-theme='light']) .discover-type-pill.solution {
 }
 
 .btn.mini {
-  min-height: 26px;
-  padding: 4px 9px;
+  padding: 3px 9px;
   border-radius: 999px;
   font-size: 11px;
   gap: 5px;
@@ -1463,11 +1462,15 @@ body:not([data-theme='light']) .discover-type-pill.solution {
   width: 100%;
 }
 
-.skill-card.active,
-.skill-card:hover {
+.skill-card.active {
   border-color: var(--accent-border-strong);
   background: var(--accent-bg-soft);
 }
+
+.skill-card:hover {
+  border-color: var(--accent-border-strong);
+}
+
 
 .skill-card-header {
   display: flex;
