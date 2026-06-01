@@ -113,16 +113,15 @@ const SettingsPage = () => {
         <div className="settings-section-head">
           <div>
             <h2>存放路径</h2>
-            <p>本机 skills 的存放路径。</p>
+            <p>本机 skills 的存放路径</p>
           </div>
-          <button
-            type="button"
-            className="btn ghost"
+          <Button
+            variant="outline"
             onClick={handleSelectInstallPath}
           >
             <FolderRegular className="icon" />
             选择文件夹
-          </button>
+          </Button>
         </div>
         <div className="settings-path-row">
           <span>{installPath || "正在读取默认路径"}</span>

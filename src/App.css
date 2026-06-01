@@ -353,13 +353,12 @@
 }
 
 .settings-path-row {
-  min-height: 46px;
   border: 1px solid var(--border-subtle);
   border-radius: 12px;
   background: var(--surface-bg-strong);
   display: flex;
   align-items: center;
-  padding: 0 14px;
+  padding: 6px 14px;
   color: var(--text-soft);
   font-family: "JetBrains Mono", monospace;
   font-size: 12px;
@@ -1971,6 +1970,7 @@ body:not([data-theme='light']) .discover-type-pill.solution {
   background: var(--surface-bg);
 }
 
+.discover-detail-main ul>li,
 .preview ul>li,
 .viewer-content ul>li {
   list-style: disc;
@@ -1979,7 +1979,7 @@ body:not([data-theme='light']) .discover-type-pill.solution {
   margin-top: 6px;
 }
 
-
+.discover-detail-main ol>li,
 .preview ol>li,
 .viewer-content ol>li {
   list-style: decimal;

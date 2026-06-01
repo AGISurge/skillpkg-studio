@@ -20,6 +20,7 @@ import type {
   SkillpkgSkillSummary,
 } from '../types/models';
 import { formatBytes, stripMarkdownFrontmatter } from '../utils/skillUtils';
+import { Button } from '@/components/ui/button';
 
 const detailCache = new Map<string, SkillpkgSkillDetail>();
 const detailRequests = new Map<string, Promise<SkillpkgSkillDetail>>();
@@ -456,9 +457,8 @@ const DiscoverDetailPage = () => {
                   </dd>
                 </div>
               </dl>
-              <button
-                type="button"
-                className={`btn primary discover-download-button ${importing ? 'loading' : ''}`}
+              <Button
+                className={`discover-download-button ${importing ? 'loading' : ''}`}
                 onClick={handleDownload}
                 disabled={importing}
               >
@@ -468,7 +468,7 @@ const DiscoverDetailPage = () => {
                   <ArrowDownloadRegular className="icon" />
                 )}
                 {importing ? '下载导入中' : '导入并安装'}
-              </button>
+              </Button>
             </div>
 
             <div className="discover-detail-card discover-file-card">
