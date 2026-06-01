@@ -2,8 +2,8 @@ const { updateChannel, updateServerUrl } = require('./electron/updateConfig');
 
 module.exports = {
   extends: null,
-  appId: 'com.agisurge.skillpkgstudio',
-  productName: 'Skillpkg Studio',
+  appId: 'com.skillpkg.studio',
+  productName: 'SkillPKG Studio',
   directories: {
     output: 'dist',
   },
