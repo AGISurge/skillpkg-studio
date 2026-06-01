@@ -1663,7 +1663,7 @@ body:not([data-theme='light']) .discover-type-pill.solution {
 .hljs {
   background: var(--code-bg-strong);
   font-family: "JetBrains Mono", monospace;
-  font-size: 13px;
+  font-size: 12px;
   line-height: 1.8;
   color: var(--code-text);
 }
@@ -1723,6 +1723,25 @@ body:not([data-theme='light']) .discover-type-pill.solution {
 .viewer-content tr:nth-child(even) {
   background: var(--surface-bg);
 }
+
+.preview ul>li,
+.viewer-content ul>li {
+  list-style: disc;
+  margin-left: 40px;
+}
+
+.preview pre > code,
+.viewer-content pre > code {
+  background: var(--code-bg-strong);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 12px;
+  line-height: 1.8;
+  color: var(--code-text);
+  display: block;
+  overflow-x: auto;
+  padding: 1em;
+}
+
 
 .empty-state {
   padding: 24px;
