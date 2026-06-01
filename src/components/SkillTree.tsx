@@ -15,6 +15,7 @@ type SkillTreeProps = {
   files: SkillFile[];
   selectedFilePath: string;
   expandedFolders: Set<string>;
+  forceExpandAll?: boolean;
   onToggleFolder: (path: string) => void;
   onSelectFile: (path: string) => void;
 };
@@ -26,6 +27,7 @@ const SkillTree = ({
   files,
   selectedFilePath,
   expandedFolders,
+  forceExpandAll = false,
   onToggleFolder,
   onSelectFile,
 }: SkillTreeProps) => {
@@ -42,7 +44,7 @@ const SkillTree = ({
       return a.type === 'folder' ? -1 : 1;
     });
     return entries.map((entry) => {
-      const isExpanded = expandedFolders.has(entry.path);
+      const isExpanded = forceExpandAll || expandedFolders.has(entry.path);
       const isActive = entry.path === selectedFilePath;
       if (entry.type === 'folder') {
         return (

@@ -1,11 +1,12 @@
 import {
+  ChevronDownRegular,
   CodeRegular,
   DismissRegular,
   EditRegular,
   SaveRegular,
+  SearchRegular,
 } from "@fluentui/react-icons";
-import { memo } from "react";
-import { useMemo } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
 import remarkGfm from "remark-gfm";
@@ -16,6 +17,7 @@ import {
   getFilePolicyMessage,
   getMarkdownContent,
 } from "../utils/skillUtils";
+import SkillTree from "./SkillTree";
 import { Button } from "./ui/button";
 
 const markdownRehypePlugins = [rehypeHighlight];
@@ -26,12 +28,128 @@ const markdownRemarkPlugins = [remarkGfm];
  */
 type SkillViewerProps = {
   file: SkillFile | null;
+  files: SkillFile[];
+  selectedFilePath: string;
+  expandedFolders: Set<string>;
   editing: boolean;
   draftValue: string | undefined;
+  onToggleFolder: (path: string) => void;
+  onSelectFile: (path: string) => void;
   onStartEdit: () => void;
   onSave: () => void;
   onCancel: () => void;
   onChangeDraft: (value: string) => void;
+};
+
+type FileSelectorDropdownProps = {
+  file: SkillFile | null;
+  files: SkillFile[];
+  selectedFilePath: string;
+  expandedFolders: Set<string>;
+  onToggleFolder: (path: string) => void;
+  onSelectFile: (path: string) => void;
+};
+
+const FileSelectorDropdown = ({
+  file,
+  files,
+  selectedFilePath,
+  expandedFolders,
+  onToggleFolder,
+  onSelectFile,
+}: FileSelectorDropdownProps) => {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const normalizedQuery = query.trim().toLocaleLowerCase();
+  const filteredFiles = useMemo(() => {
+    if (!normalizedQuery) return files;
+    return files.filter((entry) =>
+      entry.path.toLocaleLowerCase().includes(normalizedQuery),
+    );
+  }, [files, normalizedQuery]);
+
+  useEffect(() => {
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => document.removeEventListener("mousedown", handlePointerDown);
+  }, []);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [open]);
+
+  return (
+    <div className="file-selector" ref={rootRef}>
+      <button
+        type="button"
+        className="file-selector-trigger"
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        onClick={() => setOpen((current) => !current)}
+      >
+        <CodeRegular className="icon" />
+        <span className="file-selector-label">{file?.path || "未选择文件"}</span>
+        {file?.size !== undefined && (
+          <span className="viewer-file-meta">{formatBytes(file.size)}</span>
+        )}
+        <ChevronDownRegular className="icon file-selector-chevron" />
+      </button>
+      {open ? (
+        <div className="file-selector-popover" role="dialog" aria-label="选择文件">
+          <div className="file-selector-search">
+            <SearchRegular className="icon" />
+            <input
+              type="search"
+              value={query}
+              aria-label="筛选文件"
+              placeholder="按文件名或路径筛选"
+              autoFocus
+              onChange={(event) => setQuery(event.target.value)}
+            />
+            {query && (
+              <button
+                type="button"
+                className="skill-search-clear"
+                aria-label="清空筛选"
+                onClick={() => setQuery("")}
+              >
+                <DismissRegular className="icon" />
+              </button>
+            )}
+          </div>
+          <div className="file-selector-tree">
+            {filteredFiles.length ? (
+              <SkillTree
+                files={filteredFiles}
+                selectedFilePath={selectedFilePath}
+                expandedFolders={expandedFolders}
+                forceExpandAll={Boolean(normalizedQuery)}
+                onToggleFolder={onToggleFolder}
+                onSelectFile={(path) => {
+                  onSelectFile(path);
+                  setOpen(false);
+                }}
+              />
+            ) : (
+              <div className="empty-state">未找到匹配的文件。</div>
+            )}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
 };
 
 /**
@@ -39,8 +157,13 @@ type SkillViewerProps = {
  */
 const SkillViewer = ({
   file,
+  files,
+  selectedFilePath,
+  expandedFolders,
   editing,
   draftValue,
+  onToggleFolder,
+  onSelectFile,
   onStartEdit,
   onSave,
   onCancel,
@@ -94,11 +217,14 @@ const SkillViewer = ({
       <div className="viewer-header">
         <div className="viewer-header-inner">
           <div className="viewer-title">
-            <CodeRegular className="icon" />
-            <span>{file?.path || "未选择文件"}</span>
-            {file?.size !== undefined && (
-              <span className="viewer-file-meta">{formatBytes(file.size)}</span>
-            )}
+            <FileSelectorDropdown
+              file={file}
+              files={files}
+              selectedFilePath={selectedFilePath}
+              expandedFolders={expandedFolders}
+              onToggleFolder={onToggleFolder}
+              onSelectFile={onSelectFile}
+            />
           </div>
           <div className="viewer-actions">
             {editing ? (
@@ -125,7 +251,7 @@ const SkillViewer = ({
             ) : (
               <Button
                 variant="ghost"
-                size="sm"
+                size="xs"
                 onClick={onStartEdit}
                 disabled={!canEdit}
                 title={!canEdit && file ? "此文件不支持编辑" : undefined}

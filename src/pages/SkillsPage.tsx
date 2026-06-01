@@ -11,7 +11,6 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import type { KeyboardEvent, ReactNode } from "react";
 import type { Skill, SkillFile } from "../types/models";
-import SkillTree from "../components/SkillTree";
 import SkillViewer from "../components/SkillViewer";
 import { Button } from "@/components/ui/button";
 
@@ -355,20 +354,16 @@ const SkillsPage = ({
               </div>
             </div>
             <div className="detail-body">
-              <div className="tree py-4 px-2">
-                <SkillTree
+              <div className="viewer pt-2">
+                <SkillViewer
+                  file={selectedFile}
                   files={selectedSkill.files}
                   selectedFilePath={selectedFilePath}
                   expandedFolders={expandedFolders}
-                  onToggleFolder={onToggleFolder}
-                  onSelectFile={onSelectFile}
-                />
-              </div>
-              <div className="viewer pt-4">
-                <SkillViewer
-                  file={selectedFile}
                   editing={editing}
                   draftValue={draftValue}
+                  onToggleFolder={onToggleFolder}
+                  onSelectFile={onSelectFile}
                   onStartEdit={onStartEdit}
                   onSave={onSave}
                   onCancel={onCancelEdit}
