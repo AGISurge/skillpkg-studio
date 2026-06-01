@@ -6,6 +6,54 @@ This project was bootstrapped with [Create React App](https://github.com/faceboo
 
 In the project directory, you can run:
 
+### `npm run dist`
+
+Builds the React app and packages the Electron app for the current platform.
+
+Platform-specific commands are also available:
+
+```bash
+npm run dist:mac
+npm run dist:win
+npm run dist:linux
+npm run dist:all
+```
+
+The packaging entrypoint is cross-platform:
+
+```bash
+node scripts/package.js --platform mac
+node scripts/package.js --platform win
+node scripts/package.js --platform linux
+node scripts/package.js --platform all
+```
+
+Pass extra Electron Builder options after `--`:
+
+```bash
+node scripts/package.js --platform mac -- --arm64
+```
+
+### Signed Packages
+
+macOS signing uses Electron Builder's standard certificate environment:
+
+```bash
+CSC_LINK=/path/to/certificate.p12 \
+CSC_KEY_PASSWORD=certificate-password \
+npm run dist:mac:signed
+```
+
+You can also use `CSC_NAME` when the signing identity is already installed in the keychain.
+
+Linux signing creates GPG detached signatures (`.sig`) and SHA-256 checksum files next to generated Linux artifacts:
+
+```bash
+LINUX_GPG_KEY_ID=your-key-id npm run dist:linux:signed
+```
+
+If the GPG key requires a passphrase in CI, set `LINUX_GPG_PASSPHRASE`.
+
 ### `npm start`
 
 Runs the app in the development mode.\
