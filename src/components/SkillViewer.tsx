@@ -183,10 +183,10 @@ const SkillViewer = ({
   const canEdit = Boolean(file && !loadingContent && filePolicy.canEdit);
   const isImagePreview = Boolean(
     file &&
-      filePolicy.kind === "image" &&
-      filePolicy.canPreview &&
-      file.contentLoaded !== false &&
-      displayedContent,
+    filePolicy.kind === "image" &&
+    filePolicy.canPreview &&
+    file.contentLoaded !== false &&
+    displayedContent,
   );
 
   const renderPreview = () => {
@@ -231,7 +231,8 @@ const SkillViewer = ({
               <>
                 <Button
                   variant="default"
-                  size="sm"
+                  size="xs"
+                  className="rounded-full"
                   onClick={onSave}
                   disabled={loadingContent || !hasChanges}
                 >
@@ -239,8 +240,9 @@ const SkillViewer = ({
                   保存
                 </Button>
                 <Button
-                 variant="ghost"
-                  size="sm"
+                  variant="ghost"
+                  className="rounded-full"
+                  size="xs"
                   onClick={onCancel}
                   disabled={loadingContent}
                 >
@@ -252,6 +254,7 @@ const SkillViewer = ({
               <Button
                 variant="ghost"
                 size="xs"
+                className="rounded-full"
                 onClick={onStartEdit}
                 disabled={!canEdit}
                 title={!canEdit && file ? "此文件不支持编辑" : undefined}

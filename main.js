@@ -68,9 +68,9 @@ const configureDockIcon = () => {
 const createWindow = () => {
   const iconPath = getPlatformIconPath();
   const win = new BrowserWindow({
-    width: 1280,
-    minWidth: 1280,
-    height: 600,
+    width: 1120,
+    minWidth: 1120,
+    height: 768,
     ...(iconPath ? { icon: iconPath } : {}),
     ...(process.platform === 'darwin' ? { titleBarStyle: 'hiddenInset' } : {}),
     webPreferences: {
