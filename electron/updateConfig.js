@@ -1,9 +1,12 @@
-const DEFAULT_UPDATE_SERVER_URL = 'https://updates.skillpkg.com/skillpkg-studio';
-
-const updateServerUrl =
-  process.env.SKILLPKG_UPDATE_SERVER_URL || DEFAULT_UPDATE_SERVER_URL;
+const DEFAULT_UPDATE_SERVER_URL = 'https://oss.skillpkg.com/studio';
 
 const updateChannel = process.env.SKILLPKG_UPDATE_CHANNEL || 'latest';
+
+const trimTrailingSlash = (value) => String(value).replace(/\/+$/, '');
+
+const updateServerUrl =
+  process.env.SKILLPKG_UPDATE_SERVER_URL ||
+  `${trimTrailingSlash(DEFAULT_UPDATE_SERVER_URL)}/${updateChannel}`;
 
 const platformUpdateEnabled = {
   darwin: true,

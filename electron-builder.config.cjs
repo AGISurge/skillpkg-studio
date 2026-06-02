@@ -24,6 +24,7 @@ module.exports = {
   ],
   mac: {
     icon: 'assets/icons/macos/icon.icns',
+    notarize: true,
     target: ['dmg', 'zip'],
   },
   win: {
