@@ -3,12 +3,18 @@ const path = require('path');
 
 const APP_ID = 'com.agisurge.skillpkgstudio';
 const APP_NAME = 'Skillpkg Studio';
-const ICON_ROOT = path.join(__dirname, '..', 'assets', 'icons');
 
 const firstExistingPath = (paths) =>
   paths.find((candidatePath) => fs.existsSync(candidatePath)) || null;
 
+const ICON_ROOT = firstExistingPath([
+  path.join(__dirname, 'assets', 'icons'),
+  path.join(__dirname, '..', 'assets', 'icons'),
+]);
+
 const getPlatformIconPath = (platform = process.platform) => {
+  if (!ICON_ROOT) return null;
+
   if (platform === 'win32') {
     return firstExistingPath([
       path.join(ICON_ROOT, 'windows', 'icon.ico'),
@@ -33,11 +39,13 @@ const getPlatformIconPath = (platform = process.platform) => {
 };
 
 const getDockIconPath = () =>
-  firstExistingPath([
-    path.join(ICON_ROOT, 'macos', '512x512.png'),
-    path.join(ICON_ROOT, 'macos', '1024x1024.png'),
-    path.join(ICON_ROOT, 'icon.png'),
-  ]);
+  ICON_ROOT
+    ? firstExistingPath([
+      path.join(ICON_ROOT, 'macos', '512x512.png'),
+      path.join(ICON_ROOT, 'macos', '1024x1024.png'),
+      path.join(ICON_ROOT, 'icon.png'),
+    ])
+    : null;
 
 module.exports = {
   APP_ID,

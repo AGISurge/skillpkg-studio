@@ -32,6 +32,7 @@
   "scripts": {
     "start": "craco start",
     "build": "craco build",
+    "build:electron": "node scripts/build-electron.js",
     "dist": "node scripts/package.js",
     "dist:all": "node scripts/package.js --platform all",
     "dist:mac": "node scripts/package.js --platform mac",
@@ -78,6 +79,7 @@
     "cross-env": "^7.0.3",
     "electron": "^41.2.1",
     "electron-builder": "^26.8.1",
+    "esbuild": "^0.28.0",
     "postcss": "^8.5.12",
     "shadcn": "^4.8.3",
     "tailwindcss": "^4.3.0",

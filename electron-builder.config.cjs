@@ -5,15 +5,13 @@ module.exports = {
   appId: 'com.skillpkg.studio',
   productName: 'SkillPKG Studio',
   directories: {
+    app: '.electron-build/app',
     output: 'dist',
   },
+  compression: 'maximum',
+  beforeBuild: async () => false,
   files: [
-    'build/**/*',
-    'electron/**/*',
-    'assets/icons/**/*',
-    'main.js',
-    'preload.js',
-    'package.json',
+    '**/*',
   ],
   publish: [
     {

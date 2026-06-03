@@ -7,6 +7,8 @@ const { spawnSync } = require('node:child_process');
 
 const projectRoot = path.resolve(__dirname, '..');
 const distDir = path.join(projectRoot, 'dist');
+const electronBuildDir = path.join(projectRoot, '.electron-build');
+const stagedAppDir = path.join(electronBuildDir, 'app');
 const builderConfig = path.join(projectRoot, 'electron-builder.config.cjs');
 const electronBuilderCli = require.resolve('electron-builder/cli.js');
 
@@ -229,6 +231,49 @@ function signLinuxArtifacts(startedAt) {
   }
 }
 
+function copyDir(source, target) {
+  if (!fs.existsSync(source)) {
+    throw new Error(`Missing required build input: ${path.relative(projectRoot, source)}`);
+  }
+
+  fs.cpSync(source, target, {
+    recursive: true,
+    force: true,
+    filter: (sourcePath) => path.basename(sourcePath) !== '.DS_Store',
+  });
+}
+
+function writeStagedPackageJson() {
+  const rootPackage = JSON.parse(
+    fs.readFileSync(path.join(projectRoot, 'package.json'), 'utf-8'),
+  );
+  const stagedPackage = {
+    name: rootPackage.name,
+    version: rootPackage.version,
+    private: true,
+    main: 'main.cjs',
+  };
+
+  fs.writeFileSync(
+    path.join(stagedAppDir, 'package.json'),
+    `${JSON.stringify(stagedPackage, null, 2)}\n`,
+  );
+}
+
+function prepareStagedApp() {
+  fs.rmSync(stagedAppDir, { recursive: true, force: true });
+  fs.mkdirSync(stagedAppDir, { recursive: true });
+
+  copyDir(path.join(projectRoot, 'build'), path.join(stagedAppDir, 'build'));
+  copyDir(path.join(projectRoot, 'assets', 'icons'), path.join(stagedAppDir, 'assets', 'icons'));
+  writeStagedPackageJson();
+  run(process.execPath, [
+    path.join(projectRoot, 'scripts', 'build-electron.js'),
+    '--out-dir',
+    path.relative(projectRoot, stagedAppDir),
+  ]);
+}
+
 function main() {
   const options = parseArgs(process.argv.slice(2));
   const buildStartedAt = Date.now();
@@ -238,6 +283,8 @@ function main() {
   if (!options.skipBuild) {
     run('npm', ['run', 'build']);
   }
+
+  prepareStagedApp();
 
   const builderArgs = [
     '--config',

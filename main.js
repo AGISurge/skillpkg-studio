@@ -52,6 +52,7 @@ const {
 } = require('./electron/updateService');
 
 const isDev = !app.isPackaged;
+const appRoot = __dirname;
 
 app.setName(APP_NAME);
 if (process.platform === 'win32') {
@@ -59,9 +60,21 @@ if (process.platform === 'win32') {
 }
 
 const getRendererIndexPath = () => {
-  const buildIndexPath = path.join(__dirname, 'build', 'index.html');
+  const buildIndexPath = path.join(appRoot, 'build', 'index.html');
   if (require('fs').existsSync(buildIndexPath)) return buildIndexPath;
-  return path.join(__dirname, 'index.html');
+  return path.join(appRoot, 'index.html');
+};
+
+const getPreloadPath = () => {
+  if (isDev) return path.join(appRoot, 'preload.js');
+  return path.join(appRoot, 'preload.cjs');
+};
+
+const getSqlWasmPath = () => {
+  if (isDev) {
+    return path.join(appRoot, 'node_modules', 'sql.js', 'dist', 'sql-wasm.wasm');
+  }
+  return path.join(appRoot, 'sql-wasm.wasm');
 };
 
 const configureDockIcon = () => {
@@ -81,7 +94,7 @@ const createWindow = () => {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-      preload: path.join(__dirname, 'preload.js'),
+      preload: getPreloadPath(),
     },
   });
   if (isDev) {
@@ -132,7 +145,9 @@ const saveDatabase = async () => {
 const initDatabase = async () => {
   try {
     const dbPath = getDatabasePath();
-    const SQL = await initSqlJs();
+    const SQL = await initSqlJs({
+      locateFile: (file) => (file.endsWith('.wasm') ? getSqlWasmPath() : file),
+    });
     const existing = await fs.readFile(dbPath).catch(() => null);
     db = existing && existing.length
       ? new SQL.Database(new Uint8Array(existing))
