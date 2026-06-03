@@ -125,50 +125,81 @@ const normalizeExternalUrl = (value) => {
 let db = null;
 let dbInitError = null;
 let dbSaveQueue = Promise.resolve();
+let sqlModule = null;
 
 const getDatabasePath = () =>
   path.join(app.getPath('userData'), 'skillpkg.sqlite');
 
+const getSqlModule = async () => {
+  if (!sqlModule) {
+    sqlModule = await initSqlJs({
+      locateFile: (file) => (file.endsWith('.wasm') ? getSqlWasmPath() : file),
+    });
+  }
+  return sqlModule;
+};
+
+const ensureDatabaseSchema = (database) => {
+  database.run(`
+    CREATE TABLE IF NOT EXISTS skill_agent_link (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      skillId TEXT NOT NULL,
+      agentId TEXT NOT NULL,
+      version TEXT,
+      description TEXT,
+      createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(skillId, agentId)
+    );
+  `);
+  database.run(`
+    CREATE TABLE IF NOT EXISTS skill_favorite (
+      skillId TEXT PRIMARY KEY,
+      createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+};
+
+const writeFileAtomic = async (targetPath, data) => {
+  await ensureDir(path.dirname(targetPath));
+  const tempPath = path.join(
+    path.dirname(targetPath),
+    `.${path.basename(targetPath)}.${process.pid}.${Date.now()}.tmp`,
+  );
+  let handle = null;
+  try {
+    handle = await fs.open(tempPath, 'w');
+    await handle.writeFile(data);
+    await handle.sync();
+    await handle.close();
+    handle = null;
+    await fs.rename(tempPath, targetPath);
+  } catch (error) {
+    if (handle) await handle.close().catch(() => {});
+    await fs.unlink(tempPath).catch(() => {});
+    throw error;
+  }
+};
+
 const saveDatabase = async () => {
   if (!db) return;
   const dbPath = getDatabasePath();
-  dbSaveQueue = dbSaveQueue
-    .then(async () => {
-      await ensureDir(path.dirname(dbPath));
-      const data = db.export();
-      await fs.writeFile(dbPath, Buffer.from(data));
-    })
-    .catch(() => {});
+  const previousSave = dbSaveQueue.catch(() => {});
+  dbSaveQueue = previousSave.then(async () => {
+    const data = Buffer.from(db.export());
+    await writeFileAtomic(dbPath, data);
+  });
   return dbSaveQueue;
 };
 
 const initDatabase = async () => {
   try {
     const dbPath = getDatabasePath();
-    const SQL = await initSqlJs({
-      locateFile: (file) => (file.endsWith('.wasm') ? getSqlWasmPath() : file),
-    });
+    const SQL = await getSqlModule();
     const existing = await fs.readFile(dbPath).catch(() => null);
     db = existing && existing.length
       ? new SQL.Database(new Uint8Array(existing))
       : new SQL.Database();
-    db.run(`
-      CREATE TABLE IF NOT EXISTS skill_agent_link (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        skillId TEXT NOT NULL,
-        agentId TEXT NOT NULL,
-        version TEXT,
-        description TEXT,
-        createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE(skillId, agentId)
-      );
-    `);
-    db.run(`
-      CREATE TABLE IF NOT EXISTS skill_favorite (
-        skillId TEXT PRIMARY KEY,
-        createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
-      );
-    `);
+    ensureDatabaseSchema(db);
     await saveDatabase();
   } catch (error) {
     dbInitError = error;
@@ -176,11 +207,95 @@ const initDatabase = async () => {
   }
 };
 
-const getDatabaseInfo = () => ({
-  path: getDatabasePath(),
-  ok: Boolean(db) && !dbInitError,
-  error: dbInitError ? String(dbInitError.message || dbInitError) : null,
-});
+const getDatabaseInfo = async () => {
+  const dbPath = getDatabasePath();
+  const stat = await fs.stat(dbPath).catch(() => null);
+  return {
+    path: dbPath,
+    ok: Boolean(db) && !dbInitError,
+    error: dbInitError ? String(dbInitError.message || dbInitError) : null,
+    exists: Boolean(stat?.isFile()),
+    size: stat?.isFile() ? stat.size : 0,
+  };
+};
+
+const getTimestampForFilename = () =>
+  new Date().toISOString().replace(/[:.]/g, '-');
+
+const openDatabaseLocation = async () => {
+  const dbPath = getDatabasePath();
+  await saveDatabase();
+  if (await pathExists(dbPath)) {
+    shell.showItemInFolder(dbPath);
+    return { ok: true, path: dbPath };
+  }
+  await ensureDir(path.dirname(dbPath));
+  const errorMessage = await shell.openPath(path.dirname(dbPath));
+  return errorMessage
+    ? { ok: false, reason: 'open-failed', error: errorMessage }
+    : { ok: true, path: path.dirname(dbPath) };
+};
+
+const backupDatabase = async () => {
+  if (!db || dbInitError) return { ok: false, reason: 'db-unavailable' };
+  await saveDatabase();
+  const result = await dialog.showSaveDialog({
+    title: '备份数据库',
+    defaultPath: path.join(
+      app.getPath('documents'),
+      `skillpkg-${getTimestampForFilename()}.sqlite`,
+    ),
+    filters: [{ name: 'SQLite database', extensions: ['sqlite', 'db'] }],
+  });
+  if (result.canceled || !result.filePath) return { ok: false, canceled: true };
+  await fs.copyFile(getDatabasePath(), result.filePath);
+  return { ok: true, path: result.filePath };
+};
+
+const restoreDatabase = async () => {
+  if (!sqlModule) await getSqlModule();
+  const result = await dialog.showOpenDialog({
+    title: '恢复数据库',
+    properties: ['openFile'],
+    filters: [{ name: 'SQLite database', extensions: ['sqlite', 'db'] }],
+  });
+  if (result.canceled || !result.filePaths?.[0]) {
+    return { ok: false, canceled: true };
+  }
+
+  const sourcePath = result.filePaths[0];
+  const restoredBytes = await fs.readFile(sourcePath);
+  let restoredDb = null;
+  try {
+    restoredDb = new sqlModule.Database(new Uint8Array(restoredBytes));
+    ensureDatabaseSchema(restoredDb);
+  } catch (error) {
+    if (restoredDb) restoredDb.close();
+    return {
+      ok: false,
+      reason: 'invalid-database',
+      error: String(error.message || error),
+    };
+  }
+
+  await dbSaveQueue.catch(() => {});
+  const previousDb = db;
+  db = restoredDb;
+  dbInitError = null;
+  try {
+    await saveDatabase();
+    if (previousDb && previousDb !== db) previousDb.close();
+    return { ok: true, path: sourcePath };
+  } catch (error) {
+    db = previousDb;
+    restoredDb.close();
+    return {
+      ok: false,
+      reason: 'restore-failed',
+      error: String(error.message || error),
+    };
+  }
+};
 
 const upsertSkillInstallRecord = async ({
   skillId,
@@ -684,6 +799,9 @@ const registerIpcHandlers = () => {
     replaceFavoriteSkillIds(skillIds));
 
   ipcMain.handle('get-db-info', async () => getDatabaseInfo());
+  ipcMain.handle('open-db-location', async () => openDatabaseLocation());
+  ipcMain.handle('backup-db', async () => backupDatabase());
+  ipcMain.handle('restore-db', async () => restoreDatabase());
 
   ipcMain.handle('save-skill-file', async (_event, payload) => {
     const { installPath, skillId, filePath, content, rootPath } = payload || {};

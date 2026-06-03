@@ -365,6 +365,47 @@
   word-break: break-all;
 }
 
+.settings-db-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: var(--text-muted);
+  font-size: 12px;
+  margin-top: 8px;
+}
+
+.settings-db-meta span {
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  background: var(--surface-bg);
+  padding: 4px 9px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.settings-db-meta strong {
+  color: var(--app-text-strong);
+  font-weight: 600;
+}
+
+.settings-db-status {
+  color: var(--text-soft);
+  font-size: 12px;
+}
+
+.settings-db-status.error {
+  color: var(--danger-text);
+}
+
+.settings-db-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+  flex: 0 0 auto;
+}
+
 .muted {
   color: var(--text-muted);
 }

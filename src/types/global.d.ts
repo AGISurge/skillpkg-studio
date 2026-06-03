@@ -392,6 +392,37 @@ declare global {
         path: string;
         ok: boolean;
         error: string | null;
+        exists?: boolean;
+        size?: number;
+      }>;
+      /**
+       * 在系统文件管理器中打开 SQLite 数据库位置。
+       */
+      openDbLocation: () => Promise<{
+        ok: boolean;
+        path?: string;
+        reason?: string;
+        error?: string;
+      }>;
+      /**
+       * 将当前 SQLite 数据库备份到用户选择的位置。
+       */
+      backupDb: () => Promise<{
+        ok: boolean;
+        canceled?: boolean;
+        path?: string;
+        reason?: string;
+        error?: string;
+      }>;
+      /**
+       * 从用户选择的 SQLite 文件恢复数据库。
+       */
+      restoreDb: () => Promise<{
+        ok: boolean;
+        canceled?: boolean;
+        path?: string;
+        reason?: string;
+        error?: string;
       }>;
 
       /**

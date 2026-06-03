@@ -43,6 +43,9 @@ contextBridge.exposeInMainWorld('skillpkg', {
   replaceFavoriteSkillIds: (skillIds) =>
     ipcRenderer.invoke('replace-favorite-skill-ids', skillIds),
   getDbInfo: () => ipcRenderer.invoke('get-db-info'),
+  openDbLocation: () => ipcRenderer.invoke('open-db-location'),
+  backupDb: () => ipcRenderer.invoke('backup-db'),
+  restoreDb: () => ipcRenderer.invoke('restore-db'),
   getAgentSkillCounts: (payload) =>
     ipcRenderer.invoke('get-agent-skill-counts', payload),
   getAppUpdateState: () => ipcRenderer.invoke('get-app-update-state'),
