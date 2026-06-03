@@ -42,6 +42,7 @@ type DiscoverViewState = {
 const categoryCache = new Map<string, DiscoverCategoriesCacheEntry>();
 const listCache = new Map<string, DiscoverListCacheEntry>();
 let pendingDiscoverReturnState: DiscoverViewState | null = null;
+const emptyImageSrc = `${process.env.PUBLIC_URL || ''}/robot.webp`;
 
 const getCacheExpiry = () => Date.now() + DISCOVER_CACHE_TTL_MS;
 
@@ -641,7 +642,7 @@ const DiscoverPage = () => {
         ) : (
           <div className="empty-state discover-empty flex flex-col h-full">
             <div>
-              <img src="/robot.webp" alt="" className="w-32 h-32" />
+              <img src={emptyImageSrc} alt="" className="w-32 h-32" />
             </div>
             <p>{error || '未找到匹配的 Skill。'}</p>
             {!normalizedApiKey && (

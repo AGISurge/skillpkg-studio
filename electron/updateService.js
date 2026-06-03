@@ -1,4 +1,3 @@
-const isDev = require('electron-is-dev');
 const { autoUpdater } = require('electron-updater');
 const {
   isUpdateEnabledForPlatform,
@@ -22,16 +21,23 @@ const normalizeUpdateInfo = (info) => ({
   version: typeof info?.version === 'string' ? info.version : null,
 });
 
+const resolveIsDev = ({ app, dev }) => {
+  if (typeof dev === 'boolean') return dev;
+  if (app) return !app.isPackaged;
+  return process.env.NODE_ENV === 'development';
+};
+
 const createUpdateService = ({
   app,
   BrowserWindow,
   updater = autoUpdater,
   platform = process.platform,
-  dev = isDev,
+  dev,
   config = {},
 } = {}) => {
+  const isDev = resolveIsDev({ app, dev });
   const enabled =
-    !dev &&
+    !isDev &&
     (typeof config.enabled === 'boolean'
       ? config.enabled
       : isUpdateEnabledForPlatform(platform));
@@ -62,14 +68,22 @@ const createUpdateService = ({
   const startChecking = () => {
     if (!enabled || checkingStarted) return state;
     checkingStarted = true;
-    configureUpdater();
-    setState({ status: 'checking', error: null });
-    Promise.resolve(updater.checkForUpdates()).catch((error) => {
+
+    const recordError = (error) => {
       setState({
         status: 'error',
         error: error?.message || String(error),
       });
-    });
+    };
+
+    try {
+      configureUpdater();
+      setState({ status: 'checking', error: null });
+      Promise.resolve(updater.checkForUpdates()).catch(recordError);
+    } catch (error) {
+      recordError(error);
+    }
+
     return state;
   };
 

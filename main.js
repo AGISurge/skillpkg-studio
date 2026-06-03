@@ -1,7 +1,6 @@
 const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron/main');
 const path = require('path');
 const fs = require('fs/promises');
-const isDev = require('electron-is-dev');
 const initSqlJs = require('sql.js');
 const {
   ensureDir,
@@ -51,6 +50,8 @@ const {
   createUpdateService,
   registerUpdateIpcHandlers,
 } = require('./electron/updateService');
+
+const isDev = !app.isPackaged;
 
 app.setName(APP_NAME);
 if (process.platform === 'win32') {

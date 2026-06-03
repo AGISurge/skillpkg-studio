@@ -4,8 +4,6 @@ jest.mock('electron-updater', () => ({
   autoUpdater: new (require('events'))(),
 }));
 
-jest.mock('electron-is-dev', () => false);
-
 const { createUpdateService } = require('../../electron/updateService');
 
 const createFakeUpdater = () => {
@@ -21,7 +19,7 @@ const createService = (options = {}) => {
   const updater = options.updater || createFakeUpdater();
   const send = jest.fn();
   const service = createUpdateService({
-    app: { getVersion: () => '0.1.0' },
+    app: { getVersion: () => '0.1.0', isPackaged: true },
     BrowserWindow: {
       getAllWindows: () => [{ webContents: { send } }],
     },
@@ -48,6 +46,61 @@ test('disables updates on linux by default', () => {
   service.startChecking();
 
   expect(updater.checkForUpdates).not.toHaveBeenCalled();
+});
+
+test('uses app.isPackaged to disable updates in development by default', () => {
+  const updater = createFakeUpdater();
+  const service = createUpdateService({
+    app: { getVersion: () => '0.1.0', isPackaged: false },
+    BrowserWindow: {
+      getAllWindows: () => [],
+    },
+    updater,
+    platform: 'darwin',
+    config: {
+      url: 'https://updates.example.com/app',
+      channel: 'latest',
+    },
+  });
+
+  expect(service.getState()).toEqual(expect.objectContaining({
+    enabled: false,
+    status: 'disabled',
+  }));
+
+  service.startChecking();
+
+  expect(updater.checkForUpdates).not.toHaveBeenCalled();
+});
+
+test('keeps update setup errors inside update state', () => {
+  const updater = createFakeUpdater();
+  updater.setFeedURL.mockImplementation(() => {
+    throw new Error('bad feed');
+  });
+  const { service } = createService({ updater, platform: 'darwin' });
+
+  expect(() => service.startChecking()).not.toThrow();
+  expect(service.getState()).toEqual(expect.objectContaining({
+    enabled: true,
+    status: 'error',
+    error: 'bad feed',
+  }));
+});
+
+test('keeps synchronous update check errors inside update state', () => {
+  const updater = createFakeUpdater();
+  updater.checkForUpdates.mockImplementation(() => {
+    throw new Error('check failed');
+  });
+  const { service } = createService({ updater, platform: 'darwin' });
+
+  expect(() => service.startChecking()).not.toThrow();
+  expect(service.getState()).toEqual(expect.objectContaining({
+    enabled: true,
+    status: 'error',
+    error: 'check failed',
+  }));
 });
 
 test('records available update version on supported platforms', () => {

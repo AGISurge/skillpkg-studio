@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "main": "main.js",
+  "homepage": ".",
   "productName": "Skillpkg Studio",
   "dependencies": {
     "@fluentui/react-icons": "^2.0.0",
@@ -77,7 +78,6 @@
     "cross-env": "^7.0.3",
     "electron": "^41.2.1",
     "electron-builder": "^26.8.1",
-    "electron-is-dev": "^3.0.1",
     "postcss": "^8.5.12",
     "shadcn": "^4.8.3",
     "tailwindcss": "^4.3.0",
