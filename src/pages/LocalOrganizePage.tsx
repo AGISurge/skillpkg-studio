@@ -2,29 +2,10 @@ import {
   BroomRegular,
   CheckmarkCircleRegular,
   DismissCircleRegular,
-  SettingsRegular,
 } from '@fluentui/react-icons';
 import { useEffect, useMemo } from 'react';
 import { useAppContext, useToolbar } from '../AppContext';
-import type { LocalOrganizeStatus } from '../AppContext';
 import { Button } from '@/components/ui/button';
-
-const getStatusText = (
-  status: LocalOrganizeStatus,
-  scannedAgentCount: number,
-  totalAgentCount: number,
-) => {
-  if (status === 'scanning') {
-    return totalAgentCount
-      ? `正在扫描 Agents (${scannedAgentCount}/${totalAgentCount})`
-      : '正在扫描 Agents';
-  }
-  if (status === 'completed') return '扫描完成';
-  if (status === 'canceled') return '扫描已取消';
-  if (status === 'hosting') return '正在执行托管';
-  if (status === 'error') return '任务失败';
-  return '准备扫描';
-};
 
 const LocalOrganizePage = () => {
   const {
@@ -48,7 +29,6 @@ const LocalOrganizePage = () => {
   } = localOrganizeTask;
   const selectedCount = selectedSkillIds.size;
   const canHost = status === 'completed' && selectedCount > 0;
-  const isBusy = status === 'scanning' || status === 'hosting';
   const allSelected = candidates.length > 0 && candidates.every((candidate) =>
     selectedSkillIds.has(candidate.skillId),
   );

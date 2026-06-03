@@ -1,4 +1,4 @@
-import { CheckmarkCircleRegular, DismissCircleRegular, DeleteRegular } from '@fluentui/react-icons';
+import { CheckmarkCircleRegular, DismissCircleRegular } from '@fluentui/react-icons';
 import type { SkillDeleteDialogState } from '../AppContext';
 import { Button } from './ui/button';
 

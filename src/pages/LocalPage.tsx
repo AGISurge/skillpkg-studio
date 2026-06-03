@@ -1,4 +1,4 @@
-import { BroomRegular, SettingsRegular } from '@fluentui/react-icons';
+import { BroomRegular } from '@fluentui/react-icons';
 import { useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext, useToolbar } from '../AppContext';
