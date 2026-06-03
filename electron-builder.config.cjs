@@ -34,6 +34,7 @@ module.exports = {
   linux: {
     icon: 'assets/icons/linux',
     category: 'Development',
+    maintainer: 'SkillPKG <support@skillpkg.com>',
     target: ['AppImage', 'deb'],
   },
 };

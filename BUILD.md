@@ -85,6 +85,10 @@ base64 -i DeveloperIDApplication.p12 | pbcopy
 
 ### Linux Signing
 
+Linux `.deb` packages require maintainer metadata. The release config sets this
+in `electron-builder.config.cjs` as `SkillPKG <support@skillpkg.com>`. Update
+that value if the project has a different official release contact.
+
 | Name | Required | Description |
 | --- | --- | --- |
 | `LINUX_GPG_PRIVATE_KEY_BASE64` | Yes | Base64-encoded armored private key used to create detached signatures for Linux artifacts. |
