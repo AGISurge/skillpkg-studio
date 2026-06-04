@@ -185,6 +185,7 @@ const SettingsPage = () => {
             <p>本机 skills 的存放路径</p>
           </div>
           <Button
+             size="xs"
             variant="outline"
             onClick={handleSelectInstallPath}
           >
@@ -215,6 +216,7 @@ const SettingsPage = () => {
           <div className="settings-db-actions">
             <Button
               variant="outline"
+              size="xs"
               onClick={handleOpenDbLocation}
             >
               <FolderOpenRegular className="icon" />
@@ -222,6 +224,7 @@ const SettingsPage = () => {
             </Button>
             <Button
               variant="outline"
+               size="xs"
               onClick={handleBackupDb}
               disabled={dbActionPending || !dbInfo?.ok}
             >
@@ -229,6 +232,7 @@ const SettingsPage = () => {
               备份
             </Button>
             <Button
+             size="xs"
               variant="outline"
               onClick={handleRestoreDb}
               disabled={dbActionPending}

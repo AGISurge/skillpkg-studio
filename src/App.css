@@ -370,7 +370,7 @@
   flex-wrap: wrap;
   gap: 8px;
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: 11px;
   margin-top: 8px;
 }
 
@@ -378,7 +378,7 @@
   border: 1px solid var(--border-subtle);
   border-radius: 999px;
   background: var(--surface-bg);
-  padding: 4px 9px;
+  padding: 2px 9px;
   display: inline-flex;
   align-items: center;
   gap: 6px;
