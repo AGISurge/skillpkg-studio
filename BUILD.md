@@ -1,8 +1,9 @@
 # Build and Release
 
 This project publishes desktop releases through GitHub Actions. The release
-workflow builds macOS, Linux, and Windows packages, then uploads the generated
-artifacts and update metadata to Tencent Cloud COS with COSCLI.
+workflow builds macOS, Linux, and Windows packages, uploads the versioned
+artifact archive to GitHub Releases, and uploads the current update feed to
+Tencent Cloud COS with COSCLI.
 
 The macOS package is built for direct distribution through COS/CDN. This
 pipeline does not build a Mac App Store (`mas`) target and does not upload
@@ -18,16 +19,16 @@ used only for notarization through Apple Notary Service.
   trigger builds the current `package.json` version and accepts a `channel`
   input. The default channel is `latest`.
 
-The updater feed is uploaded to:
+The updater feed is uploaded to COS:
 
 ```text
 ${TENCENT_COS_REMOTE_PREFIX}/${channel}/
 ```
 
-An immutable archive copy is also uploaded to:
+The immutable version archive is uploaded to GitHub Releases:
 
 ```text
-${TENCENT_COS_REMOTE_PREFIX}/releases/v${packageVersion}/
+v${packageVersion}
 ```
 
 ## GitHub Variables
@@ -61,8 +62,8 @@ variables > Actions > Secrets**.
 | `TENCENT_COS_REGION` | Yes | COS bucket region, for example `ap-shanghai` or `ap-guangzhou`. |
 
 The workflow downloads the Linux amd64 COSCLI binary from Tencent Cloud's
-official download endpoint and uploads with the bucket endpoint
-`cos.${TENCENT_COS_REGION}.myqcloud.com`.
+official download endpoint and uploads the current channel feed with the bucket
+endpoint `cos.${TENCENT_COS_REGION}.myqcloud.com`.
 
 ### macOS Signing and Notarization for Direct Distribution
 
@@ -141,7 +142,7 @@ npm run dist:linux:signed
 - Linux job produces `.AppImage`, `.deb`, `.sig`, `.sha256`, and update
   metadata.
 - Windows job produces an unsigned NSIS `.exe` installer plus update metadata.
+- GitHub Release `v${packageVersion}` contains the complete versioned artifact
+  set for all supported platforms.
 - COS channel feed contains the complete current release set for all supported
   platforms.
-- COS release archive contains the same files under
-  `releases/v${packageVersion}/`.
