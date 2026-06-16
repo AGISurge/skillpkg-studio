@@ -1,8 +1,13 @@
-# SkillPKG Studio
+<div style="text-align: center;">
+<h1>SkillPKG Studio</h1>
+
+![Studio](./skillpkg-studio.webp)
 
 SkillPKG Studio 是一个用于发现、导入、管理和安装 AI Agent Skills 的桌面应用。它把分散在不同工具目录里的 Skill 统一收纳到本机 Skill 库，再按需分发给 Claude Code、Codex、Cursor、Qoder、CodeBuddy、WorkBuddy、TRAE 等 Agent。
 
 项目采用 Electron + React 构建，面向 macOS、Windows 和 Linux 桌面环境。
+
+</div>
 
 ## 项目目的
 
