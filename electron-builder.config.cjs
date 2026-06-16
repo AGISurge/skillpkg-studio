@@ -25,6 +25,9 @@ module.exports = {
     icon: 'assets/icons/windows/icon.ico',
     target: ['nsis'],
   },
+  nsis: {
+    artifactName: 'SkillPKG-Studio-Setup-${version}.${ext}',
+  },
   linux: {
     icon: 'assets/icons/linux',
     category: 'Development',
