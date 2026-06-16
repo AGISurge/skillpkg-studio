@@ -1,11 +1,11 @@
 # Build and Release
 
 This project publishes desktop releases through GitHub Actions. The release
-workflow builds macOS, Linux, and Windows packages, uploads the versioned
-artifact archive to GitHub Releases, and uploads the current update feed to
-Tencent Cloud COS with COSCLI.
+workflow builds macOS, Linux, and Windows packages, uploads all installers and
+electron-updater metadata to GitHub Releases, and the packaged app checks
+`AGISurge/skillpkg-studio` GitHub Releases for updates.
 
-The macOS package is built for direct distribution through COS/CDN. This
+The macOS package is built for direct distribution from GitHub Releases. This
 pipeline does not build a Mac App Store (`mas`) target and does not upload
 anything to App Store Connect for App Store distribution. Apple credentials are
 used only for notarization through Apple Notary Service.
@@ -19,56 +19,39 @@ used only for notarization through Apple Notary Service.
   trigger builds the current `package.json` version and accepts a `channel`
   input. The default channel is `latest`.
 
-The updater feed is uploaded to COS:
+The immutable release archive and update feed are both uploaded to GitHub
+Releases:
 
 ```text
-${TENCENT_COS_REMOTE_PREFIX}/${channel}/
+https://github.com/AGISurge/skillpkg-studio/releases/tag/v${packageVersion}
 ```
 
-The immutable version archive is uploaded to GitHub Releases:
+The app defaults to GitHub release updates from:
 
 ```text
-v${packageVersion}
+owner: AGISurge
+repo: skillpkg-studio
+channel: latest
 ```
 
-## GitHub Variables
-
-Configure these in GitHub repository settings under **Settings > Secrets and
-variables > Actions > Variables**.
+For a non-default update source, set these environment variables before
+packaging:
 
 | Name | Required | Description |
 | --- | --- | --- |
-| `TENCENT_COS_REMOTE_PREFIX` | No | COS object prefix for release files. Defaults to `skillpkg-studio` when unset. Do not include leading or trailing slashes. |
-| `SKILLPKG_UPDATE_SERVER_URL` | No | COS/CDN base URL used by electron-builder metadata. Defaults to `https://oss.skillpkg.com/studio`. The workflow appends the selected channel, for example `/latest`. |
-
-The application runtime currently defaults to
-`https://oss.skillpkg.com/studio/latest` for the `latest` channel.
-If production uses another domain, update `electron/updateConfig.js` before
-releasing or make sure the runtime environment provides
-`SKILLPKG_UPDATE_SERVER_URL`.
+| `SKILLPKG_UPDATE_CHANNEL` | No | electron-updater metadata channel. Defaults to `latest`. |
+| `SKILLPKG_UPDATE_GITHUB_OWNER` | No | GitHub owner for release updates. Defaults to `AGISurge`. |
+| `SKILLPKG_UPDATE_GITHUB_REPO` | No | GitHub repository for release updates. Defaults to `skillpkg-studio`. |
 
 ## GitHub Secrets
 
 Configure these in GitHub repository settings under **Settings > Secrets and
 variables > Actions > Secrets**.
 
-### Tencent Cloud COS
-
-| Name | Required | Description |
-| --- | --- | --- |
-| `TENCENT_COS_SECRET_ID` | Yes | Tencent Cloud API SecretId with write access to the target bucket. Use a least-privilege sub-account when possible. |
-| `TENCENT_COS_SECRET_KEY` | Yes | Tencent Cloud API SecretKey for the same identity. |
-| `TENCENT_COS_BUCKET` | Yes | COS bucket name, including APPID, for example `releases-1250000000`. |
-| `TENCENT_COS_REGION` | Yes | COS bucket region, for example `ap-shanghai` or `ap-guangzhou`. |
-
-The workflow downloads the Linux amd64 COSCLI binary from Tencent Cloud's
-official download endpoint and uploads the current channel feed with the bucket
-endpoint `cos.${TENCENT_COS_REGION}.myqcloud.com`.
-
 ### macOS Signing and Notarization for Direct Distribution
 
-These values are for a Developer ID signed app distributed from Tencent Cloud
-COS. They are not App Store distribution credentials for a `mas` build.
+These values are for a Developer ID signed app distributed from GitHub
+Releases. They are not App Store distribution credentials for a `mas` build.
 
 | Name | Required | Description |
 | --- | --- | --- |
@@ -142,7 +125,5 @@ npm run dist:linux:signed
 - Linux job produces `.AppImage`, `.deb`, `.sig`, `.sha256`, and update
   metadata.
 - Windows job produces an unsigned NSIS `.exe` installer plus update metadata.
-- GitHub Release `v${packageVersion}` contains the complete versioned artifact
-  set for all supported platforms.
-- COS channel feed contains the complete current release set for all supported
-  platforms.
+- GitHub Release `v${packageVersion}` contains the complete artifact set and
+  electron-updater metadata for all supported platforms.

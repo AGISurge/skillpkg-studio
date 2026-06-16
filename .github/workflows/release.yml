@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       channel:
-        description: 'Update channel and COS feed directory.'
+        description: 'Update channel for electron-updater metadata.'
         required: false
         default: 'latest'
 
@@ -20,7 +20,6 @@ concurrency:
 
 env:
   NODE_VERSION: '22.22.2'
-  DEFAULT_UPDATE_SERVER_URL: 'https://oss.skillpkg.com/studio'
 
 jobs:
   prepare:
@@ -30,8 +29,6 @@ jobs:
       version: ${{ steps.release.outputs.version }}
       tag_name: ${{ steps.release.outputs.tag_name }}
       channel: ${{ steps.release.outputs.channel }}
-      cos_prefix: ${{ steps.release.outputs.cos_prefix }}
-      update_server_url: ${{ steps.release.outputs.update_server_url }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -41,15 +38,11 @@ jobs:
         shell: bash
         env:
           INPUT_CHANNEL: ${{ github.event.inputs.channel }}
-          COS_PREFIX_VAR: ${{ vars.TENCENT_COS_REMOTE_PREFIX }}
-          UPDATE_SERVER_URL_VAR: ${{ vars.SKILLPKG_UPDATE_SERVER_URL }}
         run: |
           set -euo pipefail
 
           package_version="$(node -p "require('./package.json').version")"
           channel="${INPUT_CHANNEL:-latest}"
-          cos_prefix="${COS_PREFIX_VAR:-studio}"
-          update_server_base_url="${UPDATE_SERVER_URL_VAR:-$DEFAULT_UPDATE_SERVER_URL}"
 
           if [[ ! "${channel}" =~ ^[0-9A-Za-z._-]+$ ]]; then
             echo "Release channel may only contain letters, numbers, dots, underscores, and hyphens. Got ${channel}." >&2
@@ -72,16 +65,9 @@ jobs:
             tag_name="v${package_version}"
           fi
 
-          cos_prefix="${cos_prefix#/}"
-          cos_prefix="${cos_prefix%/}"
-          update_server_base_url="${update_server_base_url%/}"
-          update_server_url="${update_server_base_url}/${channel}"
-
           echo "version=${package_version}" >> "${GITHUB_OUTPUT}"
           echo "tag_name=${tag_name}" >> "${GITHUB_OUTPUT}"
           echo "channel=${channel}" >> "${GITHUB_OUTPUT}"
-          echo "cos_prefix=${cos_prefix}" >> "${GITHUB_OUTPUT}"
-          echo "update_server_url=${update_server_url}" >> "${GITHUB_OUTPUT}"
 
   build-mac:
     name: Build macOS arm64
@@ -89,7 +75,6 @@ jobs:
     needs: prepare
     env:
       SKILLPKG_UPDATE_CHANNEL: ${{ needs.prepare.outputs.channel }}
-      SKILLPKG_UPDATE_SERVER_URL: ${{ needs.prepare.outputs.update_server_url }}
       CSC_LINK: ${{ secrets.CSC_LINK }}
       CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
       APPLE_ID: ${{ secrets.APPLE_ID }}
@@ -118,7 +103,7 @@ jobs:
           fi
 
       - name: Build signed and notarized macOS package for direct distribution
-        run: node scripts/package.js --platform mac --sign --publish always -- --arm64
+        run: node scripts/package.js --platform mac --sign --publish never -- --arm64
 
       - name: Upload macOS artifacts
         uses: actions/upload-artifact@v4
@@ -130,7 +115,7 @@ jobs:
             dist/*.dmg
             dist/*.zip
             dist/*.blockmap
-            dist/*mac*.yml
+            dist/*.yml
 
   build-linux:
     name: Build Linux x64
@@ -138,7 +123,6 @@ jobs:
     needs: prepare
     env:
       SKILLPKG_UPDATE_CHANNEL: ${{ needs.prepare.outputs.channel }}
-      SKILLPKG_UPDATE_SERVER_URL: ${{ needs.prepare.outputs.update_server_url }}
       LINUX_GPG_KEY_ID: ${{ secrets.LINUX_GPG_KEY_ID }}
       LINUX_GPG_PASSPHRASE: ${{ secrets.LINUX_GPG_PASSPHRASE }}
     steps:
@@ -170,7 +154,7 @@ jobs:
           gpg --batch --import "${key_path}"
 
       - name: Build signed Linux package
-        run: node scripts/package.js --platform linux --sign --publish always -- --x64
+        run: node scripts/package.js --platform linux --sign --publish never -- --x64
 
       - name: Upload Linux artifacts
         uses: actions/upload-artifact@v4
@@ -184,7 +168,7 @@ jobs:
             dist/*.blockmap
             dist/*.sig
             dist/*.sha256
-            dist/*linux*.yml
+            dist/*.yml
 
   build-windows:
     name: Build Windows x64
@@ -192,7 +176,6 @@ jobs:
     needs: prepare
     env:
       SKILLPKG_UPDATE_CHANNEL: ${{ needs.prepare.outputs.channel }}
-      SKILLPKG_UPDATE_SERVER_URL: ${{ needs.prepare.outputs.update_server_url }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -207,7 +190,7 @@ jobs:
         run: npm ci
 
       - name: Build unsigned Windows package
-        run: node scripts/package.js --platform win --publish always -- --x64
+        run: node scripts/package.js --platform win --publish never -- --x64
 
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@v4
@@ -218,62 +201,10 @@ jobs:
           path: |
             dist/*.exe
             dist/*.blockmap
-            dist/latest*.yml
-
-  publish-cos:
-    name: Publish latest feed to Tencent Cloud COS
-    runs-on: ubuntu-latest
-    needs:
-      - prepare
-      - build-mac
-      - build-linux
-      - build-windows
-    steps:
-      - name: Download release artifacts
-        uses: actions/download-artifact@v4
-        with:
-          pattern: dist-*
-          path: release-artifacts
-          merge-multiple: true
-
-      - name: Show release artifact list
-        shell: bash
-        run: find release-artifacts -maxdepth 1 -type f -print | sort
-
-      - name: Install COSCLI
-        shell: bash
-        run: |
-          set -euo pipefail
-          curl -L "https://cosbrowser.cloud.tencent.com/software/coscli/coscli-linux-amd64" -o coscli
-          chmod 755 coscli
-          ./coscli --version
-
-      - name: Publish current channel feed
-        shell: bash
-        env:
-          TENCENT_COS_SECRET_ID: ${{ secrets.TENCENT_COS_SECRET_ID }}
-          TENCENT_COS_SECRET_KEY: ${{ secrets.TENCENT_COS_SECRET_KEY }}
-          TENCENT_COS_BUCKET: ${{ secrets.TENCENT_COS_BUCKET }}
-          TENCENT_COS_REGION: ${{ secrets.TENCENT_COS_REGION }}
-          REMOTE_PATH: ${{ needs.prepare.outputs.cos_prefix }}/${{ needs.prepare.outputs.channel }}
-        run: |
-          set -euo pipefail
-          endpoint="cos.${TENCENT_COS_REGION}.myqcloud.com"
-          ./coscli sync release-artifacts/ "cos://${TENCENT_COS_BUCKET}/${REMOTE_PATH}/" \
-            -r \
-            --delete \
-            --force \
-            --part-size 16 \
-            --thread-num 10 \
-            --routines 4 \
-            --err-retry-num 10 \
-            --err-retry-interval 5 \
-            -e "${endpoint}" \
-            -i "${TENCENT_COS_SECRET_ID}" \
-            -k "${TENCENT_COS_SECRET_KEY}"
+            dist/*.yml
 
   publish-github-release:
-    name: Publish version archive to GitHub Release
+    name: Publish artifacts to GitHub Release
     runs-on: ubuntu-latest
     permissions:
       contents: write

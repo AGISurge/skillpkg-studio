@@ -1,4 +1,4 @@
-const { updateChannel, updateServerUrl } = require('./electron/updateConfig');
+const { githubUpdateProvider } = require('./electron/updateConfig');
 
 module.exports = {
   extends: null,
@@ -14,11 +14,7 @@ module.exports = {
     '**/*',
   ],
   publish: [
-    {
-      provider: 'generic',
-      url: updateServerUrl,
-      channel: updateChannel,
-    },
+    githubUpdateProvider,
   ],
   mac: {
     icon: 'assets/icons/macos/icon.icns',

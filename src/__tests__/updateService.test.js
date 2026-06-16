@@ -27,7 +27,12 @@ const createService = (options = {}) => {
     dev: false,
     platform: options.platform || 'darwin',
     config: {
-      url: 'https://updates.example.com/app',
+      provider: {
+        provider: 'github',
+        owner: 'ExampleOrg',
+        repo: 'example-app',
+        private: false,
+      },
       channel: 'latest',
       ...options.config,
     },
@@ -58,7 +63,12 @@ test('uses app.isPackaged to disable updates in development by default', () => {
     updater,
     platform: 'darwin',
     config: {
-      url: 'https://updates.example.com/app',
+      provider: {
+        provider: 'github',
+        owner: 'ExampleOrg',
+        repo: 'example-app',
+        private: false,
+      },
       channel: 'latest',
     },
   });
@@ -109,6 +119,13 @@ test('records available update version on supported platforms', () => {
   service.startChecking();
   updater.emit('update-available', { version: '0.2.0' });
 
+  expect(updater.setFeedURL).toHaveBeenCalledWith({
+    provider: 'github',
+    owner: 'ExampleOrg',
+    repo: 'example-app',
+    private: false,
+    channel: 'latest',
+  });
   expect(updater.checkForUpdates).toHaveBeenCalledTimes(1);
   expect(service.getState()).toEqual(expect.objectContaining({
     enabled: true,

@@ -1,12 +1,16 @@
-const DEFAULT_UPDATE_SERVER_URL = 'https://oss.skillpkg.com/studio';
-
 const updateChannel = process.env.SKILLPKG_UPDATE_CHANNEL || 'latest';
 
-const trimTrailingSlash = (value) => String(value).replace(/\/+$/, '');
+const githubOwner = process.env.SKILLPKG_UPDATE_GITHUB_OWNER || 'AGISurge';
+const githubRepo = process.env.SKILLPKG_UPDATE_GITHUB_REPO || 'skillpkg-studio';
 
-const updateServerUrl =
-  process.env.SKILLPKG_UPDATE_SERVER_URL ||
-  `${trimTrailingSlash(DEFAULT_UPDATE_SERVER_URL)}/${updateChannel}`;
+const githubUpdateProvider = {
+  provider: 'github',
+  owner: githubOwner,
+  repo: githubRepo,
+  channel: updateChannel,
+  private: false,
+  vPrefixedTagName: true,
+};
 
 const platformUpdateEnabled = {
   darwin: true,
@@ -18,8 +22,10 @@ const isUpdateEnabledForPlatform = (platform = process.platform) =>
   Boolean(platformUpdateEnabled[platform]);
 
 module.exports = {
-  updateServerUrl,
   updateChannel,
+  githubOwner,
+  githubRepo,
+  githubUpdateProvider,
   platformUpdateEnabled,
   isUpdateEnabledForPlatform,
 };

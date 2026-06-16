@@ -1,8 +1,8 @@
 const { autoUpdater } = require('electron-updater');
 const {
+  githubUpdateProvider,
   isUpdateEnabledForPlatform,
   updateChannel,
-  updateServerUrl,
 } = require('./updateConfig');
 
 const APP_UPDATE_STATE_CHANNEL = 'app-update-state';
@@ -55,14 +55,13 @@ const createUpdateService = ({
 
   const configureUpdater = () => {
     if (!enabled) return;
+    const provider = config.provider || githubUpdateProvider;
+    const channel = config.channel || provider.channel || updateChannel;
+
     updater.autoDownload = false;
     updater.autoInstallOnAppQuit = true;
-    updater.channel = config.channel || updateChannel;
-    updater.setFeedURL({
-      provider: 'generic',
-      url: config.url || updateServerUrl,
-      channel: config.channel || updateChannel,
-    });
+    updater.channel = channel;
+    updater.setFeedURL({ ...provider, channel });
   };
 
   const startChecking = () => {
