@@ -23,9 +23,23 @@ const stripYamlQuotes = (value) => {
   return trimmed;
 };
 
-const parseYamlScalarBlock = (lines, startIndex, baseIndent, style) => {
+const parseYamlScalarHeader = (value) => {
+  const match = value.match(
+    /^([|>])(?:(?:([+-])([1-9])?)|(?:([1-9])([+-])?))?$/,
+  );
+  if (!match) return null;
+
+  return {
+    style: match[1],
+    indentIndicator: Number(match[3] || match[4]) || null,
+  };
+};
+
+const parseYamlScalarBlock = (lines, startIndex, baseIndent, header) => {
   const blockLines = [];
-  let contentIndent = null;
+  let contentIndent = header.indentIndicator
+    ? baseIndent + header.indentIndicator
+    : null;
   let nextIndex = startIndex + 1;
 
   for (; nextIndex < lines.length; nextIndex += 1) {
@@ -37,6 +51,7 @@ const parseYamlScalarBlock = (lines, startIndex, baseIndent, style) => {
 
     const indent = line.match(/^\s*/)?.[0].length || 0;
     if (indent <= baseIndent) break;
+    if (contentIndent !== null && indent < contentIndent) break;
     contentIndent = contentIndent === null ? indent : Math.min(contentIndent, indent);
     blockLines.push(line);
   }
@@ -44,7 +59,7 @@ const parseYamlScalarBlock = (lines, startIndex, baseIndent, style) => {
   const normalizedLines = blockLines.map((line) => (
     line.trim() && contentIndent !== null ? line.slice(contentIndent) : ''
   ));
-  const value = style === '>'
+  const value = header.style === '>'
     ? normalizedLines.map((line) => line.trim()).filter(Boolean).join(' ')
     : normalizedLines.join('\n');
 
@@ -70,8 +85,9 @@ const parseSimpleYamlMetadata = (yamlContent) => {
     const normalizedKey = key.toLowerCase();
     const value = rawValue.trim();
 
-    if (value === '|' || value === '>') {
-      const block = parseYamlScalarBlock(lines, index, indentText.length, value);
+    const scalarHeader = parseYamlScalarHeader(value);
+    if (scalarHeader) {
+      const block = parseYamlScalarBlock(lines, index, indentText.length, scalarHeader);
       metadata[normalizedKey] = block.value;
       index = block.nextIndex;
       continue;

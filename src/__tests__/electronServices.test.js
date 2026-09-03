@@ -134,6 +134,46 @@ describe('electron skill services', () => {
     });
   });
 
+  test('parses folded block scalar descriptions with chomping modifiers', () => {
+    const metadata = parseSkillMarkdownMetadata([
+      '---',
+      'name: orca-cli',
+      'description: >-',
+      '  Use the public `orca` CLI to operate Orca-managed worktrees, folder contexts,',
+      '  terminals, repos, automations, artifacts, skill sharing, worktree comments, and the browser',
+      '  embedded inside the Orca app. Use when the user says "$orca-cli", "use orca cli",',
+      'version: 0.2.0',
+      '---',
+    ].join('\n'));
+
+    expect(metadata).toEqual({
+      name: 'orca-cli',
+      description: [
+        'Use the public `orca` CLI to operate Orca-managed worktrees, folder contexts,',
+        'terminals, repos, automations, artifacts, skill sharing, worktree comments, and the browser',
+        'embedded inside the Orca app. Use when the user says "$orca-cli", "use orca cli",',
+      ].join(' '),
+      version: '0.2.0',
+    });
+  });
+
+  test.each(['|-', '|+', '>-', '>+', '|2-', '|-2', '>2+', '>+2'])(
+    'recognizes the YAML block scalar header %s',
+    (header) => {
+      expect(parseSkillMarkdownMetadata([
+        '---',
+        `description: ${header}`,
+        '  first line',
+        '  second line',
+        'version: 1.0.0',
+        '---',
+      ].join('\n'))).toEqual({
+        description: header.startsWith('>') ? 'first line second line' : 'first line\nsecond line',
+        version: '1.0.0',
+      });
+    },
+  );
+
   test('marks agent skills as managed only when symlink targets the library', async () => {
     const libraryRoot = path.join(tmpDir, 'library');
     const agentRoot = path.join(tmpDir, 'agent');
