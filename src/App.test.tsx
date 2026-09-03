@@ -650,6 +650,60 @@ test('organize scan lists only unmanaged skills and enables hosting after comple
   expect(screen.getByRole('button', { name: '重新扫描' })).toBeInTheDocument();
 });
 
+test('organize scans the default .agents path and stores its skills without linking', async () => {
+  window.history.replaceState(null, '', '/#/local/organize');
+  window.localStorage.setItem('skillpkg.installPath', '/tmp/skills');
+  const migrateSkills = jest.fn(async () => ([
+    { agentId: 'agents-default', skillId: 'shared', ok: true, linked: false },
+  ]));
+  const confirmSpy = jest.spyOn(window, 'confirm').mockReturnValue(true);
+  const loadDefaultOrganizeSkills = jest.fn(async () => ({
+    agentId: 'agents-default',
+    agentName: 'Universal',
+    skillPath: '/Users/test/.agents/skills',
+    skills: [
+      {
+        ...baseSkill,
+        id: 'shared',
+        name: 'Shared Skill',
+        managed: false,
+        agentId: 'agents-default',
+        rootPath: '/Users/test/.agents/skills/shared',
+      },
+    ],
+  }));
+  window.skillpkg = {
+    detectAgents: async () => [],
+    loadSkills: async () => [],
+    loadAgentSkills: async () => [],
+    loadDefaultOrganizeSkills,
+    migrateSkills,
+  } as unknown as typeof window.skillpkg;
+
+  render(
+    <HashRouter>
+      <App />
+    </HashRouter>
+  );
+
+  await screen.findByText('Shared Skill');
+  expect(loadDefaultOrganizeSkills).toHaveBeenCalledWith({ installPath: '/tmp/skills' });
+  expect(screen.getByText('Universal')).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: '托管选中' }));
+  await waitFor(() => expect(migrateSkills).toHaveBeenCalledWith(expect.objectContaining({
+    installPath: '/tmp/skills',
+    items: [expect.objectContaining({
+      agentId: 'agents-default',
+      skillId: 'shared',
+      skillPath: '/Users/test/.agents/skills',
+      rootPath: '/Users/test/.agents/skills/shared',
+    })],
+  })));
+
+  confirmSpy.mockRestore();
+});
+
 test('organize hosting requires confirmation and migrates selected skills', async () => {
   window.location.hash = '#/local/organize';
   window.localStorage.setItem('skillpkg.installPath', '/tmp/skills');

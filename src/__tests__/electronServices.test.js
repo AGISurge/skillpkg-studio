@@ -20,8 +20,10 @@ const { getFilePolicy } = require('../../electron/filePolicy');
 const {
   deleteAgentSkillEntry,
   deleteLibrarySkillEntry,
+  finalizeMigratedSkillSource,
   linkSkillToAgents,
   loadAgentSkills,
+  loadDefaultOrganizeSkills,
   unhostAgentSkillLink,
   uninstallAgentSkillLink,
 } = require('../../electron/agentService');
@@ -33,6 +35,7 @@ const {
 } = require('../../electron/installPathService');
 const {
   AGENT_TOOL_IDS,
+  DEFAULT_ORGANIZE_SKILL_SOURCE,
   detectAgent,
   resolveAgentHomePath,
   resolveAgentSkillPath,
@@ -630,6 +633,63 @@ describe('electron skill services', () => {
     ]);
   });
 
+  test('loads organize candidates from the default ~/.agents/skills path', async () => {
+    const homeDirSpy = jest.spyOn(os, 'homedir').mockReturnValue(tmpDir);
+    try {
+      const skillRoot = path.join(tmpDir, '.agents', 'skills');
+      const skillDir = path.join(skillRoot, 'shared-skill');
+      await fs.mkdir(skillDir, { recursive: true });
+      await fs.writeFile(path.join(skillDir, 'SKILL.md'), '# Shared Skill');
+
+      const result = await loadDefaultOrganizeSkills({
+        installPath: path.join(tmpDir, '.skillpkg', 'skills'),
+      });
+
+      expect(result).toEqual(expect.objectContaining({
+        agentId: 'agents-default',
+        agentName: 'Universal',
+        skillPath: skillRoot,
+      }));
+      expect(result.skills).toEqual([
+        expect.objectContaining({
+          id: 'shared-skill',
+          name: 'Shared Skill',
+          managed: false,
+          rootPath: skillDir,
+        }),
+      ]);
+    } finally {
+      homeDirSpy.mockRestore();
+    }
+  });
+
+  test('finalizes .agents migrations without creating a managed link', async () => {
+    const sourceRoot = path.join(tmpDir, '.agents', 'skills', 'shared-skill');
+    const targetDir = path.join(tmpDir, '.skillpkg', 'skills', 'shared-skill');
+    await fs.mkdir(sourceRoot, { recursive: true });
+    await fs.mkdir(targetDir, { recursive: true });
+    await fs.writeFile(path.join(sourceRoot, 'SKILL.md'), '# Source');
+    await fs.writeFile(path.join(targetDir, 'SKILL.md'), '# Stored');
+
+    const result = await finalizeMigratedSkillSource({
+      agent: {
+        ...DEFAULT_ORGANIZE_SKILL_SOURCE,
+        skillPath: path.dirname(sourceRoot),
+      },
+      skillId: 'shared-skill',
+      sourceRoot,
+      targetDir,
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      agentId: 'agents-default',
+      linked: false,
+    });
+    await expect(fs.lstat(sourceRoot)).rejects.toThrow();
+    await expect(fs.readFile(path.join(targetDir, 'SKILL.md'), 'utf-8')).resolves.toBe('# Stored');
+  });
+
   test('detects agents only from non-empty home directory markers', async () => {
     const homeDirSpy = jest.spyOn(os, 'homedir').mockReturnValue(tmpDir);
     try {
@@ -703,6 +763,27 @@ describe('electron skill services', () => {
     }
   });
 
+  test('resolves the default organize source through USERPROFILE on Windows', () => {
+    const platformSpy = jest.spyOn(os, 'platform').mockReturnValue('win32');
+    const homeDirSpy = jest.spyOn(os, 'homedir').mockReturnValue(tmpDir);
+    const originalUserProfile = process.env.USERPROFILE;
+
+    try {
+      process.env.USERPROFILE = tmpDir;
+      expect(resolveAgentSkillPath(DEFAULT_ORGANIZE_SKILL_SOURCE)).toBe(
+        path.join(tmpDir, '.agents', 'skills'),
+      );
+    } finally {
+      if (originalUserProfile === undefined) {
+        delete process.env.USERPROFILE;
+      } else {
+        process.env.USERPROFILE = originalUserProfile;
+      }
+      platformSpy.mockRestore();
+      homeDirSpy.mockRestore();
+    }
+  });
+
   test('uses the unified Claude (Code) label', async () => {
     const homeDirSpy = jest.spyOn(os, 'homedir').mockReturnValue(tmpDir);
     try {
@@ -732,6 +813,19 @@ describe('electron skill services', () => {
       await expect(validateInstallPathChange({
         fromInstallPath: path.join(tmpDir, '.skillpkg', 'skills'),
         toInstallPath: path.join(tmpDir, '.qoder', 'skills', 'nested'),
+      })).resolves.toEqual({ ok: false, reason: 'agent-directory' });
+    } finally {
+      homeDirSpy.mockRestore();
+    }
+  });
+
+  test('rejects the default .agents directory as the unified install path', async () => {
+    const homeDirSpy = jest.spyOn(os, 'homedir').mockReturnValue(tmpDir);
+    try {
+      await expect(validateInstallPathChange({
+        fromInstallPath: path.join(tmpDir, 'old-library'),
+        toInstallPath: path.join(tmpDir, '.agents', 'skills'),
+        agents: [],
       })).resolves.toEqual({ ok: false, reason: 'agent-directory' });
     } finally {
       homeDirSpy.mockRestore();

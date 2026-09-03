@@ -3,6 +3,7 @@ const fs = require('fs/promises');
 const os = require('os');
 const {
   AGENT_CATALOG,
+  DEFAULT_ORGANIZE_SKILL_SOURCE,
   getAgentConfig,
   resolveAgentHomePath,
   resolveAgentSkillPath,
@@ -32,7 +33,10 @@ const getInstallPathDialogOptions = () => ({
 });
 
 const getProtectedAgentPaths = (agents = []) => {
-  const catalogAgents = Object.values(AGENT_CATALOG);
+  const catalogAgents = [
+    ...Object.values(AGENT_CATALOG),
+    DEFAULT_ORGANIZE_SKILL_SOURCE,
+  ];
   const providedAgents = Array.isArray(agents) ? agents : [];
   const configs = [...catalogAgents, ...providedAgents]
     .map((agent) => getAgentConfig(agent) || agent)

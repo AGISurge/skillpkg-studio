@@ -106,6 +106,23 @@ const AGENT_CATALOG = {
 
 const AGENT_TOOL_IDS = Object.keys(AGENT_CATALOG);
 
+// The cross-agent skills directory is an organize-only source. It is deliberately
+// kept out of AGENT_CATALOG so it does not appear as an install target.
+const DEFAULT_ORGANIZE_SKILL_SOURCE = {
+  id: 'agents-default',
+  name: 'Universal',
+  homePath: {
+    darwin: '~/.agents',
+    win32: '%USERPROFILE%/.agents',
+    other: '~/.agents',
+  },
+  skillPath: {
+    darwin: '~/.agents/skills',
+    win32: '%USERPROFILE%/.agents/skills',
+    other: '~/.agents/skills',
+  },
+};
+
 const getPlatformKey = () => {
   const platform = os.platform();
   if (platform === 'darwin' || platform === 'win32') return platform;
@@ -201,6 +218,7 @@ const getAgentConfig = (agentOrId) => {
 module.exports = {
   AGENT_CATALOG,
   AGENT_TOOL_IDS,
+  DEFAULT_ORGANIZE_SKILL_SOURCE,
   detectAgent,
   getAgentConfig,
   resolveAgentHomePath,

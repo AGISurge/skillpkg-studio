@@ -154,6 +154,28 @@ const mergeOrganizeCandidates = (
   return Array.from(bySkillId.values()).sort((a, b) => a.name.localeCompare(b.name));
 };
 
+const mergeLocalOrganizeScanResult = (
+  current: LocalOrganizeTask,
+  source: Agent,
+  skills: Skill[],
+): LocalOrganizeTask => {
+  if (current.status !== 'scanning') return current;
+  const previousIds = new Set(current.candidates.map((candidate) => candidate.skillId));
+  const candidates = mergeOrganizeCandidates(current.candidates, source, skills);
+  const selectedSkillIds = new Set(current.selectedSkillIds);
+  candidates.forEach((candidate) => {
+    if (!previousIds.has(candidate.skillId)) {
+      selectedSkillIds.add(candidate.skillId);
+    }
+  });
+  return {
+    ...current,
+    candidates,
+    selectedSkillIds,
+    scannedAgentCount: current.scannedAgentCount + 1,
+  };
+};
+
 // --- Toolbar context: pages register their own toolbar actions ---
 
 const ToolbarContext = createContext<ReactNode>(null);
@@ -730,9 +752,15 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       if (!agents.length && agentList.length) {
         startAgentTransition(() => setAgents(agentList));
       }
+      const shouldScanDefaultAgentsPath = Boolean(
+        window.skillpkg.loadDefaultOrganizeSkills,
+      );
       setLocalOrganizeTask((current) => (
         localOrganizeRequestRef.current === requestId
-          ? { ...current, totalAgentCount: agentList.length }
+          ? {
+              ...current,
+              totalAgentCount: agentList.length + (shouldScanDefaultAgentsPath ? 1 : 0),
+            }
           : current
       ));
 
@@ -744,23 +772,26 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         });
         if (localOrganizeRequestRef.current !== requestId) return;
 
-        setLocalOrganizeTask((current) => {
-          if (current.status !== 'scanning') return current;
-          const previousIds = new Set(current.candidates.map((candidate) => candidate.skillId));
-          const candidates = mergeOrganizeCandidates(current.candidates, agent, result?.skills || []);
-          const selectedSkillIds = new Set(current.selectedSkillIds);
-          candidates.forEach((candidate) => {
-            if (!previousIds.has(candidate.skillId)) {
-              selectedSkillIds.add(candidate.skillId);
-            }
-          });
-          return {
-            ...current,
-            candidates,
-            selectedSkillIds,
-            scannedAgentCount: current.scannedAgentCount + 1,
-          };
-        });
+        setLocalOrganizeTask((current) =>
+          mergeLocalOrganizeScanResult(current, agent, result?.skills || []));
+      }
+
+      if (shouldScanDefaultAgentsPath) {
+        if (localOrganizeRequestRef.current !== requestId) return;
+        const result = await window.skillpkg.loadDefaultOrganizeSkills({ installPath });
+        if (localOrganizeRequestRef.current !== requestId) return;
+        const skillPath = result?.skillPath || '';
+        const source: Agent = {
+          id: result?.agentId || 'agents-default',
+          name: result?.agentName || 'Universal',
+          pathMac: skillPath,
+          pathLinux: skillPath,
+          pathWindows: skillPath,
+          skillPath,
+        };
+
+        setLocalOrganizeTask((current) =>
+          mergeLocalOrganizeScanResult(current, source, result?.skills || []));
       }
 
       if (localOrganizeRequestRef.current !== requestId) return;

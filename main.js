@@ -14,9 +14,11 @@ const {
   deleteAgentSkillEntry,
   deleteLibrarySkillEntry,
   ensureAgentSkillLink,
+  finalizeMigratedSkillSource,
   linkSkillToAgents,
   listInstalledAgents,
   loadAgentSkills,
+  loadDefaultOrganizeSkills,
   unhostAgentSkillLink,
   uninstallAgentSkillLink,
 } = require('./electron/agentService');
@@ -611,10 +613,10 @@ const migrateAgentSkillToLibrary = async ({
       };
     }
   }
-  await removeIfExists(sourceRoot);
-  const linkResult = await ensureAgentSkillLink({
+  const linkResult = await finalizeMigratedSkillSource({
     agent: agentConfig,
     skillId: item.skillId,
+    sourceRoot,
     targetDir,
   });
   if (!linkResult.ok) {
@@ -623,6 +625,14 @@ const migrateAgentSkillToLibrary = async ({
       skillId: item.skillId,
       ok: false,
       reason: linkResult.reason,
+    };
+  }
+  if (linkResult.linked === false) {
+    return {
+      agentId: item.agentId,
+      skillId: item.skillId,
+      ok: true,
+      linked: false,
     };
   }
   const markdownMetadata = await getSkillMarkdownMetadata(targetDir);
@@ -867,6 +877,9 @@ const registerIpcHandlers = () => {
     const installPath = legacyAgents ? getDefaultInstallPath() : payload?.installPath;
     return loadAgentSkills({ agents, installPath });
   });
+
+  ipcMain.handle('load-default-organize-skills', async (_event, payload) =>
+    loadDefaultOrganizeSkills(payload || {}));
 
   ipcMain.handle('migrate-skills', async (_event, payload) => {
     const { installPath, items, overwrite, useExisting } = payload || {};

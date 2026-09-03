@@ -28,6 +28,8 @@ contextBridge.exposeInMainWorld('skillpkg', {
   // 检查指定的 Agent 是否安装
   detectAgents: (names) => ipcRenderer.invoke('detect-agents', names),
   loadAgentSkills: (payload) => ipcRenderer.invoke('load-agent-skills', payload),
+  loadDefaultOrganizeSkills: (payload) =>
+    ipcRenderer.invoke('load-default-organize-skills', payload),
   uninstallAgentSkill: (payload) =>
     ipcRenderer.invoke('uninstall-agent-skill', payload),
   deleteAgentSkill: (payload) => ipcRenderer.invoke('delete-agent-skill', payload),

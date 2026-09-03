@@ -272,6 +272,12 @@ declare global {
         installPath?: string;
       }) => Promise<AgentSkillsResult[]>;
       /**
+       * 扫描 ~/.agents/skills（Windows 为 %USERPROFILE%\\.agents\\skills）。
+       */
+      loadDefaultOrganizeSkills: (payload: {
+        installPath?: string;
+      }) => Promise<AgentSkillsResult>;
+      /**
        * 删除指定 Agent 下的 SkillPKG 托管软链接。
        */
       uninstallAgentSkill: (payload: {
@@ -336,6 +342,7 @@ declare global {
           agentId: string;
           skillId: string;
           ok: boolean;
+          linked?: boolean;
           reason?: string;
         }>
       >;

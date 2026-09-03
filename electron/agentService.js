@@ -1,7 +1,12 @@
 const path = require('path');
 const fs = require('fs/promises');
 const os = require('os');
-const { detectAgent, getAgentConfig, resolveAgentSkillPath } = require('./agentCatalog');
+const {
+  DEFAULT_ORGANIZE_SKILL_SOURCE,
+  detectAgent,
+  getAgentConfig,
+  resolveAgentSkillPath,
+} = require('./agentCatalog');
 const {
   ensureDir,
   getDefaultSkillLibraryPath,
@@ -41,6 +46,23 @@ const loadAgentSkills = async ({ agents, installPath }) => {
   );
 };
 
+const loadDefaultOrganizeSkills = async ({ installPath } = {}) => {
+  const skillPath = resolveAgentSkillPath(DEFAULT_ORGANIZE_SKILL_SOURCE);
+  const skills = skillPath
+    ? await loadSkillsFromPath(skillPath, {
+        mode: 'agent',
+        agentId: DEFAULT_ORGANIZE_SKILL_SOURCE.id,
+        installPath,
+      })
+    : [];
+  return {
+    agentId: DEFAULT_ORGANIZE_SKILL_SOURCE.id,
+    agentName: DEFAULT_ORGANIZE_SKILL_SOURCE.name,
+    skillPath,
+    skills,
+  };
+};
+
 const ensureAgentSkillLink = async ({ agent, skillId, targetDir }) => {
   const config = getAgentConfig(agent);
   const skillRoot = resolveAgentSkillPath(config);
@@ -57,6 +79,15 @@ const ensureAgentSkillLink = async ({ agent, skillId, targetDir }) => {
   const linkType = os.platform() === 'win32' ? 'junction' : 'dir';
   await fs.symlink(targetDir, linkPath, linkType);
   return { ok: true, agentId: config.id };
+};
+
+const finalizeMigratedSkillSource = async ({ agent, skillId, sourceRoot, targetDir }) => {
+  const config = getAgentConfig(agent);
+  await removeIfExists(sourceRoot);
+  if (config?.id === DEFAULT_ORGANIZE_SKILL_SOURCE.id) {
+    return { ok: true, agentId: config.id, linked: false };
+  }
+  return ensureAgentSkillLink({ agent: config, skillId, targetDir });
 };
 
 const linkSkillToAgents = async ({ agents, skillId, targetDir }) => {
@@ -250,9 +281,11 @@ module.exports = {
   deleteAgentSkillEntry,
   deleteLibrarySkillEntry,
   ensureAgentSkillLink,
+  finalizeMigratedSkillSource,
   linkSkillToAgents,
   listInstalledAgents,
   loadAgentSkills,
+  loadDefaultOrganizeSkills,
   unhostAgentSkillLink,
   uninstallAgentSkillLink,
 };
