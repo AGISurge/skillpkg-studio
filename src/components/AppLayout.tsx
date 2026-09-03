@@ -130,8 +130,10 @@ const AppLayout = () => {
             onSelectAgent={handleSelectAgent}
             onRefreshAgents={refreshAgents}
             refreshingAgents={refreshingAgents}
-            appUpdateState={appUpdateState}
-            onDownloadAppUpdate={downloadAppUpdate}
+            appUpdateState={appUpdateState?.source === 'manual' ? null : appUpdateState}
+            onDownloadAppUpdate={() => {
+              void downloadAppUpdate('automatic');
+            }}
             isFloating={sidebarFloating}
           />
         </>

@@ -398,6 +398,15 @@
   color: var(--danger-text);
 }
 
+.settings-update-status {
+  color: var(--text-soft);
+  font-size: 12px;
+}
+
+.settings-update-status.error {
+  color: var(--danger-text);
+}
+
 .settings-db-actions {
   display: flex;
   flex-wrap: wrap;

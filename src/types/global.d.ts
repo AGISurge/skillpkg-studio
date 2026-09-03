@@ -19,10 +19,13 @@ export type AppUpdateStatus =
   | 'downloaded'
   | 'error';
 
+export type AppUpdateSource = 'automatic' | 'manual';
+
 export type AppUpdateState = {
   enabled: boolean;
   platform: NodeJS.Platform;
   status: AppUpdateStatus;
+  source: AppUpdateSource;
   currentVersion: string;
   version: string | null;
   percent: number;
@@ -437,9 +440,13 @@ declare global {
        */
       getAppUpdateState: () => Promise<AppUpdateState>;
       /**
+       * 手动检测应用更新。
+       */
+      checkAppUpdate: (options?: { source?: AppUpdateSource }) => Promise<AppUpdateState>;
+      /**
        * 开始后台下载应用更新。
        */
-      downloadAppUpdate: () => Promise<AppUpdateState>;
+      downloadAppUpdate: (options?: { source?: AppUpdateSource }) => Promise<AppUpdateState>;
       /**
        * 立即退出并安装已下载的应用更新。
        */

@@ -49,7 +49,8 @@ contextBridge.exposeInMainWorld('skillpkg', {
   getAgentSkillCounts: (payload) =>
     ipcRenderer.invoke('get-agent-skill-counts', payload),
   getAppUpdateState: () => ipcRenderer.invoke('get-app-update-state'),
-  downloadAppUpdate: () => ipcRenderer.invoke('download-app-update'),
+  checkAppUpdate: (options) => ipcRenderer.invoke('check-app-update', options),
+  downloadAppUpdate: (options) => ipcRenderer.invoke('download-app-update', options),
   installAppUpdateNow: () => ipcRenderer.invoke('install-app-update-now'),
   onAppUpdateState: (callback) => {
     if (typeof callback !== 'function') return () => {};

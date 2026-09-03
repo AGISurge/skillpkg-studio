@@ -36,6 +36,7 @@ test('does not show update button when no app update is available', async () => 
       enabled: true,
       platform: 'darwin',
       status: 'not-available',
+      source: 'automatic',
       currentVersion: '0.1.0',
       version: null,
       percent: 0,
@@ -61,6 +62,7 @@ test('shows update button with version and starts download when clicked', async 
     enabled: true,
     platform: 'darwin',
     status: 'downloading',
+    source: 'automatic',
     currentVersion: '0.1.0',
     version: '0.2.0',
     percent: 0,
@@ -73,6 +75,7 @@ test('shows update button with version and starts download when clicked', async 
       enabled: true,
       platform: 'darwin',
       status: 'available',
+      source: 'automatic',
       currentVersion: '0.1.0',
       version: '0.2.0',
       percent: 0,
@@ -101,6 +104,7 @@ test('shows update ready dialog and installs when confirmed', async () => {
     enabled: true,
     platform: 'darwin',
     status: 'downloaded',
+    source: 'automatic',
     currentVersion: '0.1.0',
     version: '0.2.0',
     percent: 100,
@@ -113,6 +117,7 @@ test('shows update ready dialog and installs when confirmed', async () => {
       enabled: true,
       platform: 'darwin',
       status: 'downloaded',
+      source: 'automatic',
       currentVersion: '0.1.0',
       version: '0.2.0',
       percent: 100,
@@ -131,6 +136,135 @@ test('shows update ready dialog and installs when confirmed', async () => {
   expect(await screen.findByText('更新已下载')).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: '关闭并更新' }));
 
+  expect(installAppUpdateNow).toHaveBeenCalledTimes(1);
+});
+
+test('uses settings as the only update UI after a manual download starts', async () => {
+  window.location.hash = '#/settings';
+  const downloadAppUpdate = jest.fn(async () => ({
+    enabled: true,
+    platform: 'darwin' as const,
+    status: 'downloaded' as const,
+    source: 'manual' as const,
+    currentVersion: '0.1.0',
+    version: '1.1.0',
+    percent: 100,
+    error: null,
+  }));
+  window.skillpkg = {
+    detectAgents: async () => [],
+    loadSkills: async () => [],
+    getDbInfo: async () => ({ path: '/tmp/skillpkg.db', ok: true, error: null }),
+    getAppUpdateState: async () => ({
+      enabled: true,
+      platform: 'darwin',
+      status: 'available',
+      source: 'automatic',
+      currentVersion: '0.1.0',
+      version: '1.1.0',
+      percent: 0,
+      error: null,
+    }),
+    checkAppUpdate: async () => ({
+      enabled: true,
+      platform: 'darwin',
+      status: 'available',
+      source: 'manual',
+      currentVersion: '0.1.0',
+      version: '1.1.0',
+      percent: 0,
+      error: null,
+    }),
+    downloadAppUpdate,
+    installAppUpdateNow: async () => ({
+      enabled: true,
+      platform: 'darwin',
+      status: 'downloaded',
+      source: 'manual',
+      currentVersion: '0.1.0',
+      version: '1.1.0',
+      percent: 100,
+      error: null,
+    }),
+    onAppUpdateState: () => jest.fn(),
+  } as unknown as typeof window.skillpkg;
+
+  render(
+    <HashRouter>
+      <App />
+    </HashRouter>
+  );
+
+  fireEvent.click(await screen.findByRole('button', { name: '下载更新' }));
+  expect(await screen.findByRole('button', {
+    name: 'v1.1.0已就绪，重启更新',
+  })).toBeInTheDocument();
+  expect(downloadAppUpdate).toHaveBeenCalledWith({ source: 'manual' });
+  expect(screen.queryByText('更新已下载')).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: '已下载 v1.1.0' })).not.toBeInTheDocument();
+});
+
+test('keeps restart update available in settings after postponing an automatic update', async () => {
+  window.location.hash = '#/settings';
+  const installAppUpdateNow = jest.fn(async () => ({
+    enabled: true,
+    platform: 'darwin' as const,
+    status: 'downloaded' as const,
+    source: 'automatic' as const,
+    currentVersion: '0.1.0',
+    version: '1.1.0',
+    percent: 100,
+    error: null,
+  }));
+  window.skillpkg = {
+    detectAgents: async () => [],
+    loadSkills: async () => [],
+    getDbInfo: async () => ({ path: '/tmp/skillpkg.db', ok: true, error: null }),
+    getAppUpdateState: async () => ({
+      enabled: true,
+      platform: 'darwin',
+      status: 'downloaded',
+      source: 'automatic',
+      currentVersion: '0.1.0',
+      version: '1.1.0',
+      percent: 100,
+      error: null,
+    }),
+    checkAppUpdate: async () => ({
+      enabled: true,
+      platform: 'darwin',
+      status: 'downloaded',
+      source: 'manual',
+      currentVersion: '0.1.0',
+      version: '1.1.0',
+      percent: 100,
+      error: null,
+    }),
+    downloadAppUpdate: async () => ({
+      enabled: true,
+      platform: 'darwin',
+      status: 'downloaded',
+      source: 'automatic',
+      currentVersion: '0.1.0',
+      version: '1.1.0',
+      percent: 100,
+      error: null,
+    }),
+    installAppUpdateNow,
+    onAppUpdateState: () => jest.fn(),
+  } as unknown as typeof window.skillpkg;
+
+  render(
+    <HashRouter>
+      <App />
+    </HashRouter>
+  );
+
+  expect(await screen.findByText('更新已下载')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: '稍后，下次启动更新' }));
+  fireEvent.click(screen.getByRole('button', {
+    name: 'v1.1.0已就绪，重启更新',
+  }));
   expect(installAppUpdateNow).toHaveBeenCalledTimes(1);
 });
 

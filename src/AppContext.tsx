@@ -16,7 +16,7 @@ import type {
   Skill,
   SkillFile,
 } from './types/models';
-import type { AppUpdateState } from './types/global';
+import type { AppUpdateSource, AppUpdateState } from './types/global';
 import { getFilePolicy, validateSkill } from './utils/skillUtils';
 import { AGENT_CATALOG, AGENT_TOOL_IDS } from './config/agents';
 import type { AgentId } from './config/agents';
@@ -305,7 +305,8 @@ type AppContextValue = {
   closeInstallPathChangeDialog: () => void;
   handleToggleFolder: (path: string) => void;
   refreshAgents: () => Promise<void>;
-  downloadAppUpdate: () => Promise<void>;
+  checkAppUpdate: () => Promise<void>;
+  downloadAppUpdate: (source?: AppUpdateSource) => Promise<void>;
   installAppUpdateNow: () => Promise<void>;
   dismissUpdateReadyDialog: () => void;
   startLocalOrganizeScan: () => Promise<void>;
@@ -446,6 +447,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   const updateReadyDialogOpen =
     appUpdateState?.status === 'downloaded' &&
+    appUpdateState.source !== 'manual' &&
     getUpdateReadyKey(appUpdateState) !== dismissedUpdateReadyKey;
 
   const getSkillNoticeScope = useCallback((skill?: Skill | null): NoticeScope => {
@@ -484,7 +486,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   useEffect(() => {
-    if (!appUpdateState?.error || appUpdateState.status !== 'available') return;
+    if (
+      !appUpdateState?.error ||
+      appUpdateState.status !== 'available' ||
+      appUpdateState.source === 'manual'
+    ) return;
     const key = `${appUpdateState.version || ''}:${appUpdateState.error}`;
     if (key === lastUpdateErrorKey) return;
     setLastUpdateErrorKey(key);
@@ -619,19 +625,47 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     syncInstalledByAgent,
   ]);
 
-  const downloadAppUpdate = useCallback(async () => {
+  const checkAppUpdate = useCallback(async () => {
+    if (!window?.skillpkg?.checkAppUpdate) return;
+    try {
+      const state = await window.skillpkg.checkAppUpdate({ source: 'manual' });
+      setAppUpdateState(state);
+    } catch (_error) {
+      setAppUpdateState((current) => current ? {
+        ...current,
+        status: 'error',
+        source: 'manual',
+        error: '更新检测失败，请稍后重试。',
+      } : current);
+    }
+  }, []);
+
+  const downloadAppUpdate = useCallback(async (
+    source: AppUpdateSource = 'automatic',
+  ) => {
     if (!window?.skillpkg?.downloadAppUpdate) {
-      showNotice('当前环境不支持应用更新。', 'global');
+      if (source === 'automatic') {
+        showNotice('当前环境不支持应用更新。', 'global');
+      }
       return;
     }
     try {
-      const state = await window.skillpkg.downloadAppUpdate();
+      const state = await window.skillpkg.downloadAppUpdate({ source });
       setAppUpdateState(state);
-      if (state.error) {
+      if (state.error && source === 'automatic') {
         showNotice('更新下载失败，请稍后重试。', 'global');
       }
     } catch (_error) {
-      showNotice('更新下载失败，请稍后重试。', 'global');
+      if (source === 'automatic') {
+        showNotice('更新下载失败，请稍后重试。', 'global');
+      } else {
+        setAppUpdateState((current) => current ? {
+          ...current,
+          status: current.version ? 'available' : 'error',
+          source: 'manual',
+          error: '更新下载失败，请稍后重试。',
+        } : current);
+      }
     }
   }, [showNotice]);
 
@@ -2022,6 +2056,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     closeInstallPathChangeDialog,
     handleToggleFolder,
     refreshAgents,
+    checkAppUpdate,
     downloadAppUpdate,
     installAppUpdateNow,
     dismissUpdateReadyDialog,

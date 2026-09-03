@@ -7,10 +7,14 @@ const {
 
 const APP_UPDATE_STATE_CHANNEL = 'app-update-state';
 
+const normalizeSource = (source, fallback = 'automatic') =>
+  source === 'manual' || source === 'automatic' ? source : fallback;
+
 const createInitialState = ({ app, platform, enabled }) => ({
   enabled,
   platform,
   status: enabled ? 'idle' : 'disabled',
+  source: 'automatic',
   currentVersion: app.getVersion(),
   version: null,
   percent: 0,
@@ -42,7 +46,8 @@ const createUpdateService = ({
       ? config.enabled
       : isUpdateEnabledForPlatform(platform));
   let state = createInitialState({ app, platform, enabled });
-  let checkingStarted = false;
+  let initialCheckStarted = false;
+  let checking = false;
   let downloading = false;
 
   const setState = (patch) => {
@@ -64,34 +69,63 @@ const createUpdateService = ({
     updater.setFeedURL({ ...provider, channel });
   };
 
-  const startChecking = () => {
-    if (!enabled || checkingStarted) return state;
-    checkingStarted = true;
-
+  const checkForUpdates = async ({ source = 'manual' } = {}) => {
+    const nextSource = normalizeSource(source, state.source);
+    if (!enabled) return state;
+    if (checking) {
+      if (nextSource === 'manual' && state.source !== 'manual') {
+        return setState({ source: 'manual' });
+      }
+      return state;
+    }
+    if (downloading || state.status === 'downloaded') return state;
+    checking = true;
     const recordError = (error) => {
+      checking = false;
       setState({
         status: 'error',
+        source: state.source === 'manual' ? 'manual' : nextSource,
         error: error?.message || String(error),
       });
     };
 
     try {
       configureUpdater();
-      setState({ status: 'checking', error: null });
-      Promise.resolve(updater.checkForUpdates()).catch(recordError);
+      setState({
+        status: 'checking',
+        source: nextSource,
+        version: null,
+        percent: 0,
+        error: null,
+      });
+      await updater.checkForUpdates();
     } catch (error) {
       recordError(error);
+    } finally {
+      checking = false;
     }
 
     return state;
   };
 
-  const downloadUpdate = async () => {
+  const startChecking = () => {
+    if (!enabled || initialCheckStarted) return state;
+    initialCheckStarted = true;
+    void checkForUpdates({ source: 'automatic' });
+    return state;
+  };
+
+  const downloadUpdate = async ({ source } = {}) => {
     if (!enabled) return state;
     if (downloading) return state;
-    if (state.status !== 'available' && state.status !== 'error') return state;
+    if (state.status !== 'available') return state;
     downloading = true;
-    setState({ status: 'downloading', percent: 0, error: null });
+    setState({
+      status: 'downloading',
+      source: normalizeSource(source, state.source),
+      percent: 0,
+      error: null,
+    });
     try {
       await updater.downloadUpdate();
     } catch (error) {
@@ -117,6 +151,7 @@ const createUpdateService = ({
   });
 
   updater.on('update-available', (info) => {
+    checking = false;
     const updateInfo = normalizeUpdateInfo(info);
     setState({
       status: 'available',
@@ -127,6 +162,7 @@ const createUpdateService = ({
   });
 
   updater.on('update-not-available', () => {
+    checking = false;
     setState({ status: 'not-available', version: null, percent: 0, error: null });
   });
 
@@ -150,6 +186,7 @@ const createUpdateService = ({
   });
 
   updater.on('error', (error) => {
+    checking = false;
     downloading = false;
     const nextStatus =
       state.status === 'downloading' || state.version ? 'available' : 'error';
@@ -161,6 +198,7 @@ const createUpdateService = ({
 
   return {
     startChecking,
+    checkForUpdates,
     downloadUpdate,
     installNow,
     getState,
@@ -169,7 +207,10 @@ const createUpdateService = ({
 
 const registerUpdateIpcHandlers = ({ ipcMain, updateService }) => {
   ipcMain.handle('get-app-update-state', async () => updateService.getState());
-  ipcMain.handle('download-app-update', async () => updateService.downloadUpdate());
+  ipcMain.handle('check-app-update', async (_event, options) =>
+    updateService.checkForUpdates(options));
+  ipcMain.handle('download-app-update', async (_event, options) =>
+    updateService.downloadUpdate(options));
   ipcMain.handle('install-app-update-now', async () => updateService.installNow());
 };
 

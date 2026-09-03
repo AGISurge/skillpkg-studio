@@ -15,7 +15,7 @@ const githubUpdateProvider = {
 const platformUpdateEnabled = {
   darwin: true,
   win32: true,
-  linux: false,
+  linux: true,
 };
 
 const isUpdateEnabledForPlatform = (platform = process.platform) =>

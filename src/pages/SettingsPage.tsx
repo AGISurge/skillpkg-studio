@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { ComponentType } from "react";
 import {
+  ArrowClockwiseRegular,
   ArrowDownloadRegular,
   ArrowUploadRegular,
   DesktopRegular,
@@ -45,14 +46,23 @@ const formatBytes = (value?: number) => {
   return `${(value / 1024 / 1024).toFixed(1)} MB`;
 };
 
+const getDisplayVersion = (version?: string | null) => {
+  if (!version) return "";
+  return version.startsWith("v") ? version : `v${version}`;
+};
+
 const SettingsPage = () => {
   const {
     theme,
     apiKey,
     installPath,
+    appUpdateState,
     setTheme,
     setApiKey,
     handleSelectInstallPath,
+    checkAppUpdate,
+    downloadAppUpdate,
+    installAppUpdateNow,
   } = useAppContext();
   const [apiKeyVisible, setApiKeyVisible] = useState(false);
   const [dbInfo, setDbInfo] = useState<DbInfo | null>(null);
@@ -108,6 +118,60 @@ const SettingsPage = () => {
       setDbActionPending(false);
     }
   };
+
+  const updateBridgeAvailable = Boolean(window.skillpkg?.checkAppUpdate);
+  const updateStatus = appUpdateState?.status;
+  const updatePending = updateStatus === "checking" || updateStatus === "downloading";
+  const updateDisabled = !updateBridgeAvailable || !appUpdateState?.enabled || updatePending;
+  const currentVersion = getDisplayVersion(appUpdateState?.currentVersion);
+  const availableVersion = getDisplayVersion(appUpdateState?.version);
+
+  const getUpdateButtonLabel = () => {
+    if (!updateBridgeAvailable || appUpdateState?.enabled === false) {
+      return "当前环境不支持更新";
+    }
+    if (!appUpdateState) return "正在读取版本";
+    if (updateStatus === "checking") return "正在检测";
+    if (updateStatus === "available") return "下载更新";
+    if (updateStatus === "downloading") {
+      const percent = Math.round(appUpdateState.percent || 0);
+      return percent > 0 ? `下载中 ${percent}%` : "下载中";
+    }
+    if (updateStatus === "downloaded") {
+      return `${availableVersion || "新版本"}已就绪，重启更新`;
+    }
+    if (updateStatus === "error") return "重新检测";
+    return "检测新版本";
+  };
+
+  const getUpdateStatusMessage = () => {
+    if (updateStatus === "not-available") return "当前已是最新版本。";
+    if (updateStatus === "error") return "更新检测失败，请稍后重试。";
+    if (updateStatus === "available" && appUpdateState?.error) {
+      return "更新下载失败，请稍后重试。";
+    }
+    if (updateStatus === "available" && availableVersion) {
+      return `发现新版本 ${availableVersion}。`;
+    }
+    if (updateStatus === "downloaded") {
+      return "新版本已下载完成，可立即重启安装。";
+    }
+    return "";
+  };
+
+  const handleAppUpdate = async () => {
+    if (updateStatus === "available") {
+      await downloadAppUpdate("manual");
+      return;
+    }
+    if (updateStatus === "downloaded") {
+      await installAppUpdateNow();
+      return;
+    }
+    await checkAppUpdate();
+  };
+
+  const updateStatusMessage = getUpdateStatusMessage();
 
   return (
     <div className="settings-page">
@@ -250,6 +314,42 @@ const SettingsPage = () => {
         )}
         {dbStatus && (
           <div className="settings-db-status">{dbStatus}</div>
+        )}
+      </section>
+
+      <section className="settings-section">
+        <div className="settings-section-head">
+          <div>
+            <h2>版本</h2>
+            <p>当前版本 {currentVersion || "正在读取"}</p>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            className={updatePending ? "loading" : ""}
+            disabled={updateDisabled}
+            aria-busy={updatePending}
+            onClick={() => {
+              void handleAppUpdate();
+            }}
+          >
+            {updatePending ? (
+              <span className="mini-spinner" aria-hidden="true" />
+            ) : updateStatus === "downloaded" ? (
+              <ArrowClockwiseRegular className="icon" />
+            ) : (
+              <ArrowDownloadRegular className="icon" />
+            )}
+            {getUpdateButtonLabel()}
+          </Button>
+        </div>
+        {updateStatusMessage && (
+          <div
+            className={`settings-update-status ${appUpdateState?.error ? "error" : ""}`}
+            role={appUpdateState?.error ? "alert" : "status"}
+          >
+            {updateStatusMessage}
+          </div>
         )}
       </section>
     </div>
