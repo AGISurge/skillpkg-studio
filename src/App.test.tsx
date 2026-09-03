@@ -4,6 +4,7 @@ import { HashRouter } from 'react-router-dom';
 import App from './App';
 import ImportSkillDropdown from './components/ImportSkillDropdown';
 import SkillDeleteConfirmDialog from './components/SkillDeleteConfirmDialog';
+import { DiscoverMarkdownImage } from './pages/DiscoverDetailPage';
 import SkillsPage from './pages/SkillsPage';
 import type { Skill } from './types/models';
 
@@ -281,6 +282,18 @@ test('shows discover api key prompt when no api key is configured', async () => 
   );
 
   expect(await screen.findByText('请先在设置页配置 SkillPKG API Key。')).toBeInTheDocument();
+});
+
+test('does not send a referrer when loading images in discover skill details', () => {
+  render(
+    <DiscoverMarkdownImage
+      src="https://assets.example.test/preview.png"
+      alt="Remote preview"
+    />,
+  );
+
+  expect(screen.getByRole('img', { name: 'Remote preview' }))
+    .toHaveAttribute('referrerpolicy', 'no-referrer');
 });
 
 test('does not search discovery list while Chinese IME composition is active', async () => {

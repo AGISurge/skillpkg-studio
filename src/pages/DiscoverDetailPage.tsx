@@ -8,7 +8,7 @@ import {
   WarningRegular,
 } from '@fluentui/react-icons';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { AnchorHTMLAttributes, MouseEvent } from 'react';
+import type { AnchorHTMLAttributes, ImgHTMLAttributes, MouseEvent } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { useLocation, useParams } from 'react-router-dom';
 import rehypeHighlight from 'rehype-highlight';
@@ -88,6 +88,18 @@ const getExternalLabel = (value: string) => {
 type MarkdownLinkProps = AnchorHTMLAttributes<HTMLAnchorElement> & {
   node?: unknown;
 };
+
+type MarkdownImageProps = ImgHTMLAttributes<HTMLImageElement> & {
+  node?: unknown;
+};
+
+export const DiscoverMarkdownImage = ({
+  node: _node,
+  alt = '',
+  ...props
+}: MarkdownImageProps) => (
+  <img {...props} alt={alt} referrerPolicy="no-referrer" />
+);
 
 const getInitialExpandedFolders = (nodes: SkillpkgFileNode[], rootPath: string) => {
   const next = new Set<string>([rootPath]);
@@ -352,6 +364,7 @@ const DiscoverDetailPage = () => {
   }, [openExternalUrl]);
   const markdownComponents = useMemo(() => ({
     a: renderExternalLink,
+    img: DiscoverMarkdownImage,
   }), [renderExternalLink]);
 
   const handleDownload = async () => {
@@ -375,7 +388,6 @@ const DiscoverDetailPage = () => {
       ) : displayDetail ? (
         <div className="discover-detail-grid">
           <main className="discover-detail-main">
-            <div className="discover-detail-md-label">SKILL.md</div>
             {markdownContent ? (
               <ReactMarkdown
                 remarkPlugins={markdownRemarkPlugins}
