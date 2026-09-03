@@ -8,6 +8,9 @@ module.exports = {
     app: '.electron-build/app',
     output: 'dist',
   },
+  // GitHub rewrites spaces in uploaded asset names. Keep updater metadata and
+  // release asset names identical by generating a GitHub-safe name up front.
+  artifactName: 'SkillPKG-Studio-${version}-${arch}.${ext}',
   compression: 'maximum',
   beforeBuild: async () => false,
   files: [

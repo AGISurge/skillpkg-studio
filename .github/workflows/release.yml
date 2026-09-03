@@ -231,6 +231,35 @@ jobs:
         shell: bash
         run: find release-artifacts -maxdepth 1 -type f -print | sort
 
+      - name: Validate updater metadata references
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+
+          metadata_files=(release-artifacts/latest*.yml)
+          if (( ${#metadata_files[@]} == 0 )); then
+            echo "No updater metadata files were produced." >&2
+            exit 1
+          fi
+
+          for metadata in "${metadata_files[@]}"; do
+            while IFS= read -r artifact; do
+              artifact="${artifact#\"}"
+              artifact="${artifact%\"}"
+              artifact="${artifact#\'}"
+              artifact="${artifact%\'}"
+
+              if [[ "${artifact}" == */* || ! -f "release-artifacts/${artifact}" ]]; then
+                echo "${metadata} references missing release artifact: ${artifact}" >&2
+                exit 1
+              fi
+            done < <(
+              sed -nE 's/^[[:space:]]*(- url:|path:)[[:space:]]+(.+)[[:space:]]*$/\2/p' "${metadata}" \
+                | sort -u
+            )
+          done
+
       - name: Create or update GitHub Release
         shell: bash
         run: |
