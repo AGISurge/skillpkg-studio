@@ -248,10 +248,13 @@ const getSymlinkTargetPath = async (entryPath) => {
 const getDirectoryTargetInfo = async (entryPath, managedRootPaths) => {
   const lstat = await fs.lstat(entryPath);
   const isLinked = lstat.isSymbolicLink();
-  const stat = isLinked ? await fs.stat(entryPath).catch(() => null) : lstat;
-  if (!stat?.isDirectory()) return null;
   const symlinkTargetPath = isLinked ? await getSymlinkTargetPath(entryPath) : null;
-  const realPath = await normalizeRealPath(entryPath).catch(() => entryPath);
+  const stat = isLinked ? await fs.stat(entryPath).catch(() => null) : lstat;
+  const broken = Boolean(isLinked && !stat);
+  if (!stat?.isDirectory() && !broken) return null;
+  const realPath = broken
+    ? symlinkTargetPath || entryPath
+    : await normalizeRealPath(entryPath).catch(() => entryPath);
   const managed = Boolean(
     isLinked &&
     (
@@ -261,6 +264,7 @@ const getDirectoryTargetInfo = async (entryPath, managedRootPaths) => {
   );
   return {
     isLinked,
+    broken,
     managed,
     realPath,
     linkTarget: symlinkTargetPath || (isLinked ? realPath : null),
@@ -276,11 +280,20 @@ const loadSkillsFromPath = async (skillRoot, options = {}) => {
     const entryPath = path.join(skillRoot, entry.name);
     const targetInfo = await getDirectoryTargetInfo(entryPath, managedRootPaths).catch(() => null);
     if (!targetInfo) continue;
+    let skillReadPath = entryPath;
+    if (targetInfo.broken) {
+      if (!options.includeBrokenRepairCandidates) continue;
+      const managedFallback = options.installPath
+        ? path.join(options.installPath, entry.name)
+        : null;
+      if (!managedFallback || !await hasSkillMarkdown(managedFallback)) continue;
+      skillReadPath = managedFallback;
+    }
     const source =
       options.mode === 'agent'
         ? targetInfo.managed ? 'managed' : 'agent'
         : 'library';
-    const skill = await readSkillFromDir(entryPath, entry.name, {
+    const skill = await readSkillFromDir(skillReadPath, entry.name, {
       agentId: options.agentId,
       source,
       managed: targetInfo.managed,
@@ -288,7 +301,14 @@ const loadSkillsFromPath = async (skillRoot, options = {}) => {
       linkTarget: targetInfo.linkTarget,
       fileContentMode: options.fileContentMode || (options.mode === 'agent' ? 'skill-md-only' : 'all'),
     });
-    if (skill) skills.push(skill);
+    if (skill) {
+      skills.push({
+        ...skill,
+        rootPath: entryPath,
+        realPath: targetInfo.realPath,
+        linkTarget: targetInfo.linkTarget,
+      });
+    }
   }
   return skills.sort((a, b) => a.name.localeCompare(b.name));
 };

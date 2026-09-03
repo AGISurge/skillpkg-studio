@@ -20,6 +20,7 @@ const { getFilePolicy } = require('../../electron/filePolicy');
 const {
   deleteAgentSkillEntry,
   deleteLibrarySkillEntry,
+  ensureAgentSkillLink,
   finalizeMigratedSkillSource,
   linkSkillToAgents,
   loadAgentSkills,
@@ -27,6 +28,7 @@ const {
   unhostAgentSkillLink,
   uninstallAgentSkillLink,
 } = require('../../electron/agentService');
+const { migrateSkillsToLibrary } = require('../../electron/organizeService');
 const {
   getInstallPathDialogOptions,
   migrateInstallPath,
@@ -260,6 +262,53 @@ describe('electron skill services', () => {
     });
   });
 
+  test('omits a broken agent link from a normal agent scan', async () => {
+    const libraryRoot = path.join(tmpDir, 'library');
+    const agentRoot = path.join(tmpDir, 'agent');
+    const missingSource = path.join(tmpDir, '.agents', 'skills', 'shared');
+    const managedSkill = path.join(libraryRoot, 'shared');
+    const agentLink = path.join(agentRoot, 'shared');
+    await fs.mkdir(managedSkill, { recursive: true });
+    await fs.mkdir(agentRoot, { recursive: true });
+    await fs.writeFile(path.join(managedSkill, 'SKILL.md'), '# Shared');
+    await fs.symlink(missingSource, agentLink, 'dir');
+
+    await expect(loadSkillsFromPath(agentRoot, {
+      mode: 'agent',
+      agentId: 'claude',
+      installPath: libraryRoot,
+    })).resolves.toEqual([]);
+  });
+
+  test('loads a broken agent link as a repair candidate during an organize scan', async () => {
+    const libraryRoot = path.join(tmpDir, 'library');
+    const agentRoot = path.join(tmpDir, 'agent');
+    const missingSource = path.join(tmpDir, '.agents', 'skills', 'shared');
+    const managedSkill = path.join(libraryRoot, 'shared');
+    const agentLink = path.join(agentRoot, 'shared');
+    await fs.mkdir(managedSkill, { recursive: true });
+    await fs.mkdir(agentRoot, { recursive: true });
+    await fs.writeFile(path.join(managedSkill, 'SKILL.md'), '# Shared');
+    await fs.symlink(missingSource, agentLink, 'dir');
+
+    const [skill] = await loadSkillsFromPath(agentRoot, {
+      mode: 'agent',
+      agentId: 'claude',
+      installPath: libraryRoot,
+      includeBrokenRepairCandidates: true,
+    });
+
+    expect(skill).toEqual(expect.objectContaining({
+      id: 'shared',
+      name: 'Shared',
+      source: 'agent',
+      managed: false,
+      rootPath: agentLink,
+      realPath: missingSource,
+      linkTarget: missingSource,
+    }));
+  });
+
   test('loads only SKILL.md content for agent skill scans', async () => {
     const agentRoot = path.join(tmpDir, 'agent');
     const skillRoot = path.join(agentRoot, 'large-skill');
@@ -420,6 +469,130 @@ describe('electron skill services', () => {
     await expect(fs.realpath(path.join(agentRootB, 'shared'))).resolves.toBe(realTargetDir);
   });
 
+  test('replaces a broken agent symlink when linking a managed skill', async () => {
+    const libraryRoot = path.join(tmpDir, 'library');
+    const targetDir = path.join(libraryRoot, 'shared');
+    const agentRoot = path.join(tmpDir, 'agent');
+    const agentLink = path.join(agentRoot, 'shared');
+    await fs.mkdir(targetDir, { recursive: true });
+    await fs.mkdir(agentRoot, { recursive: true });
+    await fs.writeFile(path.join(targetDir, 'SKILL.md'), '# Shared');
+    await fs.symlink(path.join(tmpDir, 'missing', 'shared'), agentLink, 'dir');
+
+    const result = await ensureAgentSkillLink({
+      agent: {
+        id: 'test-agent',
+        name: 'Test Agent',
+        pathMac: agentRoot,
+        pathWindows: agentRoot,
+      },
+      skillId: 'shared',
+      targetDir,
+    });
+
+    expect(result).toEqual({ ok: true, agentId: 'test-agent' });
+    await expect(fs.realpath(agentLink)).resolves.toBe(await fs.realpath(targetDir));
+  });
+
+  test('migrates a Universal source and its Agent alias without concurrent copies', async () => {
+    const libraryRoot = path.join(tmpDir, 'library');
+    const universalRoot = path.join(tmpDir, '.agents', 'skills');
+    const sourceRoot = path.join(universalRoot, 'shared');
+    const agentRoot = path.join(tmpDir, '.claude', 'skills');
+    const agentLink = path.join(agentRoot, 'shared');
+    const targetDir = path.join(libraryRoot, 'shared');
+    const linkedRecords = [];
+    await fs.mkdir(sourceRoot, { recursive: true });
+    await fs.mkdir(agentRoot, { recursive: true });
+    await fs.writeFile(path.join(sourceRoot, 'SKILL.md'), [
+      '---',
+      'name: shared',
+      'version: 1.2.3',
+      '---',
+      '# Shared',
+    ].join('\n'));
+    await fs.symlink(sourceRoot, agentLink, 'dir');
+
+    const results = await migrateSkillsToLibrary({
+      installPath: libraryRoot,
+      // Put Universal first to verify the service still rewires Agent aliases first.
+      items: [
+        {
+          agentId: DEFAULT_ORGANIZE_SKILL_SOURCE.id,
+          skillId: 'shared',
+          pathMac: universalRoot,
+          pathWindows: universalRoot,
+          skillPath: universalRoot,
+          rootPath: sourceRoot,
+        },
+        {
+          agentId: 'test-agent',
+          skillId: 'shared',
+          pathMac: agentRoot,
+          pathWindows: agentRoot,
+          skillPath: agentRoot,
+          rootPath: agentLink,
+        },
+      ],
+      onLinked: async (record) => linkedRecords.push(record),
+    });
+
+    expect(results).toEqual([
+      expect.objectContaining({
+        agentId: DEFAULT_ORGANIZE_SKILL_SOURCE.id,
+        skillId: 'shared',
+        ok: true,
+        linked: false,
+      }),
+      expect.objectContaining({ agentId: 'test-agent', skillId: 'shared', ok: true }),
+    ]);
+    await expect(fs.lstat(sourceRoot)).rejects.toThrow();
+    await expect(fs.realpath(agentLink)).resolves.toBe(await fs.realpath(targetDir));
+    await expect(fs.readFile(path.join(targetDir, 'SKILL.md'), 'utf-8')).resolves.toContain('# Shared');
+    expect(linkedRecords).toEqual([
+      expect.objectContaining({
+        skillId: 'shared',
+        agentId: 'test-agent',
+        version: '1.2.3',
+      }),
+    ]);
+  });
+
+  test('repairs a broken Agent link by reusing an existing managed copy', async () => {
+    const libraryRoot = path.join(tmpDir, 'library');
+    const targetDir = path.join(libraryRoot, 'shared');
+    const agentRoot = path.join(tmpDir, 'agent');
+    const agentLink = path.join(agentRoot, 'shared');
+    const item = {
+      agentId: 'test-agent',
+      skillId: 'shared',
+      pathMac: agentRoot,
+      pathWindows: agentRoot,
+      skillPath: agentRoot,
+      rootPath: agentLink,
+    };
+    await fs.mkdir(targetDir, { recursive: true });
+    await fs.mkdir(agentRoot, { recursive: true });
+    await fs.writeFile(path.join(targetDir, 'SKILL.md'), '# Shared');
+    await fs.symlink(path.join(tmpDir, 'missing', 'shared'), agentLink, 'dir');
+
+    await expect(migrateSkillsToLibrary({
+      installPath: libraryRoot,
+      items: [item],
+    })).resolves.toEqual([
+      expect.objectContaining({ ok: false, reason: 'exists' }),
+    ]);
+
+    await expect(migrateSkillsToLibrary({
+      installPath: libraryRoot,
+      items: [item],
+      useExisting: true,
+    })).resolves.toEqual([
+      expect.objectContaining({ ok: true, agentId: 'test-agent', skillId: 'shared' }),
+    ]);
+    await expect(fs.realpath(agentLink)).resolves.toBe(await fs.realpath(targetDir));
+  });
+
   test('reports partial success without hiding successful agent links', async () => {
     const libraryRoot = path.join(tmpDir, 'library');
     const targetDir = path.join(libraryRoot, 'shared');
@@ -570,13 +743,36 @@ describe('electron skill services', () => {
     expect(resolveAgentSkillPath('codebuddy')).toBe(path.join(os.homedir(), '.codebuddy', 'skills'));
     expect(resolveAgentSkillPath('workbuddy')).toBe(path.join(os.homedir(), '.workbuddy', 'skills'));
     expect(resolveAgentSkillPath('trae')).toBe(path.join(os.homedir(), '.trae', 'skills'));
+    expect(resolveAgentSkillPath('pi')).toBe(path.join(os.homedir(), '.pi', 'agent', 'skills'));
+    expect(resolveAgentSkillPath('opencode')).toBe(
+      path.join(os.homedir(), '.config', 'opencode', 'skills'),
+    );
+    expect(resolveAgentSkillPath('gemini')).toBe(path.join(os.homedir(), '.gemini', 'skills'));
+    expect(resolveAgentSkillPath('copilot')).toBe(path.join(os.homedir(), '.copilot', 'skills'));
+    expect(resolveAgentSkillPath('grok')).toBe(path.join(os.homedir(), '.grok', 'skills'));
+    expect(resolveAgentSkillPath('qwenworkcn')).toBe(
+      path.join(os.homedir(), '.qwenworkcn', 'skills'),
+    );
+    expect(resolveAgentSkillPath('qwen')).toBe(path.join(os.homedir(), '.qwen', 'skills'));
   });
 
-  test('includes qoder, codebuddy, workbuddy, and trae in supported agents', () => {
-    expect(AGENT_TOOL_IDS).toContain('qoder');
-    expect(AGENT_TOOL_IDS).toContain('codebuddy');
-    expect(AGENT_TOOL_IDS).toContain('workbuddy');
-    expect(AGENT_TOOL_IDS).toContain('trae');
+  test('includes every configured supported agent', () => {
+    expect(AGENT_TOOL_IDS).toEqual([
+      'claude',
+      'codex',
+      'cursor',
+      'qoder',
+      'codebuddy',
+      'workbuddy',
+      'trae',
+      'pi',
+      'opencode',
+      'gemini',
+      'copilot',
+      'grok',
+      'qwenworkcn',
+      'qwen',
+    ]);
   });
 
   test('uses provided skillPath overrides for known agents', async () => {
@@ -737,7 +933,7 @@ describe('electron skill services', () => {
     }
   });
 
-  test('resolves Windows agent home paths through USERPROFILE', () => {
+  test('resolves Windows agent paths through USERPROFILE', () => {
     const platformSpy = jest.spyOn(os, 'platform').mockReturnValue('win32');
     const homeDirSpy = jest.spyOn(os, 'homedir').mockReturnValue(tmpDir);
     const originalUserProfile = process.env.USERPROFILE;
@@ -752,6 +948,24 @@ describe('electron skill services', () => {
       expect(resolveAgentHomePath('codebuddy')).toBe(path.join(tmpDir, '.codebuddy'));
       expect(resolveAgentHomePath('workbuddy')).toBe(path.join(tmpDir, '.workbuddy'));
       expect(resolveAgentHomePath('trae')).toBe(path.join(tmpDir, '.trae'));
+      expect(resolveAgentHomePath('pi')).toBe(path.join(tmpDir, '.pi', 'agent'));
+      expect(resolveAgentHomePath('opencode')).toBe(path.join(tmpDir, '.config', 'opencode'));
+      expect(resolveAgentHomePath('gemini')).toBe(path.join(tmpDir, '.gemini'));
+      expect(resolveAgentHomePath('copilot')).toBe(path.join(tmpDir, '.copilot'));
+      expect(resolveAgentHomePath('grok')).toBe(path.join(tmpDir, '.grok'));
+      expect(resolveAgentHomePath('qwenworkcn')).toBe(path.join(tmpDir, '.qwenworkcn'));
+      expect(resolveAgentHomePath('qwen')).toBe(path.join(tmpDir, '.qwen'));
+      expect(resolveAgentSkillPath('pi')).toBe(path.join(tmpDir, '.pi', 'agent', 'skills'));
+      expect(resolveAgentSkillPath('opencode')).toBe(
+        path.join(tmpDir, '.config', 'opencode', 'skills'),
+      );
+      expect(resolveAgentSkillPath('gemini')).toBe(path.join(tmpDir, '.gemini', 'skills'));
+      expect(resolveAgentSkillPath('copilot')).toBe(path.join(tmpDir, '.copilot', 'skills'));
+      expect(resolveAgentSkillPath('grok')).toBe(path.join(tmpDir, '.grok', 'skills'));
+      expect(resolveAgentSkillPath('qwenworkcn')).toBe(
+        path.join(tmpDir, '.qwenworkcn', 'skills'),
+      );
+      expect(resolveAgentSkillPath('qwen')).toBe(path.join(tmpDir, '.qwen', 'skills'));
     } finally {
       if (originalUserProfile === undefined) {
         delete process.env.USERPROFILE;

@@ -270,6 +270,7 @@ declare global {
       loadAgentSkills: (payload: {
         agents: Agent[];
         installPath?: string;
+        includeBrokenRepairCandidates?: boolean;
       }) => Promise<AgentSkillsResult[]>;
       /**
        * 扫描 ~/.agents/skills（Windows 为 %USERPROFILE%\\.agents\\skills）。
@@ -336,6 +337,8 @@ declare global {
           pathWindows: string;
           skillPath?: string | null;
           rootPath?: string;
+          realPath?: string;
+          linkTarget?: string | null;
         }>;
       }) => Promise<
         Array<{
@@ -344,6 +347,7 @@ declare global {
           ok: boolean;
           linked?: boolean;
           reason?: string;
+          detail?: string;
         }>
       >;
       /**

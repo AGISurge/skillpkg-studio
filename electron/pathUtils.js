@@ -15,6 +15,17 @@ const pathExists = async (targetPath) => {
   }
 };
 
+// Unlike fs.access(), lstat() still sees a broken symbolic link. Use this when
+// checking whether a filesystem entry occupies a path before replacing it.
+const pathEntryExists = async (targetPath) => {
+  try {
+    await fs.lstat(targetPath);
+    return true;
+  } catch (error) {
+    return false;
+  }
+};
+
 const readJsonIfExists = async (filePath) => {
   try {
     const raw = await fs.readFile(filePath, 'utf-8');
@@ -94,6 +105,7 @@ module.exports = {
   getLegacySkillLibraryPath,
   isPathInside,
   normalizeRealPath,
+  pathEntryExists,
   pathExists,
   readJsonIfExists,
   removeIfExists,

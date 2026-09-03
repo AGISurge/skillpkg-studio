@@ -769,6 +769,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         const [result] = await window.skillpkg.loadAgentSkills({
           agents: [agent],
           installPath,
+          includeBrokenRepairCandidates: true,
         });
         if (localOrganizeRequestRef.current !== requestId) return;
 
@@ -874,6 +875,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         pathWindows: entry.agent.pathWindows,
         skillPath: entry.agent.skillPath,
         rootPath: entry.skill.rootPath,
+        realPath: entry.skill.realPath,
+        linkTarget: entry.skill.linkTarget,
       })),
     );
     if (!items.length) {
@@ -914,8 +917,22 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         ...firstResults.filter((result) => result.ok || result.reason !== 'exists'),
         ...retryResults,
       ];
-      const successCount = finalResults.filter((result) => result.ok).length;
-      const failedCount = finalResults.length - successCount;
+      const resultByEntry = new Map(finalResults.map((result) => [
+        `${result.agentId}::${result.skillId}`,
+        result,
+      ]));
+      const successfulCandidates = selectedCandidates.filter((candidate) =>
+        candidate.agents.every((entry) =>
+          resultByEntry.get(`${entry.agentId}::${candidate.skillId}`)?.ok));
+      const successCount = successfulCandidates.length;
+      const failedCount = selectedCandidates.length - successCount;
+      const failureSummary = finalResults
+        .filter((result) => !result.ok)
+        .map((result) => (
+          `${result.skillId}/${result.agentId}: ${result.reason || 'unknown'}` +
+          `${result.detail ? ` (${result.detail})` : ''}`
+        ))
+        .join('；');
 
       await loadLocalSkills(installPath);
       await syncInstalledByAgent(agents, installPath, { replace: true });
@@ -943,7 +960,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             ),
           ),
           result: { successCount, failedCount },
-          error: failedCount ? '部分 Skill 托管失败，请检查 Agent 技能目录和统一路径权限。' : '',
+          error: failedCount
+            ? `部分 Skill 托管失败${failureSummary ? `：${failureSummary}` : '。'}`
+            : '',
         };
       });
       showNotice(

@@ -597,7 +597,7 @@ test('local page opens organize task page from toolbar', async () => {
 
   fireEvent.click(await screen.findByRole('button', { name: /整理/i }));
 
-  expect(await screen.findByRole('heading', { name: '整理' })).toBeInTheDocument();
+  expect(await screen.findByRole('button', { name: '托管选中' })).toBeInTheDocument();
   expect(window.location.hash).toBe('#/local/organize');
 });
 
@@ -643,8 +643,10 @@ test('organize scan lists only unmanaged skills and enables hosting after comple
     ]);
   });
 
-  expect(await screen.findByText('扫描完成')).toBeInTheDocument();
-  expect(screen.getByText('Own Skill')).toBeInTheDocument();
+  expect(await screen.findByText('Own Skill')).toBeInTheDocument();
+  expect(loadAgentSkills).toHaveBeenCalledWith(expect.objectContaining({
+    includeBrokenRepairCandidates: true,
+  }));
   expect(screen.queryByText('Managed Skill')).not.toBeInTheDocument();
   expect(screen.getByRole('button', { name: '托管选中' })).toBeEnabled();
   expect(screen.getByRole('button', { name: '重新扫描' })).toBeInTheDocument();
@@ -740,7 +742,7 @@ test('organize hosting requires confirmation and migrates selected skills', asyn
     </HashRouter>
   );
 
-  await screen.findByText('扫描完成');
+  await screen.findByText('Own Skill');
   fireEvent.click(screen.getByRole('button', { name: '托管选中' }));
 
   await waitFor(() => expect(confirmSpy).toHaveBeenCalled());
@@ -796,7 +798,7 @@ test('organize hosting reuses existing managed skill on name conflict', async ()
     </HashRouter>
   );
 
-  await screen.findByText('扫描完成');
+  await screen.findByText('Own Skill');
   fireEvent.click(screen.getByRole('button', { name: '托管选中' }));
 
   await waitFor(() => expect(migrateSkills).toHaveBeenCalledTimes(2));

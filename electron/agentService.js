@@ -13,6 +13,7 @@ const {
   getLegacySkillLibraryPath,
   isPathInside,
   normalizeRealPath,
+  pathEntryExists,
   pathExists,
   removeIfExists,
 } = require('./pathUtils');
@@ -23,7 +24,11 @@ const listInstalledAgents = async (agentIds) => {
   return Promise.all(list.map((agentId) => detectAgent(agentId)));
 };
 
-const loadAgentSkills = async ({ agents, installPath }) => {
+const loadAgentSkills = async ({
+  agents,
+  installPath,
+  includeBrokenRepairCandidates = false,
+}) => {
   const list = Array.isArray(agents) ? agents : [];
   return Promise.all(
     list.map(async (agent) => {
@@ -34,6 +39,7 @@ const loadAgentSkills = async ({ agents, installPath }) => {
             mode: 'agent',
             agentId: config.id,
             installPath,
+            includeBrokenRepairCandidates,
           })
         : [];
       return {
@@ -53,6 +59,7 @@ const loadDefaultOrganizeSkills = async ({ installPath } = {}) => {
         mode: 'agent',
         agentId: DEFAULT_ORGANIZE_SKILL_SOURCE.id,
         installPath,
+        includeBrokenRepairCandidates: true,
       })
     : [];
   return {
@@ -69,7 +76,7 @@ const ensureAgentSkillLink = async ({ agent, skillId, targetDir }) => {
   if (!skillRoot) return { ok: false, reason: 'agent-path-missing' };
   await ensureDir(skillRoot);
   const linkPath = path.join(skillRoot, skillId);
-  if (await pathExists(linkPath)) {
+  if (await pathEntryExists(linkPath)) {
     const lstat = await fs.lstat(linkPath);
     if (!lstat.isSymbolicLink()) {
       return { ok: false, reason: 'agent-skill-conflict', agentId: config.id };

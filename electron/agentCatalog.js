@@ -102,6 +102,104 @@ const AGENT_CATALOG = {
       other: '~/.trae/skills',
     },
   },
+  pi: {
+    id: 'pi',
+    name: 'Pi',
+    homePath: {
+      darwin: '~/.pi/agent',
+      win32: '%USERPROFILE%/.pi/agent',
+      other: '~/.pi/agent',
+    },
+    skillPath: {
+      darwin: '~/.pi/agent/skills',
+      win32: '%USERPROFILE%/.pi/agent/skills',
+      other: '~/.pi/agent/skills',
+    },
+  },
+  opencode: {
+    id: 'opencode',
+    name: 'OpenCode',
+    homePath: {
+      darwin: '~/.config/opencode',
+      win32: '%USERPROFILE%/.config/opencode',
+      other: '~/.config/opencode',
+    },
+    skillPath: {
+      darwin: '~/.config/opencode/skills',
+      win32: '%USERPROFILE%/.config/opencode/skills',
+      other: '~/.config/opencode/skills',
+    },
+  },
+  gemini: {
+    id: 'gemini',
+    name: 'Gemini CLI',
+    homePath: {
+      darwin: '~/.gemini',
+      win32: '%USERPROFILE%/.gemini',
+      other: '~/.gemini',
+    },
+    skillPath: {
+      darwin: '~/.gemini/skills',
+      win32: '%USERPROFILE%/.gemini/skills',
+      other: '~/.gemini/skills',
+    },
+  },
+  copilot: {
+    id: 'copilot',
+    name: 'Copilot',
+    homePath: {
+      darwin: '~/.copilot',
+      win32: '%USERPROFILE%/.copilot',
+      other: '~/.copilot',
+    },
+    skillPath: {
+      darwin: '~/.copilot/skills',
+      win32: '%USERPROFILE%/.copilot/skills',
+      other: '~/.copilot/skills',
+    },
+  },
+  grok: {
+    id: 'grok',
+    name: 'Grok',
+    homePath: {
+      darwin: '~/.grok',
+      win32: '%USERPROFILE%/.grok',
+      other: '~/.grok',
+    },
+    skillPath: {
+      darwin: '~/.grok/skills',
+      win32: '%USERPROFILE%/.grok/skills',
+      other: '~/.grok/skills',
+    },
+  },
+  qwenworkcn: {
+    id: 'qwenworkcn',
+    name: '千问办公',
+    homePath: {
+      darwin: '~/.qwenworkcn',
+      win32: '%USERPROFILE%/.qwenworkcn',
+      other: '~/.qwenworkcn',
+    },
+    skillPath: {
+      darwin: '~/.qwenworkcn/skills',
+      win32: '%USERPROFILE%/.qwenworkcn/skills',
+      other: '~/.qwenworkcn/skills',
+    },
+  },
+  qwen: {
+    id: 'qwen',
+    name: 'Qwen Code',
+    homePath: {
+      darwin: '~/.qwen',
+      win32: '%USERPROFILE%/.qwen',
+      other: '~/.qwen',
+    },
+    skillPath: {
+      darwin: '~/.qwen/skills',
+      win32: '%USERPROFILE%/.qwen/skills',
+      other: '~/.qwen/skills',
+    },
+  },
 };
 
 const AGENT_TOOL_IDS = Object.keys(AGENT_CATALOG);

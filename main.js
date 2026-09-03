@@ -9,12 +9,11 @@ const {
   removeIfExists,
 } = require('./electron/pathUtils');
 const { getFilePolicy } = require('./electron/filePolicy');
-const { getAgentConfig, resolveAgentSkillPath } = require('./electron/agentCatalog');
+const { getAgentConfig } = require('./electron/agentCatalog');
 const {
   deleteAgentSkillEntry,
   deleteLibrarySkillEntry,
   ensureAgentSkillLink,
-  finalizeMigratedSkillSource,
   linkSkillToAgents,
   listInstalledAgents,
   loadAgentSkills,
@@ -22,6 +21,7 @@ const {
   unhostAgentSkillLink,
   uninstallAgentSkillLink,
 } = require('./electron/agentService');
+const { migrateSkillsToLibrary } = require('./electron/organizeService');
 const {
   SKILL_MARKDOWN_FILENAME,
   hasSkillMarkdown,
@@ -526,125 +526,6 @@ const installLibrarySkillsToAgents = async ({ installPath, skillIds, agents }) =
   };
 };
 
-const copySkillDirIntoLibrary = async ({ sourceDir, targetDir, installPath }) => {
-  const sourceRealPath = await fs.realpath(sourceDir).catch(() => sourceDir);
-  const tempDir = path.join(
-    installPath,
-    `.${path.basename(targetDir)}.${process.pid}.${Date.now()}.tmp`,
-  );
-  await removeIfExists(tempDir);
-  await fs.cp(sourceRealPath, tempDir, { recursive: true, force: true });
-  if (!await hasSkillMarkdown(tempDir)) {
-    await removeIfExists(tempDir);
-    return { ok: false, reason: 'invalid-skill' };
-  }
-  await removeIfExists(targetDir);
-  await fs.rename(tempDir, targetDir);
-  return { ok: true };
-};
-
-const migrateAgentSkillToLibrary = async ({
-  installPath,
-  item,
-  overwrite,
-  useExisting,
-}) => {
-  const agentConfig = getAgentConfig({
-    id: item.agentId,
-    name: item.agentName || item.agentId,
-    pathMac: item.pathMac,
-    pathLinux: item.pathLinux,
-    pathWindows: item.pathWindows,
-    skillPath: item.skillPath,
-  }) || getAgentConfig(item.agentId);
-  const agentSkillPath = agentConfig ? resolveAgentSkillPath(agentConfig) : null;
-  const sourceRoot = item.rootPath || (
-    agentSkillPath ? path.join(agentSkillPath, item.skillId) : null
-  );
-  if (!sourceRoot) {
-    return {
-      agentId: item.agentId,
-      skillId: item.skillId,
-      ok: false,
-      reason: 'source-missing',
-    };
-  }
-  if (!await pathExists(sourceRoot)) {
-    return {
-      agentId: item.agentId,
-      skillId: item.skillId,
-      ok: false,
-      reason: 'skill-missing',
-    };
-  }
-  const targetDir = path.join(installPath, item.skillId);
-  const targetExists = await pathExists(targetDir);
-  const targetLstat = targetExists ? await fs.lstat(targetDir).catch(() => null) : null;
-  const targetIsSymlink = Boolean(targetLstat?.isSymbolicLink());
-  if (targetExists && !targetIsSymlink && !overwrite && !useExisting) {
-    return {
-      agentId: item.agentId,
-      skillId: item.skillId,
-      ok: false,
-      reason: 'exists',
-    };
-  }
-  if (useExisting && !targetIsSymlink) {
-    if (!await hasSkillMarkdown(targetDir)) {
-      return {
-        agentId: item.agentId,
-        skillId: item.skillId,
-        ok: false,
-        reason: 'invalid-managed-skill',
-      };
-    }
-  } else {
-    const copyResult = await copySkillDirIntoLibrary({
-      sourceDir: sourceRoot,
-      targetDir,
-      installPath,
-    });
-    if (!copyResult.ok) {
-      return {
-        agentId: item.agentId,
-        skillId: item.skillId,
-        ok: false,
-        reason: copyResult.reason,
-      };
-    }
-  }
-  const linkResult = await finalizeMigratedSkillSource({
-    agent: agentConfig,
-    skillId: item.skillId,
-    sourceRoot,
-    targetDir,
-  });
-  if (!linkResult.ok) {
-    return {
-      agentId: item.agentId,
-      skillId: item.skillId,
-      ok: false,
-      reason: linkResult.reason,
-    };
-  }
-  if (linkResult.linked === false) {
-    return {
-      agentId: item.agentId,
-      skillId: item.skillId,
-      ok: true,
-      linked: false,
-    };
-  }
-  const markdownMetadata = await getSkillMarkdownMetadata(targetDir);
-  await upsertSkillInstallRecord({
-    skillId: item.skillId,
-    agentId: item.agentId,
-    version: markdownMetadata.version || null,
-    description: markdownMetadata.description || null,
-  });
-  return { agentId: item.agentId, skillId: item.skillId, ok: true };
-};
-
 const registerIpcHandlers = () => {
   ipcMain.handle('get-default-install-path', async () => getDefaultInstallPath());
 
@@ -875,7 +756,10 @@ const registerIpcHandlers = () => {
     const legacyAgents = Array.isArray(payload) ? payload : null;
     const agents = legacyAgents || payload?.agents || [];
     const installPath = legacyAgents ? getDefaultInstallPath() : payload?.installPath;
-    return loadAgentSkills({ agents, installPath });
+    const includeBrokenRepairCandidates = legacyAgents
+      ? false
+      : Boolean(payload?.includeBrokenRepairCandidates);
+    return loadAgentSkills({ agents, installPath, includeBrokenRepairCandidates });
   });
 
   ipcMain.handle('load-default-organize-skills', async (_event, payload) =>
@@ -883,28 +767,13 @@ const registerIpcHandlers = () => {
 
   ipcMain.handle('migrate-skills', async (_event, payload) => {
     const { installPath, items, overwrite, useExisting } = payload || {};
-    if (!installPath || !Array.isArray(items) || !items.length) return [];
-    await ensureDir(installPath);
-    const results = await Promise.all(
-      items.map(async (item) => {
-        try {
-          return await migrateAgentSkillToLibrary({
-            installPath,
-            item,
-            overwrite: Boolean(overwrite),
-            useExisting: Boolean(useExisting),
-          });
-        } catch (error) {
-          return {
-            agentId: item.agentId,
-            skillId: item.skillId,
-            ok: false,
-            reason: 'migrate-failed',
-          };
-        }
-      }),
-    );
-    return results;
+    return migrateSkillsToLibrary({
+      installPath,
+      items,
+      overwrite: Boolean(overwrite),
+      useExisting: Boolean(useExisting),
+      onLinked: upsertSkillInstallRecord,
+    });
   });
 
   ipcMain.handle('open-skill-path', async (_event, payload) => {
