@@ -75,7 +75,9 @@ const LocalPage = () => {
           onClick={() => openDirectoryPath(installPath, 'local')}
         />
         <Button
-          className="btn ghost"
+          variant="outline"
+          size="sm"
+          className="rounded-full"
           onClick={() => navigate(routePaths.localOrganize)}
         >
           <BroomRegular className="icon" />

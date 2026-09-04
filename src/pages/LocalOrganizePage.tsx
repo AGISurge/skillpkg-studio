@@ -42,7 +42,8 @@ const LocalOrganizePage = () => {
   const toolbar = useMemo(() => (
     <>
       <Button
-        className={`${status === 'hosting' ? 'loading' : ''}`}
+        className={`rounded-full ${status === 'hosting' ? 'loading' : ''}`}
+        size="sm"
         onClick={() => {
           void confirmLocalOrganizeHosting();
         }}
@@ -57,7 +58,9 @@ const LocalOrganizePage = () => {
       </Button>
       <Button
         type="button"
-        className="btn ghost"
+        variant="outline"
+        size="sm"
+        className="rounded-full"
         onClick={() => {
           if (status === 'scanning') {
             cancelLocalOrganizeScan();

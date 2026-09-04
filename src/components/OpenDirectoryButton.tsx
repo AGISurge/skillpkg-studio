@@ -9,7 +9,9 @@ type OpenDirectoryButtonProps = {
 const OpenDirectoryButton = ({ disabled = false, onClick }: OpenDirectoryButtonProps) => (
   <Button
     type="button"
-    className="btn ghost"
+    variant="outline"
+    size="sm"
+    className="rounded-full"
     disabled={disabled}
     aria-label="打开目录"
     title="打开目录"
