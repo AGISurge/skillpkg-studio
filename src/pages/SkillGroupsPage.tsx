@@ -5,7 +5,6 @@ import { useSkillGroups } from "../SkillGroupsContext";
 import SkillGroupDialog from "../components/SkillGroupDialog";
 import { Button } from "../components/ui/button";
 import type { SkillGroup } from "../types/models";
-import { Spotlight } from "lucide-react";
 import { SpotlightCard } from "@/components/ui/spotlight-card";
 
 const SkillGroupsPage = () => {
@@ -49,9 +48,14 @@ const SkillGroupsPage = () => {
               <p>选择多个本地技能，随时切换到适合当前工作的组合。</p>
             </div>
           )}
-          <div className="group-masonry">
+          <div className="group-grid">
             {groups.map((group) => (
-              <button key={group.id} onClick={() => setEditor({ group })}>
+              <button
+                key={group.id}
+                type="button"
+                className="group-card-button"
+                onClick={() => setEditor({ group })}
+              >
                 <SpotlightCard className="group-card w-full shadow-none bg-white transition-shadow duration-300 hover:shadow-md dark:hover:shadow-lg dark:hover:shadow-primary/20 pt-6 px-6 pb-3 rounded-lg">
                   <div className="group-card-heading">
                     <h2>{group.name}</h2>
