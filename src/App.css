@@ -2371,6 +2371,27 @@ body:not([data-theme='light']) .discover-type-pill.solution {
   width: min(640px, 92vw);
 }
 
+.install-dialog,
+.batch-install-dialog {
+  max-height: calc(100dvh - 48px);
+}
+
+.install-dialog > .dialog-body,
+.batch-install-dialog > .dialog-body {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+}
+
+.install-dialog > .dialog-header,
+.install-dialog > .dialog-footer,
+.install-dialog > .dialog-body > *,
+.batch-install-dialog > .dialog-header,
+.batch-install-dialog > .dialog-footer,
+.batch-install-dialog > .dialog-body > * {
+  flex-shrink: 0;
+}
+
 .install-path-dialog {
   width: min(620px, 92vw);
 }

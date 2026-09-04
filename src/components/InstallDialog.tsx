@@ -45,7 +45,7 @@ const InstallDialog = ({
   if (!open || !skill) return null;
   return (
     <div className="dialog-backdrop">
-      <div className="dialog">
+      <div className="dialog install-dialog">
         <div className="dialog-header">
           <div>
             <div className="dialog-title">确认安装</div>
