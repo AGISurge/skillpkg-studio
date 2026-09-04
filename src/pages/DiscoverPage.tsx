@@ -9,6 +9,8 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import type { SkillpkgCategory, SkillpkgListMeta, SkillpkgSkillSummary } from '../types/models';
 import { useAppContext, useToolbar } from '../AppContext';
 import { Button } from '@/components/ui/button';
+import { SpotlightCard } from '@/components/ui/spotlight-card';
+
 
 const DISCOVER_PAGE_SIZE = 20;
 const SEARCH_DEBOUNCE_MS = 260;
@@ -609,14 +611,17 @@ const DiscoverPage = () => {
             {skills.map((skill) => {
               const typeMeta = getPackageTypeMeta(skill.type);
               return (
+
                 <article
-                  className="discover-card"
                   key={skill.publicId}
                   role="button"
                   tabIndex={0}
                   onClick={() => openSkillDetail(skill)}
                   onKeyDown={(event) => handleCardKeyDown(event, skill)}
                 >
+                  <SpotlightCard
+                    className='discover-card w-full shadow-none bg-white transition-shadow duration-300 hover:shadow-md dark:hover:shadow-lg dark:hover:shadow-primary/20 pt-6 px-6 pb-3 rounded-lg'
+                  >
                   <div className="discover-card-head">
                     <h2>{skill.name}</h2>
                     <span className={`discover-type-pill ${typeMeta.className}`}>
@@ -634,8 +639,10 @@ const DiscoverPage = () => {
                         <span>{skill.publisher.name}</span>
                       </div>
                     ) : null}
-                  </div>
-                </article>
+                    </div>
+                  </SpotlightCard>
+                  </article>
+
               );
             })}
           </div>
@@ -647,7 +654,7 @@ const DiscoverPage = () => {
             <p>{error || '未找到匹配的 Skill。'}</p>
             {!normalizedApiKey && (
               <div>
-               
+
               <p className="mt-2 text-xs text-muted-foreground">
                  没有 API Key? 请先前往
                  <a

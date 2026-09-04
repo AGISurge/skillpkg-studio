@@ -13,6 +13,7 @@ import type { KeyboardEvent, ReactNode } from "react";
 import type { Skill, SkillFile } from "../types/models";
 import SkillViewer from "../components/SkillViewer";
 import { Button } from "@/components/ui/button";
+import { SpotlightCard } from "@/components/ui/spotlight-card";
 
 const SEARCH_DEBOUNCE_MS = 220;
 
@@ -34,7 +35,10 @@ const highlightSearchMatch = (value: string, query: string): ReactNode => {
     }
     const matchEnd = matchIndex + normalizedQuery.length;
     parts.push(
-      <mark className="skill-search-highlight" key={`${matchIndex}-${matchEnd}`}>
+      <mark
+        className="skill-search-highlight"
+        key={`${matchIndex}-${matchEnd}`}
+      >
         {value.slice(matchIndex, matchEnd)}
       </mark>,
     );
@@ -174,115 +178,137 @@ const SkillsPage = ({
               skill.managed || installedSkillIds?.has(skill.id),
             );
             const isPending = Boolean(pendingSkillIds?.has(skill.id));
-            const hostedAgentNames = hostedAgentNamesBySkillId?.[skill.id] || [];
+            const hostedAgentNames =
+              hostedAgentNamesBySkillId?.[skill.id] || [];
             return (
               <div
                 key={skill.id}
-                className={`skill-card ${selectedSkillId === skill.id ? "active" : ""}`}
-                role="button"
                 tabIndex={0}
                 onClick={() => onSelectSkill(skill)}
                 onKeyDown={(event) => handleCardKeyDown(event, skill)}
               >
-                <div className="skill-card-header">
-                  <div>
-                    <div className="skill-title">
-                      {highlightSearchMatch(skill.name, debouncedSearchValue)}
+                <SpotlightCard
+                  className={`skill-card w-full shadow-none bg-white transition-shadow duration-300 hover:shadow-md dark:hover:shadow-lg dark:hover:shadow-primary/20 pt-6 px-6 pb-3 rounded-lg ${selectedSkillId === skill.id ? "active" : ""}`}
+                >
+                  <div className="skill-card-header">
+                    <div>
+                      <div className="skill-title">
+                        {highlightSearchMatch(skill.name, debouncedSearchValue)}
+                      </div>
+                      <div className="skill-version">v{skill.version}</div>
                     </div>
-                    <div className="skill-version">v{skill.version}</div>
+                    <button
+                      type="button"
+                      className="icon-btn"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onToggleFavorite(skill.id);
+                      }}
+                    >
+                      {favorites.has(skill.id) ? (
+                        <StarFilled className="icon" />
+                      ) : (
+                        <StarRegular className="icon" />
+                      )}
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    className="icon-btn"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onToggleFavorite(skill.id);
-                    }}
-                  >
-                    {favorites.has(skill.id) ? (
-                      <StarFilled className="icon" />
-                    ) : (
-                      <StarRegular className="icon" />
+                  <p>
+                    {highlightSearchMatch(
+                      skill.description,
+                      debouncedSearchValue,
                     )}
-                  </button>
-                </div>
-                <p>{highlightSearchMatch(skill.description, debouncedSearchValue)}</p>
-                {(mode === "local" || mode === "favorites") && hostedAgentNames.length > 0 && (
-                  <div className="skill-agent-tags" aria-label="已托管的 Agents">
-                    {hostedAgentNames.map((agentName) => (
-                      <span className="skill-agent-tag" key={`${skill.id}-${agentName}`}>
-                        {agentName}
-                      </span>
-                    ))}
-                  </div>
-                )}
-                {mode === "agents" && (onInstallToggle || onDeleteSkill) && (
-                  <div
-                    className="skill-card-footer"
-                    onClick={(event) => event.stopPropagation()}
-                  >
-                    {isManaged ? (
-                      <button
-                        type="button"
-                        className={`btn mini danger ${isPending ? "loading" : ""}`}
-                        disabled={isPending}
-                        aria-busy={isPending}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          if (!isPending) (onDeleteSkill || onInstallToggle)?.(skill);
-                        }}
+                  </p>
+                  {(mode === "local" || mode === "favorites") &&
+                    hostedAgentNames.length > 0 && (
+                      <div
+                        className="skill-agent-tags"
+                        aria-label="已托管的 Agents"
                       >
-                        {isPending ? (
-                          <span className="mini-spinner" aria-hidden="true" />
-                        ) : (
-                          <DeleteRegular className="icon" />
-                        )}
-                        {isPending ? "处理中" : "卸载"}
-                      </button>
-                    ) : (
-                      <>
-                        {onInstallToggle && (
-                          <button
-                            type="button"
-                            className={`btn mini primary ${isPending ? "loading" : ""}`}
-                            disabled={isPending}
-                            aria-busy={isPending}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              if (!isPending) onInstallToggle(skill);
-                            }}
+                        {hostedAgentNames.map((agentName) => (
+                          <span
+                            className="skill-agent-tag"
+                            key={`${skill.id}-${agentName}`}
                           >
-                            {isPending ? (
-                              <span className="mini-spinner" aria-hidden="true" />
-                            ) : (
-                              <SettingsRegular className="icon" />
-                            )}
-                            {isPending ? "处理中" : "托管"}
-                          </button>
-                        )}
-                        {onDeleteSkill && (
-                          <button
-                            type="button"
-                            className={`btn mini danger ${isPending ? "loading" : ""}`}
-                            disabled={isPending}
-                            aria-busy={isPending}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              if (!isPending) onDeleteSkill(skill);
-                            }}
-                          >
-                            {isPending ? (
-                              <span className="mini-spinner" aria-hidden="true" />
-                            ) : (
-                              <DeleteRegular className="icon" />
-                            )}
-                            {isPending ? "处理中" : "删除"}
-                          </button>
-                        )}
-                      </>
+                            {agentName}
+                          </span>
+                        ))}
+                      </div>
                     )}
-                  </div>
-                )}
+                  {mode === "agents" && (onInstallToggle || onDeleteSkill) && (
+                    <div
+                      className="skill-card-footer"
+                      onClick={(event) => event.stopPropagation()}
+                    >
+                      {isManaged ? (
+                        <button
+                          type="button"
+                          className={`btn mini danger ${isPending ? "loading" : ""}`}
+                          disabled={isPending}
+                          aria-busy={isPending}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            if (!isPending)
+                              (onDeleteSkill || onInstallToggle)?.(skill);
+                          }}
+                        >
+                          {isPending ? (
+                            <span className="mini-spinner" aria-hidden="true" />
+                          ) : (
+                            <DeleteRegular className="icon" />
+                          )}
+                          {isPending ? "处理中" : "卸载"}
+                        </button>
+                      ) : (
+                        <>
+                          {onInstallToggle && (
+                            <button
+                              type="button"
+                              className={`btn mini primary ${isPending ? "loading" : ""}`}
+                              disabled={isPending}
+                              aria-busy={isPending}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                if (!isPending) onInstallToggle(skill);
+                              }}
+                            >
+                              {isPending ? (
+                                <span
+                                  className="mini-spinner"
+                                  aria-hidden="true"
+                                />
+                              ) : (
+                                <SettingsRegular className="icon" />
+                              )}
+                              {isPending ? "处理中" : "托管"}
+                            </button>
+                          )}
+                          {onDeleteSkill && (
+                            <button
+                              type="button"
+                              className={`btn mini danger ${isPending ? "loading" : ""}`}
+                              disabled={isPending}
+                              aria-busy={isPending}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                if (!isPending) onDeleteSkill(skill);
+                              }}
+                            >
+                              {isPending ? (
+                                <span
+                                  className="mini-spinner"
+                                  aria-hidden="true"
+                                />
+                              ) : (
+                                <DeleteRegular className="icon" />
+                              )}
+                              {isPending ? "处理中" : "删除"}
+                            </button>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  )}
+                </SpotlightCard>
               </div>
             );
           })}
@@ -340,7 +366,11 @@ const SkillsPage = ({
                         type="button"
                         variant="ghost"
                         size="icon"
-                        aria-label={mode === "agents" && selectedSkill.managed ? "卸载 Skill" : "删除 Skill"}
+                        aria-label={
+                          mode === "agents" && selectedSkill.managed
+                            ? "卸载 Skill"
+                            : "删除 Skill"
+                        }
                         onClick={() => onDeleteSkill(selectedSkill)}
                       >
                         <DeleteRegular className="icon" />
