@@ -264,6 +264,7 @@ const SkillGroupDialog = ({
             <InputGroup>
               <InputGroupAddon>名称</InputGroupAddon>
               <InputGroupInput
+                aria-label="名称"
                 autoFocus
                 className="focus-visible:ring-0 focus-visible:outline-0 text-sm"
                 value={name}

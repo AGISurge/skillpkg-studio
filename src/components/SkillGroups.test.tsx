@@ -50,13 +50,13 @@ test('searches all skills by description, loads more and retains checked state a
 test('rejects invalid names, duplicates and empty selections, excludes solutions', async () => {
   render(<SkillGroupDialog group={null} skills={[...skills, { ...skills[0], id: 'solution', name: 'Solution', type: 'solution' }]} onClose={jest.fn()} />);
   fireEvent.change(screen.getByRole('textbox', { name: '名称' }), { target: { value: '  ' } });
-  fireEvent.click(screen.getByRole('button', { name: '保存' }));
+  fireEvent.click(screen.getByRole('button', { name: /保\s*存/ }));
   expect(screen.getByRole('alert')).toHaveTextContent('不能为空');
   fireEvent.change(screen.getByRole('textbox', { name: '名称' }), { target: { value: ' design ' } });
-  fireEvent.click(screen.getByRole('button', { name: '保存' }));
+  fireEvent.click(screen.getByRole('button', { name: /保\s*存/ }));
   expect(screen.getByRole('alert')).toHaveTextContent('已存在');
   fireEvent.change(screen.getByRole('textbox', { name: '名称' }), { target: { value: 'New' } });
-  fireEvent.click(screen.getByRole('button', { name: '保存' }));
+  fireEvent.click(screen.getByRole('button', { name: /保\s*存/ }));
   expect(screen.getByRole('alert')).toHaveTextContent('至少');
   fireEvent.click(screen.getByRole('button', { name: /选择技能/ }));
   fireEvent.change(screen.getByRole('textbox', { name: '筛选本地技能' }), { target: { value: 'Solution' } });
@@ -75,15 +75,33 @@ test('tag removal and checkbox selection stay synchronized', () => {
   fireEvent.click(screen.getAllByRole('checkbox')[0]);
   expect(screen.getByLabelText('已选技能')).not.toHaveTextContent('Skill 0');
 });
+test('modal skill options accept wheel events and scrolling loads the next batch', () => {
+  render(<SkillGroupDialog group={group} skills={skills} onClose={jest.fn()} />);
+  fireEvent.click(screen.getByRole('button', { name: /选择技能/ }));
+  const options = screen.getAllByRole('checkbox')[0].closest('.group-options') as HTMLElement;
+  // JSDOM has no layout; supply the dimensions of an overflowing list.
+  Object.defineProperties(options, {
+    scrollHeight: { configurable: true, value: 1200 },
+    clientHeight: { configurable: true, value: 300 },
+  });
+  options.style.overflowY = 'auto';
+  const wheel = new WheelEvent('wheel', { deltaY: 100, bubbles: true, cancelable: true });
+  fireEvent(options, wheel);
+  expect(wheel.defaultPrevented).toBe(false);
+  expect(screen.getAllByRole('checkbox')).toHaveLength(20);
+  fireEvent.scroll(options, { target: { scrollTop: 900 } });
+  expect(screen.getAllByRole('checkbox')).toHaveLength(40);
+  expect(screen.getAllByRole('checkbox')[0]).toBeChecked();
+});
 test('save failure preserves the draft and successful save closes the editor', async () => {
   const close = jest.fn();
   mockContext.save.mockResolvedValueOnce({ ok: false, error: 'disk error' });
   render(<SkillGroupDialog group={group} skills={skills} onClose={close} />);
   fireEvent.change(screen.getByRole('textbox', { name: '名称' }), { target: { value: ' New Name ' } });
-  fireEvent.click(screen.getByRole('button', { name: '保存' }));
+  fireEvent.click(screen.getByRole('button', { name: /保\s*存/ }));
   await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('disk error'));
   expect(close).not.toHaveBeenCalled(); expect(screen.getByRole('textbox', { name: '名称' })).toHaveValue(' New Name ');
-  fireEvent.click(screen.getByRole('button', { name: '保存' }));
+  fireEvent.click(screen.getByRole('button', { name: /保\s*存/ }));
   await waitFor(() => expect(close).toHaveBeenCalledTimes(1));
   expect(mockContext.save).toHaveBeenLastCalledWith({ id: group.id, name: 'New Name', skillIds: ['skill-0'] });
 });
