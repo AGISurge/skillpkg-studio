@@ -205,7 +205,7 @@ const SkillViewer = ({
       <ReactMarkdown
         remarkPlugins={markdownRemarkPlugins}
         rehypePlugins={markdownRehypePlugins}
-        className="leading-relaxed text-sm"
+        className="leading-5 text-[13px]"
       >
         {markdownContent}
       </ReactMarkdown>

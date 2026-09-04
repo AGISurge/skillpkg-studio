@@ -29,7 +29,6 @@ type SidebarProps = {
   onDownloadAppUpdate: () => void;
   isFloating?: boolean;
 };
-
 const getDisplayVersion = (version: string | null | undefined) => {
   if (!version) return '';
   return version.startsWith('v') ? version : `v${version}`;
@@ -175,13 +174,13 @@ const Sidebar = ({
         {showUpdateButton && appUpdateState ? (
           <button
             type="button"
-            className="sidebar-update-button"
+            className="sidebar-update-button rounded-full text-xs"
             aria-label={getUpdateButtonLabel(appUpdateState)}
             title={getUpdateButtonLabel(appUpdateState)}
             onClick={onDownloadAppUpdate}
             disabled={updateButtonDisabled}
           >
-            <ArrowDownloadRegular className="icon" />
+            <ArrowDownloadRegular className="size-4" />
             <span>{getUpdateButtonLabel(appUpdateState)}</span>
           </button>
         ) : (
