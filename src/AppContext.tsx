@@ -327,6 +327,7 @@ type AppContextValue = {
   closeInstallPathChangeDialog: () => void;
   handleToggleFolder: (path: string) => void;
   refreshAgents: () => Promise<void>;
+  refreshLocalSkills: (path: string) => Promise<Skill[]>;
   checkAppUpdate: () => Promise<void>;
   downloadAppUpdate: (source?: AppUpdateSource) => Promise<void>;
   installAppUpdateNow: () => Promise<void>;
@@ -2106,6 +2107,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     closeInstallPathChangeDialog,
     handleToggleFolder,
     refreshAgents,
+    refreshLocalSkills: loadLocalSkills,
     checkAppUpdate,
     downloadAppUpdate,
     installAppUpdateNow,

@@ -37,6 +37,7 @@ SkillPKG Studio 以 `SKILL.md` 作为识别 Skill 的核心约定。一个有效
 
 - 发现 Skill：通过 SkillPKG API 浏览分类、搜索 Skill、查看详情并下载。
 - 本机 Skill 库：集中查看、编辑、删除、收藏和打开本地 Skill。
+- 技能组：将多个本地 Skill 保存为组，在 Agent 中确认后一次性切换；非托管技能会先收纳到本地库，同名冲突时暂停切换。
 - 多 Agent 管理：自动检测已安装 Agent，查看每个 Agent 当前拥有的 Skill。
 - 一键安装：把同一个 Skill 安装到一个或多个 Agent。
 - 导入来源：支持从 ZIP 包或 Git 地址扫描并导入包含 `SKILL.md` 的 Skill。

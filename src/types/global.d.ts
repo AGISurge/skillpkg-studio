@@ -3,6 +3,8 @@ import type {
   AgentDetectionResult,
   AgentSkillsResult,
   Skill,
+  SkillGroup,
+  SkillGroupResult,
   SkillpkgCategory,
   SkillpkgSkillDetail,
   SkillpkgListMeta,
@@ -38,6 +40,12 @@ declare global {
      * 预加载脚本暴露的本地能力桥接。
      */
     skillpkg?: {
+      listSkillGroups?: (payload: { installPath: string }) => Promise<SkillGroup[]>;
+      saveSkillGroup?: (payload: { id?: string; name: string; skillIds: string[]; installPath: string }) => Promise<SkillGroupResult>;
+      deleteSkillGroup?: (payload: { id: string }) => Promise<SkillGroupResult>;
+      switchAgentSkillGroup?: (payload: { agentId: string; groupId: string; installPath: string; expectedGroup: SkillGroup }) => Promise<SkillGroupResult>;
+      onSkillGroupsChanged?: (callback: (change: { refreshLibrary: boolean }) => void) => () => void;
+
       /**
        * Electron 主进程平台标识。
        */

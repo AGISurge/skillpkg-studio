@@ -2,6 +2,15 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('skillpkg', {
   platform: process.platform,
+  listSkillGroups: (payload) => ipcRenderer.invoke('list-skill-groups', payload),
+  saveSkillGroup: (payload) => ipcRenderer.invoke('save-skill-group', payload),
+  deleteSkillGroup: (payload) => ipcRenderer.invoke('delete-skill-group', payload),
+  switchAgentSkillGroup: (payload) => ipcRenderer.invoke('switch-agent-skill-group', payload),
+  onSkillGroupsChanged: (callback) => {
+    const listener = (_event, change) => callback(change);
+    ipcRenderer.on('skill-groups-changed', listener);
+    return () => ipcRenderer.removeListener('skill-groups-changed', listener);
+  },
   getDefaultInstallPath: () => ipcRenderer.invoke('get-default-install-path'),
   selectInstallPath: () => ipcRenderer.invoke('select-install-path'),
   prepareInstallPathChange: (payload) =>

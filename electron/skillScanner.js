@@ -12,6 +12,9 @@ const { getFilePolicy } = require('./filePolicy');
 
 const SKILL_MARKDOWN_FILENAME = 'SKILL.md';
 
+const resolveSkillType = (markdownMetadata, metadata) =>
+  metadata?.type || markdownMetadata?.type || 'skill';
+
 const stripYamlQuotes = (value) => {
   const trimmed = String(value || '').trim();
   if (
@@ -196,6 +199,7 @@ const readSkillFromDir = async (skillDir, skillId, options = {}) => {
   });
   return {
     id: skillId,
+    type: resolveSkillType(markdownMetadata, legacyMetadata),
     name: markdownMetadata.name || legacyMetadata?.name || skillId,
     version: markdownMetadata.version || legacyMetadata?.version || '0.1.0',
     description:
@@ -314,6 +318,8 @@ const loadSkillsFromPath = async (skillRoot, options = {}) => {
 };
 
 module.exports = {
+  getManagedRootPaths,
+  resolveSkillType,
   SKILL_MARKDOWN_FILENAME,
   collectFiles,
   hasSkillMarkdown,

@@ -12,6 +12,7 @@ import { useAppContext, useToolbarContent } from "../AppContext";
 const SIDEBAR_FLOATING_WIDTH = 900;
 
 const getActiveSection = (path: string) => {
+  if (path.startsWith("/skill-groups")) return "skill-groups";
   if (path.startsWith("/agents")) return "agents";
   if (path.startsWith("/favorites")) return "favorites";
   if (path.startsWith("/local")) return "local";

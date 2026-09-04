@@ -1,5 +1,8 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import './App.css';
+import './SkillGroups.css';
+import { SkillGroupsProvider } from './SkillGroupsContext';
+import SkillGroupsPage from './pages/SkillGroupsPage';
 import { AppProvider, ToolbarProvider, useAppContext } from './AppContext';
 import { routePaths } from './routes';
 import AppLayout from './components/AppLayout';
@@ -158,6 +161,7 @@ const AppRoutes = () => (
         <Route path={routePaths.discoverDetail} element={<DiscoverDetailPage />} />
         <Route path={routePaths.localOrganize} element={<LocalOrganizePage />} />
         <Route path={routePaths.local} element={<LocalPage />} />
+        <Route path={routePaths.skillGroups} element={<SkillGroupsPage />} />
         <Route path={routePaths.favorites} element={<FavoritesPage />} />
         <Route path={routePaths.agents} element={<AgentsPage />} />
         <Route path={routePaths.settings} element={<SettingsPage />} />
@@ -170,9 +174,11 @@ const AppRoutes = () => (
 
 const App = () => (
   <AppProvider>
-    <ToolbarProvider>
-      <AppRoutes />
-    </ToolbarProvider>
+    <SkillGroupsProvider>
+      <ToolbarProvider>
+        <AppRoutes />
+      </ToolbarProvider>
+    </SkillGroupsProvider>
   </AppProvider>
 );
 

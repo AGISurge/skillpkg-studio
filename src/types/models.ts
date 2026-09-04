@@ -15,6 +15,7 @@ export type SkillFile = {
  * 技能对象结构。
  */
 export type Skill = {
+  type?: SkillpkgPackageType;
   id: string;
   name: string;
   version: string;
@@ -120,4 +121,23 @@ export type AgentSkillsResult = {
   agentName: string;
   skillPath?: string | null;
   skills: Skill[];
+};
+
+/** A reusable, one-time selection of skills from the local library. */
+export type SkillGroup = {
+  id: string;
+  name: string;
+  skillIds: string[];
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type SkillGroupResult = {
+  ok: boolean;
+  error?: string;
+  reason?: string;
+  warning?: string;
+  recoveryPath?: string;
+  hostedSkillIds?: string[];
+  group?: SkillGroup;
 };

@@ -4,6 +4,7 @@ import {
   SearchRegular,
   SettingsRegular,
   StarRegular,
+  FolderRegular
 } from '@fluentui/react-icons';
 
 /**
@@ -25,6 +26,7 @@ export const routePaths = {
   discover: '/discover',
   discoverDetail: '/discover/:publicId',
   local: '/local',
+  skillGroups: '/skill-groups',
   localOrganize: '/local/organize',
   favorites: '/favorites',
   agents: '/agents/:agentId?',
@@ -47,6 +49,13 @@ export const menuRoutes: RouteConfig[] = [
     path: routePaths.local,
     label: '本机',
     icon: BoxRegular,
+    showInMenu: true,
+  },
+  {
+    id: 'skill-groups',
+    path: routePaths.skillGroups,
+    label: '技能组',
+    icon: FolderRegular,
     showInMenu: true,
   },
   {

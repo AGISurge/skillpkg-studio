@@ -9,7 +9,10 @@ const {
   removeIfExists,
 } = require('./electron/pathUtils');
 const { getFilePolicy } = require('./electron/filePolicy');
-const { getAgentConfig } = require('./electron/agentCatalog');
+const { getAgentConfig, resolveAgentSkillPath, detectAgent } = require('./electron/agentCatalog');
+const { ensureSkillGroupSchema, createSkillGroupStore } = require('./electron/skillGroupStore');
+const { createGroupLibraryGuard, reconcileSkillGroups, validateGroupSkills, replaceAgentSkillGroup } = require('./electron/skillGroupService');
+const { createMutationCoordinator } = require('./electron/mutationCoordinator');
 const {
   deleteAgentSkillEntry,
   deleteLibrarySkillEntry,
@@ -142,6 +145,7 @@ const getSqlModule = async () => {
 };
 
 const ensureDatabaseSchema = (database) => {
+  ensureSkillGroupSchema(database);
   database.run(`
     CREATE TABLE IF NOT EXISTS skill_agent_link (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -442,6 +446,7 @@ const writeSkillToLibrary = async ({ installPath, skill, overwrite }) => {
   await ensureDir(skillDir);
   const metadata = {
     name: skill.name,
+    type: skill.type || 'skill',
     version: skill.version,
     description: skill.description,
     author: skill.author,
@@ -526,22 +531,104 @@ const installLibrarySkillsToAgents = async ({ installPath, skillIds, agents }) =
   };
 };
 
-const registerIpcHandlers = () => {
-  ipcMain.handle('get-default-install-path', async () => getDefaultInstallPath());
+const groupStore = createSkillGroupStore({
+  getDatabase: () => dbInitError ? null : db,
+  persist: saveDatabase,
+  restoreDatabase: (bytes) => {
+    const previous = db;
+    db = new sqlModule.Database(bytes);
+    previous.close();
+  },
+});
 
-  ipcMain.handle('select-install-path', async () => {
+const registerIpcHandlers = () => {
+  const coordinate = createMutationCoordinator();
+  const groupLibrary = createGroupLibraryGuard();
+  const reconcileGroups = (installPath) => groupLibrary.accepts(installPath)
+    ? reconcileSkillGroups(groupStore, installPath)
+    : Promise.resolve(groupStore.list());
+  const requireCurrentLibrary = (installPath) => {
+    if (!groupLibrary.accepts(installPath)) throw new Error('本地库路径已变化，请刷新后重试。');
+  };
+  const writes = new Set([
+    'save-skill-group', 'delete-skill-group', 'switch-agent-skill-group',
+    'install-skill', 'install-library-skills', 'uninstall-agent-skill',
+    'delete-agent-skill', 'delete-library-skill', 'unhost-agent-skill',
+    'migrate-skills', 'migrate-install-path', 'import-skill-source',
+    'download-skillpkg-skill', 'save-skill-file', 'restore-db',
+    'replace-favorite-skill-ids',
+  ]);
+  const coordinatedReads = new Set([
+    'list-skill-groups', 'load-skills', 'backup-db', 'open-db-location',
+    'load-agent-skills', 'load-skill-install-records', 'get-agent-skill-counts',
+  ]);
+  const groupChanges = new Set(['save-skill-group', 'delete-skill-group', 'delete-library-skill', 'load-skills']);
+  const libraryChanges = new Set(['restore-db', 'switch-agent-skill-group']);
+  const handle = (channel, handler) => ipcMain.handle(channel, async (...args) => {
+    const run = async () => {
+      const result = await handler(...args);
+      if (groupChanges.has(channel) || libraryChanges.has(channel)) {
+        BrowserWindow.getAllWindows().forEach((window) => window.webContents.send('skill-groups-changed', { refreshLibrary: libraryChanges.has(channel) }));
+      }
+      return result;
+    };
+    if (!writes.has(channel) && !coordinatedReads.has(channel)) return run();
+    return coordinate(run, { switchSkills: channel === 'switch-agent-skill-group', read: coordinatedReads.has(channel) });
+  });
+
+  handle('list-skill-groups', async (_event, payload) => reconcileGroups(payload?.installPath));
+  handle('save-skill-group', async (_event, payload) => {
+    try {
+      requireCurrentLibrary(payload?.installPath);
+      await validateGroupSkills(payload?.installPath, payload?.skillIds);
+      const group = await groupStore.save(payload || {});
+      return { ok: true, group };
+    } catch (error) { return { ok: false, error: error.message }; }
+  });
+  handle('delete-skill-group', async (_event, payload) => {
+    try {
+      if (typeof payload?.id !== 'string') throw new Error('技能组标识无效。');
+      await groupStore.remove(payload.id);
+      return { ok: true };
+    } catch (error) { return { ok: false, error: error.message }; }
+  });
+  handle('switch-agent-skill-group', async (_event, payload) => {
+    try {
+      const agent = typeof payload?.agentId === 'string' ? getAgentConfig(payload.agentId) : null;
+      if (!agent || !(await detectAgent(agent.id)).installed) throw new Error('Agent 不存在或尚未安装。');
+      requireCurrentLibrary(payload.installPath);
+      const groups = await reconcileGroups(payload.installPath);
+      const group = groups.find((item) => item.id === payload.groupId);
+      if (!group) throw new Error('技能组已被删除，请重新选择。');
+      const expected = payload.expectedGroup;
+      if (!expected || group.name !== expected.name || group.updatedAt !== expected.updatedAt || JSON.stringify(group.skillIds) !== JSON.stringify(expected.skillIds)) {
+        return { ok: false, reason: 'group-changed', error: '技能组已发生变化，请重新选择并确认。' };
+      }
+      const skills = await validateGroupSkills(payload.installPath, group.skillIds);
+      return await replaceAgentSkillGroup({
+        skillRoot: resolveAgentSkillPath(agent), installPath: payload.installPath, skills,
+        commit: () => groupStore.replaceAgentSkills(agent.id, skills),
+      });
+    } catch (error) { return { ok: false, error: error.message }; }
+  });
+  handle('get-default-install-path', async () => getDefaultInstallPath());
+
+  handle('select-install-path', async () => {
     const result = await dialog.showOpenDialog(getInstallPathDialogOptions());
     if (result.canceled) return null;
     return result.filePaths?.[0] || null;
   });
 
-  ipcMain.handle('prepare-install-path-change', async (_event, payload) =>
+  handle('prepare-install-path-change', async (_event, payload) =>
     prepareInstallPathChange(payload || {}));
 
-  ipcMain.handle('migrate-install-path', async (_event, payload) =>
-    migrateInstallPath(payload || {}));
+  handle('migrate-install-path', async (_event, payload) => {
+    const result = await migrateInstallPath(payload || {});
+    if (result.ok) groupLibrary.migrated(payload.toInstallPath);
+    return result;
+  });
 
-  ipcMain.handle('select-import-zip', async () => {
+  handle('select-import-zip', async () => {
     const result = await dialog.showOpenDialog({
       properties: ['openFile'],
       filters: [{ name: 'Zip archives', extensions: ['zip'] }],
@@ -550,41 +637,41 @@ const registerIpcHandlers = () => {
     return result.filePaths?.[0] || null;
   });
 
-  ipcMain.handle('scan-import-candidates', async (_event, payload) => {
+  handle('scan-import-candidates', async (_event, payload) => {
     const { scanImportCandidates } = require('./electron/importService');
     return scanImportCandidates(payload || {});
   });
 
-  ipcMain.handle('import-skill-source', async (_event, payload) =>
+  handle('import-skill-source', async (_event, payload) =>
     importSkillSource({
       ...(payload || {}),
       tempRoot: getImportTempRoot(),
     }));
 
-  ipcMain.handle('list-skillpkg-categories', async (_event, payload) =>
+  handle('list-skillpkg-categories', async (_event, payload) =>
     listSkillpkgCategories(payload || {}));
 
-  ipcMain.handle('list-skillpkg-skills', async (_event, payload) =>
+  handle('list-skillpkg-skills', async (_event, payload) =>
     listSkillpkgSkills(payload || {}));
 
-  ipcMain.handle('get-skillpkg-skill-detail', async (_event, payload) =>
+  handle('get-skillpkg-skill-detail', async (_event, payload) =>
     getSkillpkgSkillDetail(payload || {}));
 
-  ipcMain.handle('download-skillpkg-skill', async (_event, payload) => {
+  handle('download-skillpkg-skill', async (_event, payload) => {
     return downloadSkillpkgSkill({
       ...(payload || {}),
       tempRoot: getImportTempRoot(),
     });
   });
 
-  ipcMain.handle('open-external-url', async (_event, url) => {
+  handle('open-external-url', async (_event, url) => {
     const externalUrl = normalizeExternalUrl(url);
     if (!externalUrl) return { ok: false, reason: 'invalid-url' };
     await shell.openExternal(externalUrl);
     return { ok: true };
   });
 
-  ipcMain.handle('get-agent-skill-counts', async (_event, payload) => {
+  handle('get-agent-skill-counts', async (_event, payload) => {
     const { agents, installPath } = payload || {};
     const results = await loadAgentSkills({ agents: agents || [], installPath });
     return results.reduce((acc, result) => {
@@ -593,10 +680,12 @@ const registerIpcHandlers = () => {
     }, {});
   });
 
-  ipcMain.handle('load-skills', async (_event, installPath) =>
-    loadSkillsFromPath(installPath, { mode: 'library' }));
+  handle('load-skills', async (_event, installPath) => {
+    if (db && !dbInitError) await reconcileGroups(installPath);
+    return loadSkillsFromPath(installPath, { mode: 'library' });
+  });
 
-  ipcMain.handle('install-skill', async (_event, payload) => {
+  handle('install-skill', async (_event, payload) => {
     const { installPath, skill, agents, overwrite } = payload || {};
     if (!installPath || !skill?.id) return { ok: false, reason: 'invalid' };
     const agentList = Array.isArray(agents) ? agents : [];
@@ -622,10 +711,10 @@ const registerIpcHandlers = () => {
     return installResult;
   });
 
-  ipcMain.handle('install-library-skills', async (_event, payload) =>
+  handle('install-library-skills', async (_event, payload) =>
     installLibrarySkillsToAgents(payload || {}));
 
-  ipcMain.handle('uninstall-agent-skill', async (_event, payload) => {
+  handle('uninstall-agent-skill', async (_event, payload) => {
     const { agent, agentId, skillId, installPath } = payload || {};
     if (!agentId || !skillId) return { ok: false, reason: 'invalid' };
     const result = await uninstallAgentSkillLink({
@@ -639,7 +728,7 @@ const registerIpcHandlers = () => {
     return result;
   });
 
-  ipcMain.handle('delete-agent-skill', async (_event, payload) => {
+  handle('delete-agent-skill', async (_event, payload) => {
     const { agent, agentId, skillId } = payload || {};
     if (!agentId || !skillId) return { ok: false, reason: 'invalid' };
     const result = await deleteAgentSkillEntry({
@@ -652,7 +741,7 @@ const registerIpcHandlers = () => {
     return result;
   });
 
-  ipcMain.handle('delete-library-skill', async (_event, payload) => {
+  handle('delete-library-skill', async (_event, payload) => {
     const { installPath, skillId, agents } = payload || {};
     if (!installPath || !skillId) return { ok: false, reason: 'invalid', results: [] };
     const result = await deleteLibrarySkillEntry({
@@ -663,11 +752,12 @@ const registerIpcHandlers = () => {
     if (result.ok) {
       await deleteSkillInstallRecordsForSkill(skillId);
       await deleteFavoriteSkillId(skillId);
+      await groupStore.removeMembers([skillId]);
     }
     return result;
   });
 
-  ipcMain.handle('unhost-agent-skill', async (_event, payload) => {
+  handle('unhost-agent-skill', async (_event, payload) => {
     const { agent, agentId, skillId, installPath } = payload || {};
     if (!agentId || !skillId) return { ok: false, reason: 'invalid' };
     const result = await unhostAgentSkillLink({
@@ -681,20 +771,20 @@ const registerIpcHandlers = () => {
     return result;
   });
 
-  ipcMain.handle('load-skill-install-records', async (_event, filters) =>
+  handle('load-skill-install-records', async (_event, filters) =>
     listSkillInstallRecords(filters));
 
-  ipcMain.handle('load-favorite-skill-ids', async () => listFavoriteSkillIds());
+  handle('load-favorite-skill-ids', async () => listFavoriteSkillIds());
 
-  ipcMain.handle('replace-favorite-skill-ids', async (_event, skillIds) =>
+  handle('replace-favorite-skill-ids', async (_event, skillIds) =>
     replaceFavoriteSkillIds(skillIds));
 
-  ipcMain.handle('get-db-info', async () => getDatabaseInfo());
-  ipcMain.handle('open-db-location', async () => openDatabaseLocation());
-  ipcMain.handle('backup-db', async () => backupDatabase());
-  ipcMain.handle('restore-db', async () => restoreDatabase());
+  handle('get-db-info', async () => getDatabaseInfo());
+  handle('open-db-location', async () => openDatabaseLocation());
+  handle('backup-db', async () => backupDatabase());
+  handle('restore-db', async () => restoreDatabase());
 
-  ipcMain.handle('save-skill-file', async (_event, payload) => {
+  handle('save-skill-file', async (_event, payload) => {
     const { installPath, skillId, filePath, content, rootPath } = payload || {};
     if (!filePath) return false;
     const basePath = rootPath || (installPath && skillId ? path.join(installPath, skillId) : null);
@@ -709,7 +799,7 @@ const registerIpcHandlers = () => {
     return true;
   });
 
-  ipcMain.handle('load-skill-file', async (_event, payload) => {
+  handle('load-skill-file', async (_event, payload) => {
     const { rootPath, filePath } = payload || {};
     if (!rootPath || !filePath) return { ok: false, reason: 'invalid' };
     const targetPath = path.normalize(path.join(rootPath, ...filePath.split('/')));
@@ -752,7 +842,7 @@ const registerIpcHandlers = () => {
     }
   });
 
-  ipcMain.handle('load-agent-skills', async (_event, payload) => {
+  handle('load-agent-skills', async (_event, payload) => {
     const legacyAgents = Array.isArray(payload) ? payload : null;
     const agents = legacyAgents || payload?.agents || [];
     const installPath = legacyAgents ? getDefaultInstallPath() : payload?.installPath;
@@ -762,10 +852,10 @@ const registerIpcHandlers = () => {
     return loadAgentSkills({ agents, installPath, includeBrokenRepairCandidates });
   });
 
-  ipcMain.handle('load-default-organize-skills', async (_event, payload) =>
+  handle('load-default-organize-skills', async (_event, payload) =>
     loadDefaultOrganizeSkills(payload || {}));
 
-  ipcMain.handle('migrate-skills', async (_event, payload) => {
+  handle('migrate-skills', async (_event, payload) => {
     const { installPath, items, overwrite, useExisting } = payload || {};
     return migrateSkillsToLibrary({
       installPath,
@@ -776,7 +866,7 @@ const registerIpcHandlers = () => {
     });
   });
 
-  ipcMain.handle('open-skill-path', async (_event, payload) => {
+  handle('open-skill-path', async (_event, payload) => {
     const { installPath, skillId, rootPath } = payload || {};
     const targetDir = rootPath || (installPath && skillId ? path.join(installPath, skillId) : null);
     if (!targetDir || !await pathExists(targetDir)) return false;
@@ -784,7 +874,7 @@ const registerIpcHandlers = () => {
     return !errorMessage;
   });
 
-  ipcMain.handle('detect-agents', async (_event, names) =>
+  handle('detect-agents', async (_event, names) =>
     listInstalledAgents(Array.isArray(names) ? names : names ? [names] : []));
 };
 

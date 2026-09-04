@@ -4,6 +4,7 @@ import { useAppContext, useToolbar } from '../AppContext';
 import Empty from '../components/Empty';
 import OpenDirectoryButton from '../components/OpenDirectoryButton';
 import SkillsPage from './SkillsPage';
+import SwitchSkillGroupButton from '../components/SwitchSkillGroupButton';
 
 /**
  * Agents 页面封装，复用 SkillsPage。
@@ -99,12 +100,15 @@ const AgentsPage = () => {
   );
   const toolbar = useMemo(
     () => (
-      <OpenDirectoryButton
-        disabled={!currentAgent?.skillPath}
-        onClick={() => openDirectoryPath(currentAgent?.skillPath, 'agents')}
-      />
+      <>
+        <SwitchSkillGroupButton agent={currentAgent} skills={agentSkills} />
+        <OpenDirectoryButton
+          disabled={!currentAgent?.skillPath}
+          onClick={() => openDirectoryPath(currentAgent?.skillPath, 'agents')}
+        />
+      </>
     ),
-    [currentAgent?.skillPath, openDirectoryPath],
+    [currentAgent, agentSkills, openDirectoryPath],
   );
   useToolbar(toolbar);
 
