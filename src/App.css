@@ -1822,12 +1822,10 @@ body:not([data-theme='light']) .discover-type-pill.solution {
 .skill-agent-tag {
   display: inline-flex;
   align-items: center;
-  min-height: 22px;
-  padding: 3px 8px;
-  border: 1px solid var(--border-subtle);
-  border-radius: 999px;
+  padding: 3px 8px 4px 8px;
+  border-radius: 6px;
   background: var(--tag-bg);
-  color: var(--text-soft);
+  color: var(--app-text-strong);
   font-size: 11px;
   line-height: 1;
 }
