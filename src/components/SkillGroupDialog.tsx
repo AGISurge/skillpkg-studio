@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { Dialog, Popover } from "radix-ui";
 import { ChevronDown, X } from "lucide-react";
@@ -7,6 +7,8 @@ import { Input } from "./ui/input";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "./ui/input-group";
 import type { Skill, SkillGroup } from "../types/models";
 import { useSkillGroups } from "../SkillGroupsContext";
+
+const GroupModalPortalContext = createContext<HTMLDivElement | null>(null);
 
 export const GroupModal = ({
   title,
@@ -20,7 +22,9 @@ export const GroupModal = ({
   onClose: () => void;
   busy?: boolean;
   compact?: boolean;
-}) => (
+}) => {
+  const [portalContainer, setPortalContainer] = useState<HTMLDivElement | null>(null);
+  return (
   <Dialog.Root
     open
     onOpenChange={(open) => {
@@ -30,6 +34,7 @@ export const GroupModal = ({
     <Dialog.Portal>
       <Dialog.Overlay className="group-modal-overlay" />
       <Dialog.Content
+        ref={setPortalContainer}
         className={`dialog group-modal ${compact ? "group-modal-compact" : ""}`}
         aria-describedby={undefined}
         onEscapeKeyDown={(event) => {
@@ -51,11 +56,14 @@ export const GroupModal = ({
             <X />
           </Button>
         </div>
-        {children}
+        <GroupModalPortalContext.Provider value={portalContainer}>
+          {children}
+        </GroupModalPortalContext.Provider>
       </Dialog.Content>
     </Dialog.Portal>
   </Dialog.Root>
 );
+};
 
 export const SkillMultiSelect = ({
   skills,
@@ -68,6 +76,7 @@ export const SkillMultiSelect = ({
   onToggle: (id: string) => void;
   disabled?: boolean;
 }) => {
+  const portalContainer = useContext(GroupModalPortalContext);
   const [query, setQuery] = useState("");
   const [limit, setLimit] = useState(20);
   const keywords = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
@@ -89,7 +98,8 @@ export const SkillMultiSelect = ({
           <ChevronDown />
         </Button>
       </Popover.Trigger>
-      <Popover.Portal>
+      {/* Keep wheel events inside the modal scroll-lock boundary. */}
+      <Popover.Portal container={portalContainer}>
         <Popover.Content className="group-popover" sideOffset={6} align="start">
           <Input
             autoFocus
@@ -310,12 +320,13 @@ const SkillGroupDialog = ({
               </p>
             )}
           </div>
-          <div className="dialog-footer group-footer">
+          <div className="dialog-footer group-footer  pt-4">
             {group && (
               <Button
                 type="button"
                 variant="destructive"
-                className="group-delete"
+                className="group-delete rounded-full"
+                size="sm"
                 disabled={busy}
                 onClick={() => setConfirm("delete")}
               >
@@ -325,13 +336,15 @@ const SkillGroupDialog = ({
             <Button
               type="button"
               variant="ghost"
+              className="rounded-full"
+              size="sm"
               onClick={close}
               disabled={busy}
             >
               取消
             </Button>
-            <Button type="submit" disabled={busy}>
-              {busy ? "保存中…" : "保存"}
+            <Button type="submit" disabled={busy} className="rounded-full" size="sm">
+              {busy ? "保存中…" : "保 存"}
             </Button>
           </div>
         </form>
