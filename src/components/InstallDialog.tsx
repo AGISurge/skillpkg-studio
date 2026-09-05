@@ -79,24 +79,24 @@ const InstallDialog = ({
           ) : null}
         </div>
         <div className="dialog-footer">
-          <Button type="button" variant="ghost" onClick={onOpenSkillPath} disabled={submitting}>
+          <Button type="button" variant="ghost" size="sm" onClick={onOpenSkillPath} disabled={submitting}>
             查看位置
           </Button>
           {conflict ? (
-            <Button type="button" variant="ghost" onClick={onKeep} disabled={submitting}>
+            <Button type="button" variant="ghost" size="sm" onClick={onKeep} disabled={submitting}>
               保留现有
             </Button>
           ) : null}
-          <Button type="button"  variant="ghost" onClick={onClose} disabled={submitting}>
+          <Button type="button" variant="ghost" size="sm" onClick={onClose} disabled={submitting}>
             取消
           </Button>
           {conflict ? (
-            <Button type="button" className="btn primary" onClick={onOverwrite} disabled={submitting}>
+            <Button type="button" className="rounded-full" size="sm" onClick={onOverwrite} disabled={submitting}>
               {submitting ? <span className="mini-spinner" aria-hidden="true" /> : <CheckmarkCircleRegular className="icon" />}
               覆盖安装
             </Button>
           ) : (
-            <Button type="button" className="btn primary" onClick={onConfirm} disabled={submitting || !selectedAgents.size}>
+            <Button type="button" className="rounded-full" size="sm" onClick={onConfirm} disabled={submitting || !selectedAgents.size}>
               {submitting ? <span className="mini-spinner" aria-hidden="true" /> : <CheckmarkCircleRegular className="icon" />}
               确认安装
             </Button>

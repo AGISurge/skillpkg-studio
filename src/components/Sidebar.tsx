@@ -95,7 +95,7 @@ const Sidebar = ({
                 to={route.path}
                 key={route.id}
                 className={({ isActive }: { isActive: boolean }) =>
-                  `menu-item ${isActive ? 'active' : ''}`
+                  `!py-1 menu-item ${isActive ? 'active' : ''}`
                 }
               >
                 <Icon className="icon" />
@@ -111,7 +111,7 @@ const Sidebar = ({
               <button
                 type="button"
                 key={route.id}
-                className={`menu-item ${activeSection === 'agents' ? 'active' : ''}`}
+                className={`!py-1 menu-item ${activeSection === 'agents' ? 'active' : ''}`}
                 onClick={onToggleAgents}
               >
                 {agentsExpanded ? (
@@ -152,7 +152,7 @@ const Sidebar = ({
                 to={`/agents/${agent.id}`}
                 key={agent.id}
                 className={({ isActive }: { isActive: boolean }) =>
-                  `menu-subitem ${
+                  `menu-subitem !py-1 ${
                     isActive ||
                     (activeSection === 'agents' && selectedAgentId === agent.id)
                       ? 'active'
@@ -169,7 +169,6 @@ const Sidebar = ({
           </div>
         )}
       </nav>
-      <div className="grow" />
       <div className="sidebar-footer">
         {showUpdateButton && appUpdateState ? (
           <button
@@ -186,7 +185,7 @@ const Sidebar = ({
         ) : (
           <div />
         )}
-        <NavLink to="/settings" className="sidebar-settings-link" aria-label="设置">
+        <NavLink to="/settings" className="sidebar-settings-link mt-1 rounded-full" aria-label="设置">
           <SettingsRegular className="icon" />
         </NavLink>
       </div>
