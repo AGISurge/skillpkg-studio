@@ -2,14 +2,22 @@
 
 import { useRef, useState } from "react";
 
+const LIGHT_SPOTLIGHT_COLOR = "#ede1df";
+const DARK_SPOTLIGHT_COLOR = "rgb(217 93 63 / 22%)";
+
 export const SpotlightCard = ({
   children,
   className = "",
-  spotlightColor = "#ede1df",
+  spotlightColor = LIGHT_SPOTLIGHT_COLOR,
+  darkSpotlightColor =
+    spotlightColor === LIGHT_SPOTLIGHT_COLOR
+      ? DARK_SPOTLIGHT_COLOR
+      : spotlightColor,
 }: {
   children: any;
   className?: string;
   spotlightColor?: string;
+  darkSpotlightColor?: string;
 }) => {
   const divRef = useRef<HTMLDivElement>(null);
   const [isFocused, setIsFocused] = useState(false);
@@ -53,11 +61,21 @@ export const SpotlightCard = ({
     >
       <div
         className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-500 ease-in-out"
-        style={{
-          opacity,
-          background: `radial-gradient(circle at ${position.x}px ${position.y}px, ${spotlightColor}, transparent 80%)`,
-        }}
-      />
+        style={{ opacity }}
+      >
+        <div
+          className="absolute inset-0 dark:hidden"
+          style={{
+            background: `radial-gradient(circle at ${position.x}px ${position.y}px, ${spotlightColor}, transparent 80%)`,
+          }}
+        />
+        <div
+          className="absolute inset-0 hidden dark:block"
+          style={{
+            background: `radial-gradient(circle at ${position.x}px ${position.y}px, ${darkSpotlightColor}, transparent 80%)`,
+          }}
+        />
+      </div>
       {children}
     </div>
   );
