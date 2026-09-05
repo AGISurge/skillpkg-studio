@@ -439,6 +439,53 @@ test('agent unmanaged skill keeps host action and adds delete action', () => {
   expect(onDeleteSkill).toHaveBeenCalledWith(expect.objectContaining({ id: 'demo' }));
 });
 
+test('collapses overflowing local skill descriptions and toggles the full text', () => {
+  const scrollHeight = jest
+    .spyOn(HTMLElement.prototype, 'scrollHeight', 'get')
+    .mockReturnValue(100);
+  const clientHeight = jest
+    .spyOn(HTMLElement.prototype, 'clientHeight', 'get')
+    .mockReturnValue(80);
+
+  renderSkillsPage(baseSkill, { mode: 'local' });
+
+  const description = screen.getAllByText('Demo description')[1];
+  const toggle = screen.getByRole('button', { name: '展开' });
+  expect(description).toHaveClass('clamped');
+  expect(toggle).toHaveAttribute('aria-expanded', 'false');
+
+  fireEvent.click(toggle);
+
+  expect(description).not.toHaveClass('clamped');
+  expect(screen.getByRole('button', { name: '收起' }))
+    .toHaveAttribute('aria-expanded', 'true');
+
+  fireEvent.click(screen.getByRole('button', { name: '收起' }));
+
+  expect(description).toHaveClass('clamped');
+  expect(screen.getByRole('button', { name: '展开' }))
+    .toHaveAttribute('aria-expanded', 'false');
+
+  scrollHeight.mockRestore();
+  clientHeight.mockRestore();
+});
+
+test('does not show a toggle when the local skill description fits four lines', () => {
+  const scrollHeight = jest
+    .spyOn(HTMLElement.prototype, 'scrollHeight', 'get')
+    .mockReturnValue(80);
+  const clientHeight = jest
+    .spyOn(HTMLElement.prototype, 'clientHeight', 'get')
+    .mockReturnValue(80);
+
+  renderSkillsPage(baseSkill, { mode: 'local' });
+
+  expect(screen.queryByRole('button', { name: '展开' })).not.toBeInTheDocument();
+
+  scrollHeight.mockRestore();
+  clientHeight.mockRestore();
+});
+
 test('local delete confirmation lists agents using the skill', () => {
   render(
     <SkillDeleteConfirmDialog

@@ -862,7 +862,7 @@ body:not([data-theme='light']) .discover-type-pill.solution {
   min-width: 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(260px, 300px);
-  gap: 22px;
+  gap: 12px;
   overflow: hidden;
 }
 
@@ -1214,7 +1214,7 @@ body:not([data-theme='light']) .discover-type-pill.solution {
 
   .discover-detail-grid {
     grid-template-columns: minmax(0, 1fr) minmax(280px, 320px);
-    gap: 16px;
+    gap: 12px;
   }
 
   .discover-detail-main {
@@ -1332,8 +1332,8 @@ body:not([data-theme='light']) .discover-type-pill.solution {
 }
 
 .icon {
-  width: 18px;
-  height: 18px;
+  width: 15px;
+  height: 15px;
 }
 
 .icon-btn {
@@ -1911,6 +1911,35 @@ body:not([data-theme='light']) .discover-type-pill.solution {
   color: var(--text-muted);
   margin-top: 6px;
   overflow-wrap: anywhere;
+}
+
+.detail-subtitle.clamped {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  overflow: hidden;
+}
+
+.detail-description-toggle {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  line-height: 1.5;
+  margin-top: 2px;
+  padding: 2px 0;
+}
+
+.detail-description-toggle:hover {
+  color: var(--app-text-strong);
+}
+
+.detail-description-toggle:focus-visible {
+  border-radius: 3px;
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
 }
 
 .detail-actions {

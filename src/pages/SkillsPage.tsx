@@ -1,5 +1,7 @@
 import {
   ArrowDownloadRegular,
+  ChevronDownRegular,
+  ChevronUpRegular,
   DeleteRegular,
   DismissRegular,
   OpenFolderRegular,
@@ -8,12 +10,20 @@ import {
   StarFilled,
   StarRegular,
 } from "@fluentui/react-icons";
-import { useEffect, useMemo, useState } from "react";
+import {
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type { KeyboardEvent, ReactNode } from "react";
 import type { Skill, SkillFile } from "../types/models";
 import SkillViewer from "../components/SkillViewer";
 import { Button } from "@/components/ui/button";
 import { SpotlightCard } from "@/components/ui/spotlight-card";
+import { ChevronDown } from "lucide-react";
 
 const SEARCH_DEBOUNCE_MS = 220;
 
@@ -51,6 +61,67 @@ const highlightSearchMatch = (value: string, query: string): ReactNode => {
   }
 
   return parts;
+};
+
+type LocalSkillDescriptionProps = {
+  description: string;
+};
+
+const LocalSkillDescription = ({
+  description,
+}: LocalSkillDescriptionProps) => {
+  const descriptionId = useId();
+  const descriptionRef = useRef<HTMLDivElement>(null);
+  const [expanded, setExpanded] = useState(false);
+  const [overflows, setOverflows] = useState(false);
+
+  useLayoutEffect(() => {
+    if (expanded) return;
+
+    const descriptionElement = descriptionRef.current;
+    if (!descriptionElement) return;
+
+    const measureOverflow = () => {
+      setOverflows(
+        descriptionElement.scrollHeight > descriptionElement.clientHeight + 1,
+      );
+    };
+
+    measureOverflow();
+
+    if (typeof ResizeObserver !== "undefined") {
+      const observer = new ResizeObserver(measureOverflow);
+      observer.observe(descriptionElement);
+      return () => observer.disconnect();
+    }
+
+    window.addEventListener("resize", measureOverflow);
+    return () => window.removeEventListener("resize", measureOverflow);
+  }, [description, expanded]);
+
+  return (
+    <div className="detail-description">
+      <div
+        ref={descriptionRef}
+        id={descriptionId}
+        className={`detail-subtitle ${expanded ? "" : "clamped"}`}
+      >
+        {description}
+      </div>
+      {overflows && (
+        <button
+          type="button"
+          className="detail-description-toggle text-xs mt-1"
+          aria-controls={descriptionId}
+          aria-expanded={expanded}
+          onClick={() => setExpanded((current) => !current)}
+        >
+          {expanded ? "收起" : "展开"}
+          {expanded ? <ChevronUpRegular /> : <ChevronDownRegular />}
+        </button>
+      )}
+    </div>
+  );
 };
 
 /**
@@ -378,9 +449,16 @@ const SkillsPage = ({
                     )}
                   </div>
                 </div>
-                <div className="detail-subtitle">
-                  {selectedSkill.description}
-                </div>
+                {mode === "local" ? (
+                  <LocalSkillDescription
+                    key={selectedSkill.id}
+                    description={selectedSkill.description}
+                  />
+                ) : (
+                  <div className="detail-subtitle">
+                    {selectedSkill.description}
+                  </div>
+                )}
               </div>
             </div>
             <div className="detail-body">
