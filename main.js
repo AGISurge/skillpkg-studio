@@ -11,7 +11,7 @@ const {
 const { getFilePolicy } = require('./electron/filePolicy');
 const { getAgentConfig, resolveAgentSkillPath, detectAgent } = require('./electron/agentCatalog');
 const { ensureSkillGroupSchema, createSkillGroupStore } = require('./electron/skillGroupStore');
-const { createGroupLibraryGuard, reconcileSkillGroups, validateGroupSkills, replaceAgentSkillGroup } = require('./electron/skillGroupService');
+const { createGroupLibraryGuard, readSkillGroups, validateGroupSkills, replaceAgentSkillGroup } = require('./electron/skillGroupService');
 const { createMutationCoordinator } = require('./electron/mutationCoordinator');
 const {
   deleteAgentSkillEntry,
@@ -584,9 +584,6 @@ const registerIpcHandlers = () => {
     }),
   });
   const groupLibrary = createGroupLibraryGuard();
-  const reconcileGroups = (installPath) => groupLibrary.accepts(installPath)
-    ? reconcileSkillGroups(groupStore, installPath)
-    : Promise.resolve(groupStore.list());
   const requireCurrentLibrary = (installPath) => {
     if (!groupLibrary.accepts(installPath)) throw new Error('本地库路径已变化，请刷新后重试。');
   };
@@ -602,7 +599,7 @@ const registerIpcHandlers = () => {
     'list-skill-groups', 'load-skills', 'backup-db', 'open-db-location',
     'load-agent-skills', 'load-skill-install-records', 'get-agent-skill-counts',
   ]);
-  const groupChanges = new Set(['save-skill-group', 'delete-skill-group', 'delete-library-skill', 'load-skills']);
+  const groupChanges = new Set(['save-skill-group', 'delete-skill-group', 'delete-library-skill']);
   const libraryChanges = new Set(['restore-db', 'switch-agent-skill-group']);
   const handle = (channel, handler) => ipcMain.handle(channel, async (...args) => {
     const run = async () => {
@@ -616,7 +613,7 @@ const registerIpcHandlers = () => {
     return coordinate(run, { switchSkills: channel === 'switch-agent-skill-group', read: coordinatedReads.has(channel) });
   });
 
-  handle('list-skill-groups', async (_event, payload) => reconcileGroups(payload?.installPath));
+  handle('list-skill-groups', async () => readSkillGroups(groupStore));
   handle('save-skill-group', async (_event, payload) => {
     try {
       requireCurrentLibrary(payload?.installPath);
@@ -637,7 +634,7 @@ const registerIpcHandlers = () => {
       const agent = typeof payload?.agentId === 'string' ? getAgentConfig(payload.agentId) : null;
       if (!agent || !(await detectAgent(agent.id)).installed) throw new Error('Agent 不存在或尚未安装。');
       requireCurrentLibrary(payload.installPath);
-      const groups = await reconcileGroups(payload.installPath);
+      const groups = readSkillGroups(groupStore);
       const group = groups.find((item) => item.id === payload.groupId);
       if (!group) throw new Error('技能组已被删除，请重新选择。');
       const expected = payload.expectedGroup;
@@ -744,7 +741,6 @@ const registerIpcHandlers = () => {
   });
 
   handle('load-skills', async (_event, installPath) => {
-    if (db && !dbInitError) await reconcileGroups(installPath);
     return loadSkillsFromPath(installPath, { mode: 'library' });
   });
 

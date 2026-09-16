@@ -98,7 +98,7 @@ const Sidebar = ({
                   `!py-1 menu-item ${isActive ? 'active' : ''}`
                 }
               >
-                <Icon className="icon" />
+                <Icon className="icon text-muted-foreground" />
                 <span>{route.label}</span>
               </NavLink>
             );

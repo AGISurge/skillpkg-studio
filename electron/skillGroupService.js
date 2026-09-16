@@ -51,23 +51,11 @@ const inspectSkill = async (root, id, io = fs) => {
   };
 };
 
-const reconcileSkillGroups = async (store, installPath, io = fs) => {
-  const groups = store.list();
-  if (!installPath) return groups;
-  // A missing or unreadable library is not an empty library.
-  try { await io.readdir(installPath); } catch (_error) { return groups; }
-  const invalid = [];
-  for (const id of new Set(groups.flatMap((group) => group.skillIds))) {
-    try {
-      const skill = await inspectSkill(installPath, id, io);
-      if (!skill || skill.type !== 'skill') invalid.push(id);
-    } catch (_error) { /* Unknown state: retain the reference. */ }
-  }
-  // Recheck availability before committing any cleanup.
-  try { await io.readdir(installPath); } catch (_error) { return groups; }
-  await store.removeMembers(invalid);
-  return store.list();
-};
+// Group membership is durable user data. Reading a group must never mutate it
+// based on a point-in-time filesystem scan: the selected library can be stale,
+// temporarily incomplete, or later restored. Explicit library deletion remains
+// responsible for removing references through store.removeMembers().
+const readSkillGroups = (store) => store.list();
 
 const validateGroupSkills = async (installPath, skillIds, io = fs) => {
   if (!installPath || !Array.isArray(skillIds) || !skillIds.length) throw new Error('请至少选择一个有效的本地技能。');
@@ -208,4 +196,4 @@ const replaceAgentSkillGroup = async ({ skillRoot, installPath, skills, commit, 
   return { ok: true, hostedSkillIds };
 };
 
-module.exports = { createGroupLibraryGuard, inspectSkill, reconcileSkillGroups, validateGroupSkills, replaceAgentSkillGroup };
+module.exports = { createGroupLibraryGuard, inspectSkill, readSkillGroups, validateGroupSkills, replaceAgentSkillGroup };

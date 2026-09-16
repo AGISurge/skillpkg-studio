@@ -4,7 +4,7 @@ const os = require('os');
 const path = require('path');
 const initSqlJs = require('sql.js/dist/sql-asm.js');
 const { createSkillGroupStore, ensureSkillGroupSchema } = require('../../electron/skillGroupStore');
-const { createGroupLibraryGuard, inspectSkill, reconcileSkillGroups, validateGroupSkills, replaceAgentSkillGroup } = require('../../electron/skillGroupService');
+const { createGroupLibraryGuard, inspectSkill, readSkillGroups, validateGroupSkills, replaceAgentSkillGroup } = require('../../electron/skillGroupService');
 const { createMutationCoordinator } = require('../../electron/mutationCoordinator');
 const { loadSkillsFromPath } = require('../../electron/skillScanner');
 
@@ -69,19 +69,14 @@ test('recognizes explicit solution types while preserving legacy skills', async 
   await expect(validateGroupSkills(library, ['../outside'])).rejects.toThrow('无效');
   await expect(validateGroupSkills(library, ['legacy'])).resolves.toHaveLength(1);
 });
-test('cleans missing and non-skill references while retaining empty groups', async () => {
+test('reads retain missing and non-skill references until an explicit deletion', async () => {
   await writeSkill(library, 'solution', { type: 'solution' });
   const group = await store.save({ name: 'Group', skillIds: ['missing', 'solution'] });
-  const result = await reconcileSkillGroups(store, library);
-  expect(result[0].id).toBe(group.id); expect(result[0].skillIds).toEqual([]);
-});
-test('unavailable library and permission errors never erase references', async () => {
-  await writeSkill(library, 'keep'); await store.save({ name: 'Group', skillIds: ['keep'] });
-  await reconcileSkillGroups(store, path.join(tmp, 'unmounted'));
-  expect(store.list()[0].skillIds).toEqual(['keep']);
-  const io = { ...fs, readFile: async () => { const error = new Error('denied'); error.code = 'EACCES'; throw error; } };
-  await reconcileSkillGroups(store, library, io);
-  expect(store.list()[0].skillIds).toEqual(['keep']);
+  const result = readSkillGroups(store);
+  expect(result[0].id).toBe(group.id);
+  expect(result[0].skillIds).toEqual(['missing', 'solution']);
+  await store.removeMembers(['missing']);
+  expect(readSkillGroups(store)[0].skillIds).toEqual(['solution']);
 });
 
 test('stale refreshes after library migration cannot prune group members', async () => {
@@ -91,7 +86,7 @@ test('stale refreshes after library migration cannot prune group members', async
   await writeSkill(newLibrary, 'keep');
   await store.save({ name: 'Group', skillIds: ['keep'] });
   guard.migrated(newLibrary);
-  if (guard.accepts(library)) await reconcileSkillGroups(store, library);
+  if (guard.accepts(library)) readSkillGroups(store);
   expect(store.list()[0].skillIds).toEqual(['keep']);
   expect(guard.accepts(newLibrary)).toBe(true);
   guard.migrated(library);

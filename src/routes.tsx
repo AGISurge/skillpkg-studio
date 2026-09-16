@@ -4,7 +4,7 @@ import {
   SearchRegular,
   SettingsRegular,
   StarRegular,
-  ShieldCheckmarkRegular,
+  ShieldTaskRegular,
   FolderRegular
 } from '@fluentui/react-icons';
 
@@ -57,7 +57,7 @@ export const menuRoutes: RouteConfig[] = [
     id: 'security',
     path: routePaths.security,
     label: '安全扫描',
-    icon: ShieldCheckmarkRegular,
+    icon: ShieldTaskRegular,
     showInMenu: true,
   },
   {

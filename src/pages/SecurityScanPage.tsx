@@ -132,7 +132,7 @@ const SecurityScanPage = () => {
   const currentStatusText = scanning
     ? `正在扫描：${currentTarget}`
     : task?.phase === 'completed'
-      ? '扫描已完成'
+      ? ''
       : task?.phase === 'canceled'
         ? '扫描已取消，已完成的结果已保留'
         : task?.phase === 'error'
