@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { FolderRegular, AddRegular } from "@fluentui/react-icons";
 import { useAppContext, useToolbar } from "../AppContext";
 import { useSkillGroups } from "../SkillGroupsContext";
@@ -7,6 +7,85 @@ import { Button } from "../components/ui/button";
 import type { SkillGroup } from "../types/models";
 import { SpotlightCard } from "@/components/ui/spotlight-card";
 import { useMasonryGrid } from "../utils/useMasonryGrid";
+
+const SkillGroupCard = ({
+  group,
+  names,
+  onEdit,
+}: {
+  group: SkillGroup;
+  names: ReadonlyMap<string, string>;
+  onEdit: () => void;
+}) => {
+  const [expanded, setExpanded] = useState(false);
+  const [overflowing, setOverflowing] = useState(false);
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const contentId = useId();
+
+  useLayoutEffect(() => {
+    const viewport = viewportRef.current;
+    const content = contentRef.current;
+    if (!viewport || !content || expanded) return;
+
+    const measure = () => {
+      setOverflowing(content.scrollHeight > viewport.clientHeight + 1);
+    };
+
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+
+    const observer = new ResizeObserver(measure);
+    observer.observe(viewport);
+    observer.observe(content);
+    return () => observer.disconnect();
+  }, [expanded, group.skillIds]);
+
+  return (
+    <div className="group-card-item">
+      <SpotlightCard className="group-card w-full shadow-none bg-white transition-shadow duration-300 hover:shadow-md dark:hover:shadow-lg dark:hover:shadow-primary/20 p-0 rounded-lg">
+        <button
+          type="button"
+          className="group-card-open"
+          aria-label={`编辑技能组 ${group.name}`}
+          onClick={onEdit}
+        >
+          <div className="group-card-heading">
+            <h2>{group.name}</h2>
+            <span>{group.skillIds.length}</span>
+          </div>
+          <div
+            ref={viewportRef}
+            id={contentId}
+            className={`group-card-tags-viewport ${expanded ? "is-expanded" : ""}`}
+          >
+            <div ref={contentRef} className="group-tags group-card-tags-content">
+              {group.skillIds.map((id) => (
+                <span className="group-tag" key={id}>
+                  {names.get(id) || id}
+                </span>
+              ))}
+            </div>
+            {!group.skillIds.length && (
+              <p className="group-muted">请添加技能</p>
+            )}
+          </div>
+        </button>
+        {overflowing && (
+          <button
+            type="button"
+            className="group-card-toggle"
+            aria-controls={contentId}
+            aria-expanded={expanded}
+            onClick={() => setExpanded((current) => !current)}
+          >
+            {expanded ? "收起" : "展开"}
+          </button>
+        )}
+      </SpotlightCard>
+    </div>
+  );
+};
 
 const SkillGroupsPage = () => {
   const { localSkills } = useAppContext();
@@ -52,29 +131,12 @@ const SkillGroupsPage = () => {
           )}
           <div className="group-grid" ref={groupGridRef}>
             {groups.map((group) => (
-              <button
+              <SkillGroupCard
                 key={group.id}
-                type="button"
-                className="group-card-button"
-                onClick={() => setEditor({ group })}
-              >
-                <SpotlightCard className="group-card w-full shadow-none bg-white transition-shadow duration-300 hover:shadow-md dark:hover:shadow-lg dark:hover:shadow-primary/20 pt-6 px-6 pb-3 rounded-lg">
-                  <div className="group-card-heading">
-                    <h2>{group.name}</h2>
-                    <span>{group.skillIds.length}</span>
-                  </div>
-                  <div className="group-tags">
-                    {group.skillIds.map((id) => (
-                      <span className="group-tag" key={id}>
-                        {names.get(id) || id}
-                      </span>
-                    ))}
-                  </div>
-                  {!group.skillIds.length && (
-                    <p className="group-muted">请添加技能</p>
-                  )}
-                </SpotlightCard>
-              </button>
+                group={group}
+                names={names}
+                onEdit={() => setEditor({ group })}
+              />
             ))}
           </div>
         </>
