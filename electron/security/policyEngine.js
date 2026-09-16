@@ -1,7 +1,7 @@
 const crypto = require('crypto');
 
-const POLICY_VERSION = '2.0.1';
-const ANALYZER_VERSION = '1.0.0';
+const POLICY_VERSION = '2.2.0';
+const ANALYZER_VERSION = '2.1.0';
 const SCANNER_VERSION = '1.0.0';
 
 const SEVERITY_RANK = {
@@ -26,7 +26,7 @@ const POLICY = {
       ruleId: 'INSTRUCTION_PROMPT_OVERRIDE',
       title: '试图覆盖上层指令',
       category: 'prompt-injection',
-      severity: 'high',
+      severity: 'medium',
       confidence: 'high',
       pattern: /(?<!do not )(?<!don't )(?<!never )(?:ignore|disregard|override|bypass)\s+(?:all\s+)?(?:(?:previous|prior)\s+)?(?:system|developer|user|safety)?\s*(?:instructions?|rules?|prompts?)|(?<!不要)(?<!不得)(?<!禁止)(?<!切勿)(?:忽略|无视|绕过|覆盖).{0,12}(?:系统|开发者|用户|安全|上述|之前).{0,12}(?:指令|规则|限制)/i,
       message: '内容要求 Agent 忽略或覆盖更高优先级的指令。',
@@ -37,7 +37,7 @@ const POLICY = {
       ruleId: 'INSTRUCTION_SYSTEM_IMPERSONATION',
       title: '伪造系统或工具身份',
       category: 'prompt-injection',
-      severity: 'high',
+      severity: 'medium',
       confidence: 'medium',
       pattern: /^\s*(?:#{1,6}\s*)?(?:\*\*)?(?:SYSTEM|DEVELOPER|TOOL|ASSISTANT)(?:\*\*)?\s*:|(?<!do not )(?<!don't )(?<!never )\b(?:pretend|claim|act)\b\s+(?:that\s+)?(?:you|approval|the tool)|(?<!不要)(?<!不得)(?<!禁止)(?<!切勿)(?:假装|伪造).{0,12}(?:系统|工具|审批|开发者)/i,
       message: '内容可能在伪造系统消息、工具结果或授权状态。',
@@ -48,9 +48,9 @@ const POLICY = {
       ruleId: 'INSTRUCTION_CONCEALMENT',
       title: '要求隐瞒操作',
       category: 'concealment',
-      severity: 'high',
+      severity: 'medium',
       confidence: 'high',
-      pattern: /(?:do\s+not|don'?t|never)\s+(?:tell|inform|show|mention)\s+(?:the\s+)?user|(?<!do not )(?<!don't )(?<!never )(?:hide|conceal|erase|delete)\s+(?:the\s+)?(?:logs?|history|evidence)|(?:不要|无需|禁止).{0,10}(?:告知|告诉|通知|提示|显示).{0,8}(?:用户|操作者)|(?<!不要)(?<!不得)(?<!禁止)(?<!切勿)(?:隐瞒|隐藏).{0,8}(?:操作|行为|事实|结果|记录|证据)|(?<!不要)(?<!不得)(?<!禁止)(?<!切勿)(?:删除|清除|擦除).{0,8}(?:日志|记录|证据|历史)/i,
+      pattern: /(?:do\s+not|don'?t|never)\s+(?:tell|inform|show|mention)\s+(?:the\s+)?user.{0,30}(?:proceed|execute|send|delete|modify|change|operation|action|result)|(?<!do not )(?<!don't )(?<!never )(?:hide|conceal|erase|delete)\s+(?:the\s+)?(?:logs?|history|evidence)|(?:不要|无需|禁止).{0,10}(?:告知|告诉|通知|提示|显示).{0,8}(?:用户|操作者).{0,20}(?:(?:直接|静默|偷偷|已|已经).{0,8})?(?:执行|发送|删除|修改|操作)|(?<!不要)(?<!不得)(?<!禁止)(?<!切勿)(?:隐瞒|隐藏).{0,8}(?:操作|行为|事实|结果|记录|证据)|(?<!不要)(?<!不得)(?<!禁止)(?<!切勿)(?:删除|清除|擦除).{0,8}(?:日志|证据|审计记录|操作记录|访问记录|系统记录|操作历史|审计历史)/i,
       message: '内容要求对用户隐瞒操作或清除审计记录。',
       remediation: '所有有副作用的操作都应向用户清晰说明并保留审计记录。',
       features: ['concealment', 'silent-operation'],
@@ -59,10 +59,10 @@ const POLICY = {
       ruleId: 'INSTRUCTION_APPROVAL_BYPASS',
       title: '试图绕过确认或权限',
       category: 'authorization',
-      severity: 'high',
+      severity: 'medium',
       confidence: 'high',
-      safePattern: /(?:do\s+not|don't|never)\s+(?:proceed|continue|advance|move\s+forward|act|execute|run|send|delete|modify|change)[^,.!?;:，。！？；：]{0,120}\bwithout\s+(?:user\s+)?(?:approval|confirmation|permission)/i,
-      pattern: /without\s+(?:user\s+)?(?:approval|confirmation|permission)|(?<!do not )(?<!don't )(?<!never )(?:skip|bypass)\s+(?:user\s+)?(?:approval|confirmation|permission)|(?:assume|claim).{0,16}(?:approved|authorized)|(?:无需|不用).{0,10}(?:用户)?(?:确认|同意|授权|审批|权限)|(?<!不要)(?<!不得)(?<!禁止)(?<!切勿)(?:跳过|绕过).{0,10}(?:用户)?(?:确认|同意|授权|审批|权限)/i,
+      safePattern: /(?:do\s+not|don't|never)\s+(?:proceed|continue|advance|move\s+forward|act|execute|run|send|delete|modify|change)[^,.!?;:，。！？；：]{0,120}\bwithout\s+(?:user\s+)?(?:approval|confirmation|permission)|(?:cannot|can't|can\s+not)\s+(?:skip|bypass)\s+(?:user\s+)?(?:approval|confirmation|permission)|without\s+(?:secondary|additional|further|repeated)\s+(?:approval|confirmation|permission)|(?:无需|不用|无须).{0,8}(?:二次|再次|额外|重复).{0,8}(?:确认|同意|授权|审批)|(?:跳过|绕过).{0,6}(?:或|或者).{0,6}(?:要求|请).{0,6}(?:用户)?确认/i,
+      pattern: /without\s+user\s+(?:approval|confirmation|permission)|(?<!do not )(?<!don't )(?<!never )(?:skip|bypass)\s+(?:user\s+)?(?:approval|confirmation|permission)|(?:assume|claim).{0,16}(?:approved|authorized)|(?:未经|没有获得).{0,8}用户(?:确认|同意|授权|审批).{0,20}(?:执行|发送|删除|修改|创建|取消|发布|外传)|(?:无需|不用|无须).{0,12}(?:用户)?(?:确认|同意|授权|审批).{0,24}(?:有副作用|不可逆|破坏性|高权限|敏感操作)|(?<!不要)(?<!不得)(?<!禁止)(?<!切勿)(?:跳过|绕过).{0,4}(?:用户)?(?:确认|同意|授权|审批|权限)/i,
       message: '内容要求在缺少用户确认或授权时继续操作。',
       remediation: '对破坏性、外部发送或高权限操作保留明确确认步骤。',
       features: ['approval-bypass', 'silent-operation'],
@@ -71,7 +71,7 @@ const POLICY = {
       ruleId: 'INSTRUCTION_SENSITIVE_ACCESS',
       title: '要求获取敏感信息',
       category: 'sensitive-data',
-      severity: 'high',
+      severity: 'medium',
       confidence: 'medium',
       pattern: /(?<!do not )(?<!don't )(?<!never )(?:read|collect|extract|find|reveal|print|dump).{0,30}(?:api[_ -]?key|password|token|credential|private\s+key|\.ssh|\.aws|keychain|browser\s+(?:data|cookies?)|system\s+prompt|conversation\s+history)|(?<!不要)(?<!不得)(?<!禁止)(?<!切勿)(?:读取|获取|导出|显示|收集|查找).{0,24}(?:密码|密钥|令牌|凭据|私钥|系统提示|对话历史|浏览器数据)/i,
       message: '内容要求读取凭据、私钥或 Agent 内部上下文。',
@@ -82,7 +82,7 @@ const POLICY = {
       ruleId: 'INSTRUCTION_EXFILTRATION',
       title: '要求将数据发送到外部',
       category: 'data-exfiltration',
-      severity: 'high',
+      severity: 'medium',
       confidence: 'medium',
       pattern: /(?<!do not )(?<!don't )(?<!never )(?:upload|send|post|transmit|exfiltrate).{0,30}(?:secret|token|key|credential|file|data|history).{0,30}(?:https?:\/\/|webhook|server|endpoint|third.party)|(?<!不要)(?<!不得)(?<!禁止)(?<!切勿)(?:上传|发送|传输|外传).{0,24}(?:密钥|令牌|凭据|文件|数据|历史).{0,24}(?:网址|服务器|接口|第三方|webhook)/i,
       message: '内容要求将本地或敏感数据发送到外部系统。',
@@ -275,7 +275,10 @@ const syntheticFinding = (ruleId, title, message, features) => normalizeFinding(
 const aggregateFindings = (rawFindings) => {
   const findings = rawFindings.map(normalizeFinding);
   const featureSet = new Set(findings
-    .filter((finding) => finding.confidence !== 'low')
+    .filter((finding) => (
+      finding.confidence === 'high'
+      || (finding.confidence === 'medium' && /^(?:SCRIPT_|MANIFEST_)/.test(finding.ruleId))
+    ))
     .flatMap((finding) => finding.features || []));
   const combinations = [
     ['COMBO_SECRET_EXFILTRATION', '敏感信息可能被外传', ['sensitive-source', 'network-sink'], '同时发现敏感信息读取与外部发送能力。'],

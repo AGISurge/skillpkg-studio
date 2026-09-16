@@ -46,6 +46,66 @@ const buildFinding = ({ rule, filePath, line, lineIndex, match, severity, confid
   });
 
 const safetyNegationPrefix = /(?:do\s+not|don't|never|不要|不得|禁止|切勿)[^,.!?;:，。！？；：]{0,24}$/i;
+const defensiveHeadingPattern = /(?:安全|防护|拒绝|禁止|不支持|风险)(?:规则|要求|策略|边界|范围|事项)?|(?:safety|security|guardrails?|refusal|prohibited|disallowed)/i;
+const defensiveOutcomeHeadingPattern = /(?:拒绝|严禁|禁止|不予(?:执行|处理|受理)|不得(?:执行|处理|操作)|不支持)|(?:refus(?:e|al)|reject(?:ed|ion)?|prohibit(?:ed|ion)?|disallow(?:ed)?|blocked?)/i;
+const negatedDefensiveOutcomePattern = /(?:不要|不得|禁止|切勿|无需|无须|不必|不可)\s*(?:直接|立即|严格|一律)?\s*(?:拒绝|严禁|禁止|不予执行)|(?:do\s+not|don't|never|must\s+not)\s+(?:refuse|reject|prohibit|block)/i;
+const defensiveLeadPattern = /(?:遇到|出现|发现|检测到|识别到|命中|以下|下列).{0,60}(?:直接)?(?:拒绝|拦截|不调用|不执行|不响应|不得执行|视为普通文本)|(?:refuse|reject|block).{0,40}(?:the following|these requests?|requests? that)|(?:if|when|whenever|the following).{0,100}(?:refuse|reject|block|do not (?:call|execute|follow|run|respond))/i;
+const markdownListItemPattern = /^\s*(?:[-+*]|\d+[.)])\s+/;
+const instructionExamplePrefixPattern = /(?:如|例如|比如|举例|出现|包含|模式|示例|such as|for example|e\.g\.)[^。！？.!?]{0,48}$/i;
+const defensiveExampleSuffixPattern = /(?:一律|应当|必须|直接)?(?:忽略|拒绝|拦截|视为普通文本)|(?:不|不得|不要|禁止)(?:响应|执行|遵循|采纳)|(?:ignore|refuse|reject|block|do not (?:execute|follow|obey|respond))/i;
+
+const headingDefinesDefensiveOutcome = (heading) => (
+  heading.length <= 120
+  && defensiveOutcomeHeadingPattern.test(heading)
+  && !negatedDefensiveOutcomePattern.test(heading)
+);
+
+const getDefensiveExampleLines = (content) => {
+  const lines = content.split(/\r?\n/);
+  const headings = [];
+  lines.forEach((line, index) => {
+    const match = /^\s*(#{1,6})\s+(.+?)\s*$/.exec(line);
+    if (!match) return;
+    headings.push({
+      index,
+      level: match[1].length,
+      text: match[2].replace(/[`*_~]/g, '').trim(),
+    });
+  });
+
+  const defensiveLines = new Set();
+  headings.forEach((heading, headingIndex) => {
+    const headingActsAsLead = headingDefinesDefensiveOutcome(heading.text);
+    if (!headingActsAsLead && !defensiveHeadingPattern.test(heading.text)) return;
+    const nextPeer = headings.slice(headingIndex + 1)
+      .find((candidate) => candidate.level <= heading.level);
+    const sectionEnd = nextPeer?.index ?? lines.length;
+    const leadIndex = headingActsAsLead
+      ? heading.index
+      : lines.findIndex((line, index) => (
+        index > heading.index
+        && index < sectionEnd
+        && defensiveLeadPattern.test(line)
+      ));
+    if (leadIndex < 0) return;
+
+    let previousWasDefensive = false;
+    for (let index = leadIndex + 1; index < sectionEnd; index += 1) {
+      const line = lines[index];
+      if (markdownListItemPattern.test(line)) {
+        defensiveLines.add(index);
+        previousWasDefensive = true;
+        continue;
+      }
+      if (previousWasDefensive && /^\s{2,}\S/.test(line)) {
+        defensiveLines.add(index);
+        continue;
+      }
+      if (line.trim()) previousWasDefensive = false;
+    }
+  });
+  return defensiveLines;
+};
 
 const findRuleMatch = (rule, value) => {
   if (rule.safePattern) {
@@ -56,7 +116,7 @@ const findRuleMatch = (rule, value) => {
   return rule.pattern.exec(value);
 };
 
-const scanLines = ({ content, filePath, rules, mode }) => {
+const scanLines = ({ content, defensiveExampleLines, filePath, rules, mode }) => {
   const extension = path.extname(filePath).slice(1).toLowerCase();
   const lines = content.split(/\r?\n/);
   const findings = [];
@@ -68,6 +128,7 @@ const scanLines = ({ content, filePath, rules, mode }) => {
       fenced = !fenced;
       return;
     }
+    if (mode === 'instruction' && defensiveExampleLines.has(lineIndex)) return;
     let commentOnly = false;
     if (mode === 'script') {
       const commentState = isCommentOnly(line, extension, inBlockComment);
@@ -82,6 +143,11 @@ const scanLines = ({ content, filePath, rules, mode }) => {
         mode === 'instruction'
         && match.index > 0
         && safetyNegationPrefix.test(line.slice(0, match.index))
+      ) return;
+      if (
+        mode === 'instruction'
+        && instructionExamplePrefixPattern.test(line.slice(0, match.index))
+        && defensiveExampleSuffixPattern.test(line.slice(match.index + String(match[0]).length))
       ) return;
       const exampleOnly = mode === 'instruction' && fenced;
       findings.push(buildFinding({
@@ -100,7 +166,7 @@ const scanLines = ({ content, filePath, rules, mode }) => {
 
 const executionRequestPattern = /(?:run|execute|paste|copy).{0,24}(?:following|below|command|script|terminal)|(?:运行|执行|复制|粘贴).{0,20}(?:以下|下列|命令|脚本|终端)|^\s*(?:run|execute)\b|^\s*(?:运行|执行)(?:\s|[:：])/i;
 
-const scanMarkdownCodeBlocks = (filePath, content) => {
+const scanMarkdownCodeBlocks = (filePath, content, defensiveExampleLines) => {
   const lines = content.split(/\r?\n/);
   const findings = [];
   let fenced = false;
@@ -117,6 +183,7 @@ const scanMarkdownCodeBlocks = (filePath, content) => {
       fenced = !fenced;
       return;
     }
+    if (defensiveExampleLines.has(lineIndex)) return;
     const inlineExecution = !fenced && executionRequestPattern.test(line);
     if (!fenced && !inlineExecution) return;
     POLICY.scriptRules.forEach((rule) => {
@@ -170,7 +237,9 @@ const scanHiddenUnicode = (filePath, content) => {
   const lines = content.split(/\r?\n/);
   const findings = [];
   lines.forEach((line, lineIndex) => {
-    const match = /[\u200B-\u200F\u202A-\u202E\u2060-\u206F\uFEFF]/.exec(line);
+    const leadingBomLength = lineIndex === 0 && line.startsWith('\uFEFF') ? 1 : 0;
+    const visibleLine = line.slice(leadingBomLength);
+    const match = /[\u200B-\u200F\u202A-\u202E\u2060-\u206F\uFEFF]/.exec(visibleLine);
     if (!match) return;
     findings.push(normalizeFinding({
       ruleId: 'CONTENT_HIDDEN_UNICODE',
@@ -181,9 +250,9 @@ const scanHiddenUnicode = (filePath, content) => {
       filePath,
       startLine: lineIndex + 1,
       endLine: lineIndex + 1,
-      startColumn: match.index + 1,
-      endColumn: match.index + 2,
-      evidence: line.replace(/[\u200B-\u200F\u202A-\u202E\u2060-\u206F\uFEFF]/g, '[HIDDEN]'),
+      startColumn: match.index + leadingBomLength + 1,
+      endColumn: match.index + leadingBomLength + 2,
+      evidence: visibleLine.replace(/[\u200B-\u200F\u202A-\u202E\u2060-\u206F\uFEFF]/g, '[HIDDEN]'),
       message: '文件中存在肉眼难以看见或可改变文本显示顺序的字符。',
       remediation: '删除隐藏字符，使指令和代码以可见形式保存。',
       features: ['obfuscation'],
@@ -334,6 +403,7 @@ const scanPackageManifest = (filePath, content) => {
 
 const analyzeTextFile = ({ filePath, content }) => {
   const extension = path.extname(filePath).slice(1).toLowerCase();
+  const defensiveExampleLines = getDefensiveExampleLines(content);
   const findings = [
     ...scanHiddenUnicode(filePath, content),
     ...scanEncodedInstructions(filePath, content),
@@ -341,9 +411,10 @@ const analyzeTextFile = ({ filePath, content }) => {
   ];
   if (INSTRUCTION_EXTENSIONS.has(extension) || path.basename(filePath).toUpperCase() === 'SKILL.MD') {
     findings.push(...scanHiddenHtmlInstructions(filePath, content));
-    findings.push(...scanMarkdownCodeBlocks(filePath, content));
+    findings.push(...scanMarkdownCodeBlocks(filePath, content, defensiveExampleLines));
     findings.push(...scanLines({
       content,
+      defensiveExampleLines,
       filePath,
       rules: POLICY.instructionRules,
       mode: 'instruction',
