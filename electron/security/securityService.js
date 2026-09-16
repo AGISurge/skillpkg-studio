@@ -112,7 +112,7 @@ const fileFailureResult = (file, error) => ({
     ruleId: 'FILE_SCAN_FAILED',
     title: '文件扫描失败',
     category: 'scan-coverage',
-    severity: 'medium',
+    severity: 'low',
     confidence: 'high',
     filePath: file.relativePath,
     evidence: String(error?.message || error || '未知错误'),

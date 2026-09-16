@@ -54,7 +54,7 @@ const classifyFile = (filePath) => {
 const structuralFinding = ({
   ruleId,
   title,
-  severity = 'medium',
+  severity = 'low',
   filePath = '',
   evidence = '',
   message,
@@ -125,7 +125,7 @@ const collectSkillInventory = async (skill, options = {}) => {
     findings.push(structuralFinding({
       ruleId: skill.rootOutsideLibrary ? 'STRUCTURE_EXTERNAL_ROOT_LINK' : 'STRUCTURE_ROOT_LINK',
       title: skill.rootOutsideLibrary ? '技能链接指向统一库之外' : '技能根目录为符号链接',
-      severity: skill.rootOutsideLibrary ? 'high' : 'medium',
+      severity: 'low',
       filePath: '',
       evidence: `${skill.entryPath} -> ${skill.realPath}`,
       message: skill.rootOutsideLibrary
@@ -143,7 +143,7 @@ const collectSkillInventory = async (skill, options = {}) => {
     findings.push(structuralFinding({
       ruleId,
       title,
-      severity: 'medium',
+      severity: 'low',
       evidence,
       message,
       remediation: '精简技能包或调整大文件后重新扫描。',
@@ -201,7 +201,7 @@ const collectSkillInventory = async (skill, options = {}) => {
         findings.push(structuralFinding({
           ruleId: targetOutsideSkill ? 'STRUCTURE_EXTERNAL_INTERNAL_LINK' : 'STRUCTURE_INTERNAL_LINK',
           title: targetOutsideSkill ? '内部符号链接指向技能目录之外' : '技能内包含符号链接',
-          severity: targetOutsideSkill ? 'high' : 'medium',
+          severity: targetOutsideSkill ? 'high' : 'low',
           filePath: relativePath,
           evidence: `${relativePath} -> ${target}`,
           message: targetOutsideSkill
@@ -293,7 +293,7 @@ const collectSkillInventory = async (skill, options = {}) => {
         findings.push(structuralFinding({
           ruleId: 'STRUCTURE_REFERENCE_OUTSIDE_SKILL',
           title: 'SKILL.md 引用了技能目录之外的文件',
-          severity: 'high',
+          severity: 'low',
           filePath: 'SKILL.md',
           startLine: lineIndex + 1,
           startColumn: match.index + 1,

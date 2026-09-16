@@ -17,10 +17,8 @@ import type {
 
 const levelMeta: Record<SecurityLevel, { label: string; rank: number }> = {
   dangerous: { label: '危险', rank: 0 },
-  'high-risk': { label: '高风险', rank: 1 },
-  incomplete: { label: '未完整扫描', rank: 2 },
-  review: { label: '需审查', rank: 3 },
-  safe: { label: '安全', rank: 4 },
+  suspicious: { label: '可疑', rank: 1 },
+  safe: { label: '安全', rank: 2 },
 };
 
 const phaseLabel: Record<string, string> = {
@@ -68,7 +66,7 @@ type SkillRow = {
 
 const LevelBadge = ({ level, partial }: { level: SecurityLevel; partial?: boolean }) => (
   <span className={`security-level security-level-${level}`}>
-    {levelMeta[level].label}{partial && level !== 'incomplete' ? ' · 扫描不完整' : ''}
+    {levelMeta[level].label}{partial ? ' · 扫描不完整' : ''}
   </span>
 );
 
@@ -96,8 +94,8 @@ const SecurityScanPage = () => {
       scanning: task?.status === 'scanning' && task.currentSkillId === skill.id,
     })).sort((left, right) => {
       if (left.scanning !== right.scanning) return left.scanning ? -1 : 1;
-      const leftRank = left.report ? levelMeta[left.report.effectiveLevel].rank : 2;
-      const rightRank = right.report ? levelMeta[right.report.effectiveLevel].rank : 2;
+      const leftRank = left.report ? levelMeta[left.report.effectiveLevel].rank : 3;
+      const rightRank = right.report ? levelMeta[right.report.effectiveLevel].rank : 3;
       return leftRank - rightRank || left.name.localeCompare(right.name);
     });
   }, [localSkills, reports, task?.currentSkillId, task?.status]);
@@ -179,7 +177,7 @@ const SecurityScanPage = () => {
         <div className="security-progress-stats">
           <span>文件 {task?.processedFiles || 0} / {task?.totalFiles || 0}</span>
           <span>Skill {task?.completedSkills || 0} / {task?.totalSkills || localSkills.length}</span>
-          <span>已发现 {task?.findingsCount || 0} 个问题</span>
+          <span>已记录 {task?.findingsCount || 0} 项发现</span>
           {task?.completedAt ? <span>更新于 {formatTime(task.completedAt)}</span> : null}
         </div>
         {(error || task?.error) ? (
@@ -207,7 +205,7 @@ const SecurityScanPage = () => {
                     {row.scanning
                       ? '正在扫描'
                       : row.report
-                        ? `${row.report.findingCount} 个问题 · 覆盖度：${coverageLabel[row.report.coverage]} · ${formatTime(row.report.scannedAt)}`
+                        ? `${row.report.findingCount} 项发现 · 覆盖度：${coverageLabel[row.report.coverage]} · ${formatTime(row.report.scannedAt)}`
                         : '等待扫描'}
                   </span>
                 </span>

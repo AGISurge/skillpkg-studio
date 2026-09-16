@@ -1,9 +1,7 @@
 export type SecurityLevel =
   | 'safe'
-  | 'review'
-  | 'high-risk'
-  | 'dangerous'
-  | 'incomplete';
+  | 'suspicious'
+  | 'dangerous';
 
 export type ScanCoverage = 'complete' | 'partial' | 'incomplete';
 
@@ -72,7 +70,7 @@ export type SecurityReportSummary = {
   skillId: string;
   name: string;
   rootPath: string;
-  baseLevel: Exclude<SecurityLevel, 'incomplete'>;
+  baseLevel: SecurityLevel;
   effectiveLevel: SecurityLevel;
   coverage: ScanCoverage;
   findingCount: number;

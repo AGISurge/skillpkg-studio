@@ -45,6 +45,17 @@ const buildFinding = ({ rule, filePath, line, lineIndex, match, severity, confid
     evidence: line,
   });
 
+const safetyNegationPrefix = /(?:do\s+not|don't|never|不要|不得|禁止|切勿)[^,.!?;:，。！？；：]{0,24}$/i;
+
+const findRuleMatch = (rule, value) => {
+  if (rule.safePattern) {
+    rule.safePattern.lastIndex = 0;
+    if (rule.safePattern.test(value)) return null;
+  }
+  rule.pattern.lastIndex = 0;
+  return rule.pattern.exec(value);
+};
+
 const scanLines = ({ content, filePath, rules, mode }) => {
   const extension = path.extname(filePath).slice(1).toLowerCase();
   const lines = content.split(/\r?\n/);
@@ -65,9 +76,13 @@ const scanLines = ({ content, filePath, rules, mode }) => {
       if (commentOnly) return;
     }
     rules.forEach((rule) => {
-      rule.pattern.lastIndex = 0;
-      const match = rule.pattern.exec(line);
+      const match = findRuleMatch(rule, line);
       if (!match) return;
+      if (
+        mode === 'instruction'
+        && match.index > 0
+        && safetyNegationPrefix.test(line.slice(0, match.index))
+      ) return;
       const exampleOnly = mode === 'instruction' && fenced;
       findings.push(buildFinding({
         rule,
@@ -128,8 +143,7 @@ const scanHiddenHtmlInstructions = (filePath, content) => {
   let comment;
   while ((comment = commentPattern.exec(content))) {
     const rule = POLICY.instructionRules.find((candidate) => {
-      candidate.pattern.lastIndex = 0;
-      return candidate.pattern.test(comment[0]);
+      return Boolean(findRuleMatch(candidate, comment[0]));
     });
     if (!rule) continue;
     const prefix = content.slice(0, comment.index);
@@ -188,8 +202,7 @@ const scanEncodedInstructions = (filePath, content) => {
         const decoded = Buffer.from(encoded[1], 'base64').toString('utf8');
         if (/^[\x09\x0A\x0D\x20-\x7E\u4E00-\u9FFF]+$/.test(decoded)) {
           const rule = POLICY.instructionRules.find((candidate) => {
-            candidate.pattern.lastIndex = 0;
-            return candidate.pattern.test(decoded);
+            return Boolean(findRuleMatch(candidate, decoded));
           });
           if (rule) {
             findings.push(normalizeFinding({
@@ -218,8 +231,7 @@ const scanEncodedInstructions = (filePath, content) => {
         .replace(/\\x([0-9a-fA-F]{2})/g, (_whole, hex) => String.fromCharCode(parseInt(hex, 16)))
         .replace(/\\u([0-9a-fA-F]{4})/g, (_whole, hex) => String.fromCharCode(parseInt(hex, 16)));
       const rule = POLICY.instructionRules.find((candidate) => {
-        candidate.pattern.lastIndex = 0;
-        return candidate.pattern.test(decoded);
+        return Boolean(findRuleMatch(candidate, decoded));
       });
       if (rule) {
         findings.push(normalizeFinding({
@@ -244,8 +256,7 @@ const scanEncodedInstructions = (filePath, content) => {
     if (!plainHex || plainHex[1].length % 2 !== 0) return;
     const decodedHex = Buffer.from(plainHex[1], 'hex').toString('utf8');
     const hexRule = POLICY.instructionRules.find((candidate) => {
-      candidate.pattern.lastIndex = 0;
-      return candidate.pattern.test(decodedHex);
+      return Boolean(findRuleMatch(candidate, decodedHex));
     });
     if (!hexRule) return;
     findings.push(normalizeFinding({

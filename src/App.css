@@ -1682,8 +1682,6 @@ body:not([data-theme='light']) .discover-type-pill.solution {
   color: var(--success-text);
 }
 
-.security-level-review,
-.security-level-incomplete,
 .security-level-pending,
 .security-scanning-label {
   border-color: var(--border-subtle);
@@ -1691,7 +1689,7 @@ body:not([data-theme='light']) .discover-type-pill.solution {
   color: var(--text-soft);
 }
 
-.security-level-high-risk,
+.security-level-suspicious,
 .security-severity-high,
 .security-severity-medium {
   background: color-mix(in srgb, #f59e0b 14%, transparent);

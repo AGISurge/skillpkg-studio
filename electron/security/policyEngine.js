@@ -1,6 +1,6 @@
 const crypto = require('crypto');
 
-const POLICY_VERSION = '1.0.0';
+const POLICY_VERSION = '2.0.1';
 const ANALYZER_VERSION = '1.0.0';
 const SCANNER_VERSION = '1.0.0';
 
@@ -28,7 +28,7 @@ const POLICY = {
       category: 'prompt-injection',
       severity: 'high',
       confidence: 'high',
-      pattern: /(?:ignore|disregard|override|bypass)\s+(?:all\s+)?(?:(?:previous|prior)\s+)?(?:system|developer|user|safety)?\s*(?:instructions?|rules?|prompts?)|(?:忽略|无视|绕过|覆盖).{0,12}(?:系统|开发者|用户|安全|上述|之前).{0,12}(?:指令|规则|限制)/i,
+      pattern: /(?<!do not )(?<!don't )(?<!never )(?:ignore|disregard|override|bypass)\s+(?:all\s+)?(?:(?:previous|prior)\s+)?(?:system|developer|user|safety)?\s*(?:instructions?|rules?|prompts?)|(?<!不要)(?<!不得)(?<!禁止)(?<!切勿)(?:忽略|无视|绕过|覆盖).{0,12}(?:系统|开发者|用户|安全|上述|之前).{0,12}(?:指令|规则|限制)/i,
       message: '内容要求 Agent 忽略或覆盖更高优先级的指令。',
       remediation: '删除覆盖指令，仅保留与技能目标直接相关的步骤。',
       features: ['prompt-override'],
@@ -37,9 +37,9 @@ const POLICY = {
       ruleId: 'INSTRUCTION_SYSTEM_IMPERSONATION',
       title: '伪造系统或工具身份',
       category: 'prompt-injection',
-      severity: 'medium',
+      severity: 'high',
       confidence: 'medium',
-      pattern: /(?:^|\b)(?:SYSTEM|DEVELOPER|TOOL|ASSISTANT)\s*:|(?:pretend|claim|act)\s+(?:that\s+)?(?:you|approval|the tool)|假装|伪造.{0,12}(?:系统|工具|审批|开发者)/i,
+      pattern: /^\s*(?:#{1,6}\s*)?(?:\*\*)?(?:SYSTEM|DEVELOPER|TOOL|ASSISTANT)(?:\*\*)?\s*:|(?<!do not )(?<!don't )(?<!never )\b(?:pretend|claim|act)\b\s+(?:that\s+)?(?:you|approval|the tool)|(?<!不要)(?<!不得)(?<!禁止)(?<!切勿)(?:假装|伪造).{0,12}(?:系统|工具|审批|开发者)/i,
       message: '内容可能在伪造系统消息、工具结果或授权状态。',
       remediation: '用普通说明文本替代伪造的角色或工具输出。',
       features: ['impersonation'],
@@ -50,7 +50,7 @@ const POLICY = {
       category: 'concealment',
       severity: 'high',
       confidence: 'high',
-      pattern: /(?:do\s+not|don'?t|never)\s+(?:tell|inform|show|mention|ask)\s+(?:the\s+)?user|(?:hide|conceal|erase|delete)\s+(?:the\s+)?(?:logs?|history|evidence)|不要|无需|禁止.{0,10}(?:告知|询问|提示|显示).{0,8}用户|隐瞒|隐藏|删除.{0,8}(?:日志|记录|证据)/i,
+      pattern: /(?:do\s+not|don'?t|never)\s+(?:tell|inform|show|mention)\s+(?:the\s+)?user|(?<!do not )(?<!don't )(?<!never )(?:hide|conceal|erase|delete)\s+(?:the\s+)?(?:logs?|history|evidence)|(?:不要|无需|禁止).{0,10}(?:告知|告诉|通知|提示|显示).{0,8}(?:用户|操作者)|(?<!不要)(?<!不得)(?<!禁止)(?<!切勿)(?:隐瞒|隐藏).{0,8}(?:操作|行为|事实|结果|记录|证据)|(?<!不要)(?<!不得)(?<!禁止)(?<!切勿)(?:删除|清除|擦除).{0,8}(?:日志|记录|证据|历史)/i,
       message: '内容要求对用户隐瞒操作或清除审计记录。',
       remediation: '所有有副作用的操作都应向用户清晰说明并保留审计记录。',
       features: ['concealment', 'silent-operation'],
@@ -61,7 +61,8 @@ const POLICY = {
       category: 'authorization',
       severity: 'high',
       confidence: 'high',
-      pattern: /(?:without|skip|bypass)\s+(?:user\s+)?(?:approval|confirmation|permission)|(?:assume|claim).{0,16}(?:approved|authorized)|无需|不用|跳过|绕过.{0,10}(?:确认|同意|授权|审批|权限)/i,
+      safePattern: /(?:do\s+not|don't|never)\s+(?:proceed|continue|advance|move\s+forward|act|execute|run|send|delete|modify|change)[^,.!?;:，。！？；：]{0,120}\bwithout\s+(?:user\s+)?(?:approval|confirmation|permission)/i,
+      pattern: /without\s+(?:user\s+)?(?:approval|confirmation|permission)|(?<!do not )(?<!don't )(?<!never )(?:skip|bypass)\s+(?:user\s+)?(?:approval|confirmation|permission)|(?:assume|claim).{0,16}(?:approved|authorized)|(?:无需|不用).{0,10}(?:用户)?(?:确认|同意|授权|审批|权限)|(?<!不要)(?<!不得)(?<!禁止)(?<!切勿)(?:跳过|绕过).{0,10}(?:用户)?(?:确认|同意|授权|审批|权限)/i,
       message: '内容要求在缺少用户确认或授权时继续操作。',
       remediation: '对破坏性、外部发送或高权限操作保留明确确认步骤。',
       features: ['approval-bypass', 'silent-operation'],
@@ -72,7 +73,7 @@ const POLICY = {
       category: 'sensitive-data',
       severity: 'high',
       confidence: 'medium',
-      pattern: /(?:read|collect|extract|find|reveal|print|dump).{0,30}(?:api[_ -]?key|password|token|credential|private\s+key|\.ssh|\.aws|keychain|browser\s+(?:data|cookies?)|system\s+prompt|conversation\s+history)|(?:读取|获取|导出|显示|收集|查找).{0,24}(?:密码|密钥|令牌|凭据|私钥|系统提示|对话历史|浏览器数据)/i,
+      pattern: /(?<!do not )(?<!don't )(?<!never )(?:read|collect|extract|find|reveal|print|dump).{0,30}(?:api[_ -]?key|password|token|credential|private\s+key|\.ssh|\.aws|keychain|browser\s+(?:data|cookies?)|system\s+prompt|conversation\s+history)|(?<!不要)(?<!不得)(?<!禁止)(?<!切勿)(?:读取|获取|导出|显示|收集|查找).{0,24}(?:密码|密钥|令牌|凭据|私钥|系统提示|对话历史|浏览器数据)/i,
       message: '内容要求读取凭据、私钥或 Agent 内部上下文。',
       remediation: '限定为必要的非敏感输入，避免读取用户凭据和内部提示。',
       features: ['sensitive-source'],
@@ -83,7 +84,7 @@ const POLICY = {
       category: 'data-exfiltration',
       severity: 'high',
       confidence: 'medium',
-      pattern: /(?:upload|send|post|transmit|exfiltrate).{0,30}(?:secret|token|key|credential|file|data|history).{0,30}(?:https?:\/\/|webhook|server|endpoint|third.party)|(?:上传|发送|传输|外传).{0,24}(?:密钥|令牌|凭据|文件|数据|历史).{0,24}(?:网址|服务器|接口|第三方|webhook)/i,
+      pattern: /(?<!do not )(?<!don't )(?<!never )(?:upload|send|post|transmit|exfiltrate).{0,30}(?:secret|token|key|credential|file|data|history).{0,30}(?:https?:\/\/|webhook|server|endpoint|third.party)|(?<!不要)(?<!不得)(?<!禁止)(?<!切勿)(?:上传|发送|传输|外传).{0,24}(?:密钥|令牌|凭据|文件|数据|历史).{0,24}(?:网址|服务器|接口|第三方|webhook)/i,
       message: '内容要求将本地或敏感数据发送到外部系统。',
       remediation: '删除外传步骤，或明确限定数据、目标和用户确认。',
       features: ['network-sink'],
@@ -94,7 +95,7 @@ const POLICY = {
       category: 'scope',
       severity: 'medium',
       confidence: 'low',
-      pattern: /(?:all|entire)\s+(?:computer|home\s+directory|filesystem|repositories|projects|accounts)|(?:unrelated|other)\s+(?:projects?|repositories?|accounts?)|整台电脑|所有(?:目录|文件|项目|仓库|账号)|其他|无关.{0,8}(?:项目|仓库|目录|账号)/i,
+      pattern: /(?<!do not )(?<!don't )(?<!never )(?:scan|read|modify|delete|access|search).{0,20}(?:(?:the\s+)?(?:entire\s+computer|all\s+(?:home\s+directory|filesystem|repositories|projects|accounts))|(?:unrelated|other)\s+(?:projects?|repositories?|accounts?))|(?<!不要)(?<!不得)(?<!禁止)(?<!切勿)(?:扫描|读取|修改|删除|访问|搜索|操作).{0,12}(?:整台电脑|所有(?:目录|文件|项目|仓库|账号)|(?:其他|无关).{0,8}(?:项目|仓库|目录|账号))/i,
       message: '指令要求操作过广或可能与技能目标无关的资源。',
       remediation: '将路径、项目和账号范围限制为完成当前技能所必需的最小集合。',
       features: ['scope-drift'],
@@ -103,7 +104,7 @@ const POLICY = {
   scriptRules: [
     {
       ruleId: 'SCRIPT_BROAD_DELETE', title: '广泛或递归删除', category: 'destructive-action',
-      severity: 'high', confidence: 'high',
+      severity: 'critical', confidence: 'high',
       pattern: /\brm\s+(?:-[a-zA-Z]*r[a-zA-Z]*f?|-[a-zA-Z]*f[a-zA-Z]*r)\s+(?:\/|~|\$HOME|\*|\.\.)|Remove-Item\b[^\n]*(?:-Recurse)[^\n]*(?:-Force)|shutil\.rmtree\s*\(|fs\.(?:rm|rmdir)\s*\([^\n]*recursive\s*:\s*true/i,
       message: '脚本包含广泛或递归删除操作。', remediation: '将删除限制到明确的技能临时目录，并在执行前要求确认。',
       features: ['broad-delete'],
@@ -132,35 +133,35 @@ const POLICY = {
     {
       ruleId: 'SCRIPT_ENVIRONMENT_DUMP', title: '批量读取环境变量', category: 'sensitive-data',
       severity: 'high', confidence: 'medium',
-      pattern: /(?:^|[;&|]\s*)(?:env|printenv)(?:\s|$)|process\.env\b|os\.environ\b|Get-ChildItem\s+Env:|gci\s+Env:/i,
+      pattern: /(?:^|[;&|]\s*)(?:env|printenv)(?:\s|$)|process\.env\b(?!\s*(?:\.|\[))|os\.environ\b(?!\s*(?:\.|\[))|Get-ChildItem\s+Env:|gci\s+Env:/i,
       message: '脚本读取全部环境变量，其中可能包含令牌和服务凭据。', remediation: '只读取明确列出的非敏感变量，不要记录或上传完整环境。',
       features: ['sensitive-source'],
     },
     {
       ruleId: 'SCRIPT_COMMAND_EXECUTION', title: '执行系统命令', category: 'command-execution',
       severity: 'high', confidence: 'medium',
-      pattern: /(?:child_process\.(?:exec|execSync|spawn)|\bexec\s*\(|subprocess\.(?:run|Popen|call|check_output)|os\.system\s*\(|shell\s*=\s*True|Invoke-Expression|\biex\s+|Start-Process)/i,
+      pattern: /(?:child_process\.(?:exec|execSync|spawn)|subprocess\.(?:run|Popen|call|check_output)|os\.system\s*\(|shell\s*=\s*True|Invoke-Expression|\biex\s+|Start-Process)/i,
       message: '脚本可以启动外部进程或执行系统命令。', remediation: '使用参数数组和允许列表，禁止将不可信内容拼接到 Shell 命令。',
       features: ['execute'],
     },
     {
       ruleId: 'SCRIPT_DYNAMIC_EXECUTION', title: '动态执行代码', category: 'dynamic-code',
       severity: 'high', confidence: 'high',
-      pattern: /\b(?:eval|Function)\s*\(|\bexec\s*\([^\n]*decode|compile\s*\([^\n]*exec|pickle\.loads?\s*\(|yaml\.load\s*\([^\n]*Loader\s*=\s*yaml\.Loader/i,
+      pattern: /\b(?:eval|Function)\s*\(|(?<!\.)\bexec\s*\(|compile\s*\([^\n]*exec|pickle\.loads?\s*\(|yaml\.load\s*\([^\n]*Loader\s*=\s*yaml\.Loader/,
       message: '脚本动态解析或执行内容，可能将数据变成代码。', remediation: '移除动态执行，改用明确的数据格式和固定操作。',
       features: ['execute', 'dynamic-exec'],
     },
     {
       ruleId: 'SCRIPT_DOWNLOAD', title: '下载外部内容', category: 'network',
-      severity: 'medium', confidence: 'high',
+      severity: 'low', confidence: 'high',
       pattern: /\b(?:curl|wget)\b|Invoke-WebRequest|DownloadString|requests\.(?:get|post)|https?\.(?:get|request)\s*\(|fetch\s*\(/i,
       message: '脚本会从网络下载或请求外部内容。', remediation: '限定可访问的域名，校验内容完整性，不要直接执行下载结果。',
       features: ['download'],
     },
     {
       ruleId: 'SCRIPT_NETWORK_UPLOAD', title: '向外部发送数据', category: 'data-exfiltration',
-      severity: 'high', confidence: 'medium',
-      pattern: /(?:requests\.post|axios\.post|fetch\s*\([^\n]*method\s*:\s*['"]POST|Invoke-RestMethod|curl\b[^\n]*(?:-d|--data|--upload-file|-F)|webhook|socket\.connect|\.sendall?\s*\()/i,
+      severity: 'medium', confidence: 'medium',
+      pattern: /(?:requests\.post|axios\.post|fetch\s*\([^\n]*method\s*:\s*['"](?:POST|post)|(?:Invoke-RestMethod|invoke-restmethod)|curl\b[^\n]*(?:-d|--data|--upload-file|-F)|webhook|socket\.connect|\.sendall?\s*\()/,
       message: '脚本具有将数据发送到网络目标的能力。', remediation: '明确限定发送的数据和目标，并在发送前向用户展示。',
       features: ['network-sink'],
     },
@@ -301,20 +302,27 @@ const aggregateFindings = (rawFindings) => {
 };
 
 const getBaseLevel = (findings) => {
-  const maximum = findings.reduce(
-    (rank, finding) => Math.max(rank, SEVERITY_RANK[finding.severity] ?? 0),
-    0,
-  );
-  if (maximum >= SEVERITY_RANK.critical) return 'dangerous';
-  if (maximum >= SEVERITY_RANK.high) return 'high-risk';
-  if (maximum >= SEVERITY_RANK.low) return 'review';
+  const dangerous = findings.some((finding) => (
+    finding.severity === 'critical' && finding.confidence === 'high'
+  ));
+  if (dangerous) return 'dangerous';
+
+  const suspicious = findings.some((finding) => (
+    finding.confidence !== 'low' && (
+      SEVERITY_RANK[finding.severity] >= SEVERITY_RANK.high
+      || (finding.severity === 'medium' && finding.confidence === 'high')
+    )
+  ));
+  if (suspicious) return 'suspicious';
   return 'safe';
 };
 
-const getEffectiveLevel = (baseLevel, coverage) => {
-  if (baseLevel === 'dangerous' || baseLevel === 'high-risk') return baseLevel;
-  if (coverage === 'incomplete') return 'incomplete';
-  return baseLevel;
+const getEffectiveLevel = (baseLevel) => baseLevel;
+
+const normalizeSecurityLevel = (value) => {
+  if (value === 'dangerous') return 'dangerous';
+  if (value === 'safe') return 'safe';
+  return 'suspicious';
 };
 
 module.exports = {
@@ -326,6 +334,7 @@ module.exports = {
   aggregateFindings,
   getBaseLevel,
   getEffectiveLevel,
+  normalizeSecurityLevel,
   normalizeFinding,
   redactEvidence,
 };

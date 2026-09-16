@@ -33,6 +33,7 @@
     "start": "craco start",
     "build": "craco build",
     "build:electron": "node scripts/build-electron.js",
+    "audit:security-policy": "node scripts/audit-security-policy.js",
     "dist": "node scripts/package.js",
     "dist:all": "node scripts/package.js --platform all",
     "dist:mac": "node scripts/package.js --platform mac",

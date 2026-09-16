@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const { normalizeSecurityLevel } = require('./policyEngine');
 
 const ensureSecuritySchema = (db) => {
   db.run(`
@@ -125,8 +126,8 @@ const mapReport = (row) => ({
   skillId: row.skillId,
   name: row.name,
   rootPath: row.rootPath,
-  baseLevel: row.baseLevel,
-  effectiveLevel: row.effectiveLevel,
+  baseLevel: normalizeSecurityLevel(row.baseLevel),
+  effectiveLevel: normalizeSecurityLevel(row.effectiveLevel),
   coverage: row.coverage,
   findingCount: Number(row.findingCount) || 0,
   severityCounts: parseJson(row.severityCountsJson, {}),
