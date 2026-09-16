@@ -6,10 +6,12 @@ import SkillGroupDialog from "../components/SkillGroupDialog";
 import { Button } from "../components/ui/button";
 import type { SkillGroup } from "../types/models";
 import { SpotlightCard } from "@/components/ui/spotlight-card";
+import { useMasonryGrid } from "../utils/useMasonryGrid";
 
 const SkillGroupsPage = () => {
   const { localSkills } = useAppContext();
   const { groups, loading, error, refresh } = useSkillGroups();
+  const groupGridRef = useMasonryGrid<HTMLDivElement>(groups);
   const [editor, setEditor] = useState<{ group: SkillGroup | null } | null>(
     null,
   );
@@ -48,7 +50,7 @@ const SkillGroupsPage = () => {
               <p>选择多个本地技能，随时切换到适合当前工作的组合。</p>
             </div>
           )}
-          <div className="group-grid">
+          <div className="group-grid" ref={groupGridRef}>
             {groups.map((group) => (
               <button
                 key={group.id}

@@ -4,7 +4,9 @@
 .group-page-heading p, .group-page-heading > span, .group-muted { color: var(--text-muted); font-size: 13px; line-height: 1.7; }
 .group-page-heading > span { white-space: nowrap; }
 .group-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); gap: 16px; align-items: start; }
+.group-grid[data-masonry="true"] { grid-auto-rows: 1px; column-gap: 16px; row-gap: 0; }
 .group-card-button { display: block; width: 100%; min-width: 0; padding: 0; border: 0; border-radius: 18px; background: transparent; color: inherit; text-align: left; cursor: pointer; }
+.group-grid[data-masonry="true"] .group-card-button { margin-bottom: 16px; }
 .group-card { display: block; width: 100%; text-align: left; padding: 20px; border: 1px solid var(--border-subtle); border-radius: 18px; color: inherit; cursor: pointer; transition: background 150ms, border-color 150ms; }
 .group-card:hover {  border-color: var(--brand); }
 .group-card-button:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
