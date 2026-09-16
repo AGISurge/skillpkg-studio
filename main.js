@@ -55,6 +55,11 @@ const {
   createUpdateService,
   registerUpdateIpcHandlers,
 } = require('./electron/updateService');
+const {
+  createSecurityStore,
+  ensureSecuritySchema,
+} = require('./electron/security/securityStore');
+const { createSecurityService } = require('./electron/security/securityService');
 
 const isDev = !app.isPackaged;
 const appRoot = __dirname;
@@ -146,6 +151,7 @@ const getSqlModule = async () => {
 
 const ensureDatabaseSchema = (database) => {
   ensureSkillGroupSchema(database);
+  ensureSecuritySchema(database);
   database.run(`
     CREATE TABLE IF NOT EXISTS skill_agent_link (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -543,6 +549,40 @@ const groupStore = createSkillGroupStore({
 
 const registerIpcHandlers = () => {
   const coordinate = createMutationCoordinator();
+  const withSecurityWrite = (operation) => coordinate(async () => {
+    if (!db || dbInitError) throw new Error('数据库不可用。');
+    const snapshot = db.export();
+    try {
+      db.run('BEGIN TRANSACTION;');
+      const result = await operation(db);
+      db.run('COMMIT;');
+      await saveDatabase();
+      return result;
+    } catch (error) {
+      try { db.run('ROLLBACK;'); } catch (_rollbackError) {}
+      const failedDb = db;
+      db = new sqlModule.Database(snapshot);
+      failedDb.close();
+      try { await saveDatabase(); } catch (_restoreError) {
+        error.recoveryRequired = true;
+      }
+      throw error;
+    }
+  });
+  const securityStore = createSecurityStore({
+    getDatabase: () => dbInitError ? null : db,
+    withWrite: withSecurityWrite,
+  });
+  const securityWorkerPath = isDev
+    ? path.join(appRoot, 'electron', 'security', 'worker.js')
+    : path.join(appRoot, 'security-worker.cjs');
+  const securityService = createSecurityService({
+    store: securityStore,
+    workerPath: securityWorkerPath,
+    emit: (event) => BrowserWindow.getAllWindows().forEach((window) => {
+      window.webContents.send('security-scan-event', event);
+    }),
+  });
   const groupLibrary = createGroupLibraryGuard();
   const reconcileGroups = (installPath) => groupLibrary.accepts(installPath)
     ? reconcileSkillGroups(groupStore, installPath)
@@ -641,6 +681,29 @@ const registerIpcHandlers = () => {
     const { scanImportCandidates } = require('./electron/importService');
     return scanImportCandidates(payload || {});
   });
+
+  handle('get-security-scan-state', async (_event, payload) => {
+    requireCurrentLibrary(payload?.installPath);
+    return securityService.getScanState(payload || {});
+  });
+
+  handle('list-security-reports', async (_event, payload) => {
+    requireCurrentLibrary(payload?.installPath);
+    return securityService.listReports(payload || {});
+  });
+
+  handle('get-security-report', async (_event, payload) => {
+    requireCurrentLibrary(payload?.installPath);
+    return securityService.getReport(payload || {});
+  });
+
+  handle('start-security-scan', async (_event, payload) => {
+    requireCurrentLibrary(payload?.installPath);
+    return securityService.startScan(payload || {});
+  });
+
+  handle('cancel-security-scan', async (_event, payload) =>
+    securityService.cancelScan(payload || {}));
 
   handle('import-skill-source', async (_event, payload) =>
     importSkillSource({

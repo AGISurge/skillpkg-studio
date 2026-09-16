@@ -21,6 +21,22 @@ contextBridge.exposeInMainWorld('skillpkg', {
   importSkillSource: (payload) => ipcRenderer.invoke('import-skill-source', payload),
   scanImportCandidates: (payload) =>
     ipcRenderer.invoke('scan-import-candidates', payload),
+  getSecurityScanState: (payload) =>
+    ipcRenderer.invoke('get-security-scan-state', payload),
+  listSecurityReports: (payload) =>
+    ipcRenderer.invoke('list-security-reports', payload),
+  getSecurityReport: (payload) =>
+    ipcRenderer.invoke('get-security-report', payload),
+  startSecurityScan: (payload) =>
+    ipcRenderer.invoke('start-security-scan', payload),
+  cancelSecurityScan: (payload) =>
+    ipcRenderer.invoke('cancel-security-scan', payload),
+  onSecurityScanEvent: (callback) => {
+    if (typeof callback !== 'function') return () => {};
+    const listener = (_event, scanEvent) => callback(scanEvent);
+    ipcRenderer.on('security-scan-event', listener);
+    return () => ipcRenderer.removeListener('security-scan-event', listener);
+  },
   listSkillpkgCategories: (payload) =>
     ipcRenderer.invoke('list-skillpkg-categories', payload),
   listSkillpkgSkills: (payload) =>

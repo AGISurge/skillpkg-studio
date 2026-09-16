@@ -20,6 +20,8 @@ import LocalOrganizePage from './pages/LocalOrganizePage';
 import FavoritesPage from './pages/FavoritesPage';
 import AgentsPage from './pages/AgentsPage';
 import SettingsPage from './pages/SettingsPage';
+import SecurityScanPage from './pages/SecurityScanPage';
+import { SecurityScanProvider } from './security/SecurityScanContext';
 
 const AppDialogs = () => {
   const {
@@ -161,6 +163,7 @@ const AppRoutes = () => (
         <Route path={routePaths.discoverDetail} element={<DiscoverDetailPage />} />
         <Route path={routePaths.localOrganize} element={<LocalOrganizePage />} />
         <Route path={routePaths.local} element={<LocalPage />} />
+        <Route path={routePaths.security} element={<SecurityScanPage />} />
         <Route path={routePaths.skillGroups} element={<SkillGroupsPage />} />
         <Route path={routePaths.favorites} element={<FavoritesPage />} />
         <Route path={routePaths.agents} element={<AgentsPage />} />
@@ -174,11 +177,13 @@ const AppRoutes = () => (
 
 const App = () => (
   <AppProvider>
-    <SkillGroupsProvider>
-      <ToolbarProvider>
-        <AppRoutes />
-      </ToolbarProvider>
-    </SkillGroupsProvider>
+    <SecurityScanProvider>
+      <SkillGroupsProvider>
+        <ToolbarProvider>
+          <AppRoutes />
+        </ToolbarProvider>
+      </SkillGroupsProvider>
+    </SecurityScanProvider>
   </AppProvider>
 );
 

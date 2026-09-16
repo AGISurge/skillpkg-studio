@@ -61,6 +61,10 @@ async function main() {
       entryPoint: 'preload.js',
       outfile: path.join(options.outDir, 'preload.cjs'),
     }),
+    buildEntry({
+      entryPoint: 'electron/security/worker.js',
+      outfile: path.join(options.outDir, 'security-worker.cjs'),
+    }),
   ]);
   copySqlWasm(options.outDir);
 

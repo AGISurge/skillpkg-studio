@@ -15,6 +15,7 @@ const getActiveSection = (path: string) => {
   if (path.startsWith("/skill-groups")) return "skill-groups";
   if (path.startsWith("/agents")) return "agents";
   if (path.startsWith("/favorites")) return "favorites";
+  if (path.startsWith("/security")) return "security";
   if (path.startsWith("/local")) return "local";
   if (path.startsWith("/settings")) return "settings";
   return "discover";

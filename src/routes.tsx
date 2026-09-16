@@ -4,6 +4,7 @@ import {
   SearchRegular,
   SettingsRegular,
   StarRegular,
+  ShieldCheckmarkRegular,
   FolderRegular
 } from '@fluentui/react-icons';
 
@@ -26,6 +27,7 @@ export const routePaths = {
   discover: '/discover',
   discoverDetail: '/discover/:publicId',
   local: '/local',
+  security: '/security',
   skillGroups: '/skill-groups',
   localOrganize: '/local/organize',
   favorites: '/favorites',
@@ -49,6 +51,13 @@ export const menuRoutes: RouteConfig[] = [
     path: routePaths.local,
     label: '本机',
     icon: BoxRegular,
+    showInMenu: true,
+  },
+  {
+    id: 'security',
+    path: routePaths.security,
+    label: '安全扫描',
+    icon: ShieldCheckmarkRegular,
     showInMenu: true,
   },
   {

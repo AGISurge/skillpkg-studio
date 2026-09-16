@@ -10,6 +10,12 @@ import type {
   SkillpkgListMeta,
   SkillpkgSkillSummary,
 } from './models';
+import type {
+  SecurityReport,
+  SecurityReportSummary,
+  SecurityScanEvent,
+  SecurityScanProgress,
+} from '../security/types';
 
 export type AppUpdateStatus =
   | 'idle'
@@ -147,6 +153,26 @@ declare global {
           existingSkillId?: string | null;
         }>;
       }>;
+      getSecurityScanState: (payload: {
+        installPath: string;
+      }) => Promise<SecurityScanProgress | null>;
+      listSecurityReports: (payload: {
+        installPath: string;
+      }) => Promise<SecurityReportSummary[]>;
+      getSecurityReport: (payload: {
+        installPath: string;
+        skillId: string;
+      }) => Promise<SecurityReport | null>;
+      startSecurityScan: (payload: {
+        installPath: string;
+        mode: 'incremental' | 'full';
+      }) => Promise<SecurityScanProgress>;
+      cancelSecurityScan: (payload: {
+        taskId: string;
+      }) => Promise<{ ok: boolean; reason?: string }>;
+      onSecurityScanEvent: (
+        callback: (event: SecurityScanEvent) => void,
+      ) => () => void;
       /**
        * 获取 SkillPkg 远程分类列表。
        */
