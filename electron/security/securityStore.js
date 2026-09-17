@@ -31,6 +31,8 @@ const ensureSecuritySchema = (db) => {
     policyVersion TEXT NOT NULL,
     analyzerVersion TEXT NOT NULL,
     scannerVersion TEXT NOT NULL,
+    semanticAnalysisJson TEXT NOT NULL DEFAULT '{"kind":"rules","reason":"legacy-report"}',
+    semanticAssessmentsJson TEXT,
     scannedAt TEXT NOT NULL,
     runId TEXT NOT NULL,
     UNIQUE(libraryPath, skillId)
@@ -59,7 +61,9 @@ const ensureSecuritySchema = (db) => {
     fileDigest TEXT NOT NULL,
     policyVersion TEXT NOT NULL,
     analyzerVersion TEXT NOT NULL,
-    scannerVersion TEXT NOT NULL
+    scannerVersion TEXT NOT NULL,
+    detector TEXT NOT NULL DEFAULT 'rule',
+    confidenceScore REAL
   );
   CREATE INDEX IF NOT EXISTS idx_security_finding_report
     ON security_finding(reportId, severity, filePath, startLine);
@@ -75,10 +79,38 @@ const ensureSecuritySchema = (db) => {
     findingsJson TEXT NOT NULL,
     policyVersion TEXT NOT NULL,
     analyzerVersion TEXT NOT NULL,
+    deterministicFindingsJson TEXT NOT NULL DEFAULT '[]',
+    instructionFindingsJson TEXT NOT NULL DEFAULT '[]',
     scannedAt TEXT NOT NULL,
     PRIMARY KEY(libraryPath, skillId, filePath)
   );
+
+  CREATE TABLE IF NOT EXISTS security_semantic_cache (
+    libraryPath TEXT NOT NULL,
+    skillId TEXT NOT NULL,
+    cacheKey TEXT NOT NULL,
+    corpusDigest TEXT NOT NULL,
+    modelSha256 TEXT NOT NULL,
+    promptVersion TEXT NOT NULL,
+    schemaVersion TEXT NOT NULL,
+    semanticPolicyVersion TEXT NOT NULL,
+    assessmentsJson TEXT NOT NULL,
+    scannedAt TEXT NOT NULL,
+    PRIMARY KEY(libraryPath, skillId)
+  );
   `);
+  const reportColumns = new Set(
+    (db.exec('PRAGMA table_info(security_report);')[0]?.values || [])
+      .map((row) => row[1]),
+  );
+  [
+    ['semanticAnalysisJson', `TEXT NOT NULL DEFAULT '{"kind":"rules","reason":"legacy-report"}'`],
+    ['semanticAssessmentsJson', 'TEXT'],
+  ].forEach(([name, definition]) => {
+    if (!reportColumns.has(name)) {
+      db.run(`ALTER TABLE security_report ADD COLUMN ${name} ${definition};`);
+    }
+  });
   const findingColumns = new Set(
     (db.exec('PRAGMA table_info(security_finding);')[0]?.values || [])
       .map((row) => row[1]),
@@ -88,9 +120,23 @@ const ensureSecuritySchema = (db) => {
     ['policyVersion', "TEXT NOT NULL DEFAULT ''"],
     ['analyzerVersion', "TEXT NOT NULL DEFAULT ''"],
     ['scannerVersion', "TEXT NOT NULL DEFAULT ''"],
+    ['detector', "TEXT NOT NULL DEFAULT 'rule'"],
+    ['confidenceScore', 'REAL'],
   ].forEach(([name, definition]) => {
     if (!findingColumns.has(name)) {
       db.run(`ALTER TABLE security_finding ADD COLUMN ${name} ${definition};`);
+    }
+  });
+  const cacheColumns = new Set(
+    (db.exec('PRAGMA table_info(security_file_cache);')[0]?.values || [])
+      .map((row) => row[1]),
+  );
+  [
+    ['deterministicFindingsJson', "TEXT NOT NULL DEFAULT '[]'"],
+    ['instructionFindingsJson', "TEXT NOT NULL DEFAULT '[]'"],
+  ].forEach(([name, definition]) => {
+    if (!cacheColumns.has(name)) {
+      db.run(`ALTER TABLE security_file_cache ADD COLUMN ${name} ${definition};`);
     }
   });
 };
@@ -135,6 +181,10 @@ const mapReport = (row) => ({
   policyVersion: row.policyVersion,
   analyzerVersion: row.analyzerVersion,
   scannerVersion: row.scannerVersion,
+  semanticAnalysis: parseJson(
+    row.semanticAnalysisJson,
+    { kind: 'rules', reason: 'legacy-report' },
+  ),
   scannedAt: row.scannedAt,
   runId: row.runId,
 });
@@ -160,6 +210,10 @@ const mapFinding = (row) => ({
   policyVersion: row.policyVersion || '',
   analyzerVersion: row.analyzerVersion || '',
   scannerVersion: row.scannerVersion || '',
+  detector: row.detector === 'model' ? 'model' : 'rule',
+  confidenceScore: row.confidenceScore === null || row.confidenceScore === undefined
+    ? null
+    : Number(row.confidenceScore),
 });
 
 const createSecurityStore = ({ getDatabase, withWrite }) => {
@@ -215,7 +269,11 @@ const createSecurityStore = ({ getDatabase, withWrite }) => {
         WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2
         WHEN 'low' THEN 3 ELSE 4 END, filePath, startLine;
     `, [report.id]).map(mapFinding);
-    return { ...report, findings };
+    return {
+      ...report,
+      findings,
+      semanticAssessments: parseJson(rows[0].semanticAssessmentsJson, null),
+    };
   };
 
   const getFileCache = (libraryPath, skillId, filePath) => {
@@ -234,21 +292,38 @@ const createSecurityStore = ({ getDatabase, withWrite }) => {
       digest: row.digest,
       coverage: row.coverage,
       findings: parseJson(row.findingsJson, []),
+      deterministicFindings: parseJson(row.deterministicFindingsJson, []),
+      instructionFindings: parseJson(row.instructionFindingsJson, []),
       policyVersion: row.policyVersion,
       analyzerVersion: row.analyzerVersion,
       scannedAt: row.scannedAt,
     };
   };
 
-  const saveReport = (report, fileResults) => withWrite((db) => {
+  const getSemanticCache = (libraryPath, skillId, cacheKey) => {
+    const rows = queryRows(database(), `
+      SELECT * FROM security_semantic_cache
+      WHERE libraryPath = ? AND skillId = ? AND cacheKey = ? LIMIT 1;
+    `, [libraryPath, skillId, cacheKey]);
+    if (!rows.length) return null;
+    return {
+      cacheKey: rows[0].cacheKey,
+      corpusDigest: rows[0].corpusDigest,
+      modelSha256: rows[0].modelSha256,
+      assessments: parseJson(rows[0].assessmentsJson, null),
+    };
+  };
+
+  const saveReport = (report, fileResults, semanticCache = null) => withWrite((db) => {
     const reportId = reportIdFor(report.libraryPath, report.skillId);
     db.run('DELETE FROM security_finding WHERE reportId = ?;', [reportId]);
     db.run(`
       INSERT INTO security_report
         (id, libraryPath, skillId, name, rootPath, baseLevel, effectiveLevel,
          coverage, findingCount, severityCountsJson, digest, policyVersion,
-         analyzerVersion, scannerVersion, scannedAt, runId)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         analyzerVersion, scannerVersion, semanticAnalysisJson,
+         semanticAssessmentsJson, scannedAt, runId)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(libraryPath, skillId) DO UPDATE SET
         id = excluded.id,
         name = excluded.name,
@@ -262,13 +337,18 @@ const createSecurityStore = ({ getDatabase, withWrite }) => {
         policyVersion = excluded.policyVersion,
         analyzerVersion = excluded.analyzerVersion,
         scannerVersion = excluded.scannerVersion,
+        semanticAnalysisJson = excluded.semanticAnalysisJson,
+        semanticAssessmentsJson = excluded.semanticAssessmentsJson,
         scannedAt = excluded.scannedAt,
         runId = excluded.runId;
     `, [
       reportId, report.libraryPath, report.skillId, report.name, report.rootPath,
       report.baseLevel, report.effectiveLevel, report.coverage, report.findingCount,
       JSON.stringify(report.severityCounts || {}), report.digest, report.policyVersion,
-      report.analyzerVersion, report.scannerVersion, report.scannedAt, report.runId,
+      report.analyzerVersion, report.scannerVersion,
+      JSON.stringify(report.semanticAnalysis || { kind: 'rules', reason: 'legacy-report' }),
+      report.semanticAssessments ? JSON.stringify(report.semanticAssessments) : null,
+      report.scannedAt, report.runId,
     ]);
 
     report.findings.forEach((finding, index) => {
@@ -277,8 +357,8 @@ const createSecurityStore = ({ getDatabase, withWrite }) => {
           (id, reportId, fingerprint, ruleId, title, category, severity, confidence,
            filePath, startLine, startColumn, endLine, endColumn, evidence, message,
            remediation, featuresJson, fileDigest, policyVersion, analyzerVersion,
-           scannerVersion)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+           scannerVersion, detector, confidenceScore)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
       `, [
         `${reportId}:${index}:${finding.fingerprint}`,
         reportId,
@@ -301,6 +381,8 @@ const createSecurityStore = ({ getDatabase, withWrite }) => {
         finding.policyVersion || report.policyVersion,
         finding.analyzerVersion || report.analyzerVersion,
         finding.scannerVersion || report.scannerVersion,
+        finding.detector === 'model' ? 'model' : 'rule',
+        Number.isFinite(finding.confidenceScore) ? finding.confidenceScore : null,
       ]);
     });
 
@@ -318,8 +400,9 @@ const createSecurityStore = ({ getDatabase, withWrite }) => {
       db.run(`
         INSERT INTO security_file_cache
           (libraryPath, skillId, filePath, size, mtimeMs, digest, coverage,
-           findingsJson, policyVersion, analyzerVersion, scannedAt)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           findingsJson, policyVersion, analyzerVersion, scannedAt,
+           deterministicFindingsJson, instructionFindingsJson)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(libraryPath, skillId, filePath) DO UPDATE SET
           size = excluded.size,
           mtimeMs = excluded.mtimeMs,
@@ -328,6 +411,8 @@ const createSecurityStore = ({ getDatabase, withWrite }) => {
           findingsJson = excluded.findingsJson,
           policyVersion = excluded.policyVersion,
           analyzerVersion = excluded.analyzerVersion,
+          deterministicFindingsJson = excluded.deterministicFindingsJson,
+          instructionFindingsJson = excluded.instructionFindingsJson,
           scannedAt = excluded.scannedAt;
       `, [
         report.libraryPath,
@@ -341,8 +426,39 @@ const createSecurityStore = ({ getDatabase, withWrite }) => {
         report.policyVersion,
         report.analyzerVersion,
         report.scannedAt,
+        JSON.stringify(result.deterministicFindings || []),
+        JSON.stringify(result.instructionFindings || []),
       ]);
     });
+
+    if (semanticCache) {
+      db.run(`
+        INSERT INTO security_semantic_cache
+          (libraryPath, skillId, cacheKey, corpusDigest, modelSha256,
+           promptVersion, schemaVersion, semanticPolicyVersion, assessmentsJson, scannedAt)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(libraryPath, skillId) DO UPDATE SET
+          cacheKey = excluded.cacheKey,
+          corpusDigest = excluded.corpusDigest,
+          modelSha256 = excluded.modelSha256,
+          promptVersion = excluded.promptVersion,
+          schemaVersion = excluded.schemaVersion,
+          semanticPolicyVersion = excluded.semanticPolicyVersion,
+          assessmentsJson = excluded.assessmentsJson,
+          scannedAt = excluded.scannedAt;
+      `, [
+        report.libraryPath,
+        report.skillId,
+        semanticCache.cacheKey,
+        semanticCache.corpusDigest,
+        semanticCache.modelSha256,
+        semanticCache.promptVersion,
+        semanticCache.schemaVersion,
+        semanticCache.semanticPolicyVersion,
+        JSON.stringify(semanticCache.assessments),
+        report.scannedAt,
+      ]);
+    }
 
     return { ...report, id: reportId };
   });
@@ -355,11 +471,13 @@ const createSecurityStore = ({ getDatabase, withWrite }) => {
         db.run('DELETE FROM security_finding WHERE reportId = ?;', [row.id]);
         db.run('DELETE FROM security_report WHERE id = ?;', [row.id]);
         db.run('DELETE FROM security_file_cache WHERE libraryPath = ? AND skillId = ?;', [libraryPath, row.skillId]);
+        db.run('DELETE FROM security_semantic_cache WHERE libraryPath = ? AND skillId = ?;', [libraryPath, row.skillId]);
       });
   });
 
   return {
     getFileCache,
+    getSemanticCache,
     getLatestTask,
     getReport,
     listReports,

@@ -105,6 +105,9 @@ jobs:
       - name: Build signed and notarized macOS package for direct distribution
         run: node scripts/package.js --platform mac --sign --publish never -- --arm64
 
+      - name: Verify macOS inference runtime package
+        run: npm run verify:electron-package -- mac arm64
+
       - name: Upload macOS artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -156,6 +159,9 @@ jobs:
       - name: Build signed Linux package
         run: node scripts/package.js --platform linux --sign --publish never -- --x64
 
+      - name: Verify Linux inference runtime package
+        run: npm run verify:electron-package -- linux x64
+
       - name: Upload Linux artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -191,6 +197,9 @@ jobs:
 
       - name: Build unsigned Windows package
         run: node scripts/package.js --platform win --publish never -- --x64
+
+      - name: Verify Windows inference runtime package
+        run: npm run verify:electron-package -- win x64
 
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@v4

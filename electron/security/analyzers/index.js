@@ -401,18 +401,19 @@ const scanPackageManifest = (filePath, content) => {
   }
 };
 
-const analyzeTextFile = ({ filePath, content }) => {
+const analyzeTextFileDetailed = ({ filePath, content }) => {
   const extension = path.extname(filePath).slice(1).toLowerCase();
   const defensiveExampleLines = getDefensiveExampleLines(content);
-  const findings = [
+  const deterministicFindings = [
     ...scanHiddenUnicode(filePath, content),
     ...scanEncodedInstructions(filePath, content),
     ...scanPackageManifest(filePath, content),
   ];
+  const instructionFindings = [];
   if (INSTRUCTION_EXTENSIONS.has(extension) || path.basename(filePath).toUpperCase() === 'SKILL.MD') {
-    findings.push(...scanHiddenHtmlInstructions(filePath, content));
-    findings.push(...scanMarkdownCodeBlocks(filePath, content, defensiveExampleLines));
-    findings.push(...scanLines({
+    deterministicFindings.push(...scanHiddenHtmlInstructions(filePath, content));
+    deterministicFindings.push(...scanMarkdownCodeBlocks(filePath, content, defensiveExampleLines));
+    instructionFindings.push(...scanLines({
       content,
       defensiveExampleLines,
       filePath,
@@ -421,16 +422,22 @@ const analyzeTextFile = ({ filePath, content }) => {
     }));
   }
   if (SCRIPT_EXTENSIONS.has(extension)) {
-    findings.push(...scanLines({
+    deterministicFindings.push(...scanLines({
       content,
       filePath,
       rules: POLICY.scriptRules,
       mode: 'script',
     }));
   }
-  return findings;
+  return { deterministicFindings, instructionFindings };
+};
+
+const analyzeTextFile = (input) => {
+  const result = analyzeTextFileDetailed(input);
+  return [...result.deterministicFindings, ...result.instructionFindings];
 };
 
 module.exports = {
   analyzeTextFile,
+  analyzeTextFileDetailed,
 };

@@ -13,6 +13,7 @@ import type {
 import type {
   SecurityReport,
   SecurityReportSummary,
+  SecurityModelState,
   SecurityScanEvent,
   SecurityScanProgress,
 } from '../security/types';
@@ -172,6 +173,14 @@ declare global {
       }) => Promise<{ ok: boolean; reason?: string }>;
       onSecurityScanEvent: (
         callback: (event: SecurityScanEvent) => void,
+      ) => () => void;
+      getSecurityModelState: () => Promise<SecurityModelState>;
+      downloadSecurityModel: () => Promise<{ ok: boolean; reason?: string; reused?: boolean }>;
+      cancelSecurityModelDownload: () => Promise<{ ok: boolean; reason?: string }>;
+      importSecurityModel: () => Promise<{ ok: boolean; reason?: string }>;
+      deleteSecurityModel: () => Promise<{ ok: boolean; reason?: string }>;
+      onSecurityModelState: (
+        callback: (state: SecurityModelState) => void,
       ) => () => void;
       /**
        * 获取 SkillPkg 远程分类列表。

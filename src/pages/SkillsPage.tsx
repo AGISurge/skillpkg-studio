@@ -23,7 +23,6 @@ import type { Skill, SkillFile } from "../types/models";
 import SkillViewer from "../components/SkillViewer";
 import { Button } from "@/components/ui/button";
 import { SpotlightCard } from "@/components/ui/spotlight-card";
-import { ChevronDown } from "lucide-react";
 
 const SEARCH_DEBOUNCE_MS = 220;
 

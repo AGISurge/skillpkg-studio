@@ -1,4 +1,5 @@
 const builderConfig = require('../../electron-builder.config.cjs');
+const { expectedNativePrefix } = require('../../scripts/verify-electron-package');
 
 test('uses GitHub-safe default updater artifact names', () => {
   expect(builderConfig.artifactName).toBe(
@@ -18,4 +19,25 @@ test('builds both Linux auto-update targets', () => {
     'AppImage',
     'deb',
   ]));
+});
+
+test('keeps the local inference runtime external and unpacked', () => {
+  expect(builderConfig.beforeBuild).toBeUndefined();
+  expect(builderConfig.asar).toBe(true);
+  expect(builderConfig.files).toEqual(expect.arrayContaining([
+    '!node_modules/node-llama-cpp/bins/**/*',
+    'node_modules/node-llama-cpp/bins/${os}-${arch}*/**/*',
+    '!**/*.gguf',
+  ]));
+  expect(builderConfig.asarUnpack).toEqual(expect.arrayContaining([
+    'node_modules/node-llama-cpp/bins',
+    'node_modules/node-llama-cpp/llama/localBuilds',
+    'node_modules/@node-llama-cpp/*',
+  ]));
+});
+
+test('checks the release matrix against target-specific native packages', () => {
+  expect(expectedNativePrefix('mac', 'arm64')).toBe('mac-arm64');
+  expect(expectedNativePrefix('linux', 'x64')).toBe('linux-x64');
+  expect(expectedNativePrefix('win', 'x64')).toBe('win-x64');
 });

@@ -37,6 +37,22 @@ contextBridge.exposeInMainWorld('skillpkg', {
     ipcRenderer.on('security-scan-event', listener);
     return () => ipcRenderer.removeListener('security-scan-event', listener);
   },
+  getSecurityModelState: () =>
+    ipcRenderer.invoke('get-security-model-state'),
+  downloadSecurityModel: () =>
+    ipcRenderer.invoke('download-security-model'),
+  cancelSecurityModelDownload: () =>
+    ipcRenderer.invoke('cancel-security-model-download'),
+  importSecurityModel: () =>
+    ipcRenderer.invoke('import-security-model'),
+  deleteSecurityModel: () =>
+    ipcRenderer.invoke('delete-security-model'),
+  onSecurityModelState: (callback) => {
+    if (typeof callback !== 'function') return () => {};
+    const listener = (_event, state) => callback(state);
+    ipcRenderer.on('security-model-state', listener);
+    return () => ipcRenderer.removeListener('security-model-state', listener);
+  },
   listSkillpkgCategories: (payload) =>
     ipcRenderer.invoke('list-skillpkg-categories', payload),
   listSkillpkgSkills: (payload) =>

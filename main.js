@@ -1,4 +1,11 @@
-const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron/main');
+const {
+  app,
+  BrowserWindow,
+  ipcMain,
+  dialog,
+  net,
+  shell,
+} = require('electron/main');
 const path = require('path');
 const fs = require('fs/promises');
 const initSqlJs = require('sql.js');
@@ -60,6 +67,12 @@ const {
   ensureSecuritySchema,
 } = require('./electron/security/securityStore');
 const { createSecurityService } = require('./electron/security/securityService');
+const {
+  createSecurityInferenceService,
+} = require('./electron/security/securityInferenceService');
+const {
+  createSecurityModelService,
+} = require('./electron/security/securityModelService');
 
 const isDev = !app.isPackaged;
 const appRoot = __dirname;
@@ -136,6 +149,7 @@ let db = null;
 let dbInitError = null;
 let dbSaveQueue = Promise.resolve();
 let sqlModule = null;
+let securityInferenceService = null;
 
 const getDatabasePath = () =>
   path.join(app.getPath('userData'), 'skillpkg.sqlite');
@@ -576,9 +590,26 @@ const registerIpcHandlers = () => {
   const securityWorkerPath = isDev
     ? path.join(appRoot, 'electron', 'security', 'worker.js')
     : path.join(appRoot, 'security-worker.cjs');
-  const securityService = createSecurityService({
+  securityInferenceService = createSecurityInferenceService();
+  let securityService = null;
+  const securityModelService = createSecurityModelService({
+    userDataPath: app.getPath('userData'),
+    fetchImpl: (url, options) => net.fetch(url, options),
+    isBusy: () => (
+      securityInferenceService?.isBusy()
+      || securityService?.isModelBusy()
+      || false
+    ),
+    prepareMutation: () => securityInferenceService.releaseIdle(),
+    emit: (state) => BrowserWindow.getAllWindows().forEach((window) => {
+      window.webContents.send('security-model-state', state);
+    }),
+  });
+  securityService = createSecurityService({
     store: securityStore,
     workerPath: securityWorkerPath,
+    modelService: securityModelService,
+    inferenceService: securityInferenceService,
     emit: (event) => BrowserWindow.getAllWindows().forEach((window) => {
       window.webContents.send('security-scan-event', event);
     }),
@@ -701,6 +732,31 @@ const registerIpcHandlers = () => {
 
   handle('cancel-security-scan', async (_event, payload) =>
     securityService.cancelScan(payload || {}));
+
+  handle('get-security-model-state', async () =>
+    securityModelService.getStatus());
+
+  handle('download-security-model', async () =>
+    securityModelService.download());
+
+  handle('cancel-security-model-download', async () =>
+    securityModelService.cancelDownload());
+
+  handle('import-security-model', async () => {
+    if (securityInferenceService?.isBusy()) return { ok: false, reason: 'busy' };
+    const result = await dialog.showOpenDialog({
+      title: '导入本地智能模型',
+      properties: ['openFile'],
+      filters: [{ name: 'GGUF model', extensions: ['gguf'] }],
+    });
+    if (result.canceled || !result.filePaths?.[0]) {
+      return { ok: false, reason: 'canceled' };
+    }
+    return securityModelService.importModel(result.filePaths[0]);
+  });
+
+  handle('delete-security-model', async () =>
+    securityModelService.remove());
 
   handle('import-skill-source', async (_event, payload) =>
     importSkillSource({
@@ -957,4 +1013,14 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
   }
+});
+
+let securityShutdownStarted = false;
+app.on('before-quit', (event) => {
+  if (securityShutdownStarted || !securityInferenceService) return;
+  event.preventDefault();
+  securityShutdownStarted = true;
+  void securityInferenceService.dispose()
+    .catch(() => {})
+    .finally(() => app.quit());
 });

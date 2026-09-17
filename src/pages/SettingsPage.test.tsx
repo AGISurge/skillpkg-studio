@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { useAppContext } from '../AppContext';
 import SettingsPage from './SettingsPage';
 import type { AppUpdateState } from '../types/global';
@@ -54,6 +54,12 @@ beforeEach(() => {
       source: 'manual',
     }),
     installAppUpdateNow: async () => createUpdateState({ status: 'downloaded' }),
+    getSecurityModelState: () => new Promise(() => undefined),
+    downloadSecurityModel: async () => ({ ok: true }),
+    cancelSecurityModelDownload: async () => ({ ok: false, reason: 'not-downloading' }),
+    importSecurityModel: async () => ({ ok: false, reason: 'canceled' }),
+    deleteSecurityModel: async () => ({ ok: true }),
+    onSecurityModelState: () => () => undefined,
   } as unknown as typeof window.skillpkg;
 });
 
@@ -126,4 +132,19 @@ test('restarts and installs a downloaded update from settings', () => {
     name: 'v1.1.0已就绪，重启更新',
   }));
   expect(installAppUpdateNow).toHaveBeenCalledTimes(1);
+});
+
+test('shows explicit local model actions and starts a fixed-source download', async () => {
+  const download = jest.fn(async () => ({ ok: true }));
+  window.skillpkg!.getSecurityModelState = async () => ({
+    kind: 'missing',
+    modelId: 'qwen3.5-2b-q4_k_m',
+  });
+  window.skillpkg!.downloadSecurityModel = download;
+  renderSettings(createUpdateState());
+
+  await waitFor(() => expect(screen.getByText('未安装')).toBeInTheDocument());
+  fireEvent.click(screen.getByRole('button', { name: '下载' }));
+  expect(download).toHaveBeenCalledTimes(1);
+  await waitFor(() => expect(screen.getByText('本地智能模型已下载。')).toBeInTheDocument());
 });

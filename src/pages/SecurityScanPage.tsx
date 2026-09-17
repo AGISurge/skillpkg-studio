@@ -13,6 +13,8 @@ import type {
   SecurityLevel,
   SecurityReport,
   SecurityReportSummary,
+  SemanticAssessment,
+  SemanticDimension,
 } from '../security/types';
 
 const levelMeta: Record<SecurityLevel, { label: string; rank: number }> = {
@@ -25,6 +27,7 @@ const phaseLabel: Record<string, string> = {
   idle: '等待扫描',
   inventory: '正在清点文件',
   analyzing: '正在分析安全风险',
+  semantic: '正在进行智能语义判断',
   finalizing: '正在汇总结果',
   completed: '扫描完成',
   canceled: '扫描已取消',
@@ -49,6 +52,25 @@ const confidenceLabel: Record<SecurityFinding['confidence'], string> = {
   high: '高',
   medium: '中',
   low: '低',
+};
+
+const semanticDimensionLabel: Record<SemanticDimension, string> = {
+  prompt_injection: '提示词注入',
+  instruction_override: '覆盖上层指令',
+  authorization_bypass: '绕过确认或授权',
+  sensitive_data_access: '敏感信息读取',
+  data_exfiltration: '数据外传',
+  destructive_actions: '破坏性操作',
+  privilege_escalation: '权限提升',
+  security_control_bypass: '绕过安全控制',
+  persistence: '持久化运行',
+  remote_code_execution: '执行远程代码',
+  unexpected_network_access: '非预期网络访问',
+  remote_code_download: '下载远程代码',
+  stealth_behavior: '隐瞒行为',
+  obfuscation: '隐藏真实行为',
+  scope_expansion: '扩大操作范围',
+  behavior_description_mismatch: '行为与描述不一致',
 };
 
 const formatTime = (value?: string | null) => {
@@ -125,7 +147,12 @@ const SecurityScanPage = () => {
   const hasPreviousScan = Boolean(task || reports.length);
   const percent = scanning || task ? task?.percent || 0 : 0;
   const currentTarget = task?.currentSkillName
-    ? [task.currentSkillName, task.currentFile].filter(Boolean).join(' / ')
+    ? [
+        task.currentSkillName,
+        task?.phase === 'semantic' && task.semanticChunkCount
+          ? `语义分块 ${task.semanticChunkIndex}/${task.semanticChunkCount}`
+          : task.currentFile,
+      ].filter(Boolean).join(' / ')
     : '等待扫描任务';
   const currentStatusText = scanning
     ? `正在扫描：${currentTarget}`
@@ -250,6 +277,33 @@ const SecurityScanPage = () => {
                   partial={selectedReport.coverage !== 'complete'}
                 />
               </div>
+              <div className="security-current-file">
+                {selectedReport.semanticAnalysis.kind === 'model'
+                  ? '智能语义 + 确定性检查'
+                  : selectedReport.semanticAnalysis.kind === 'fallback'
+                    ? `智能判断失败，已回退（${selectedReport.semanticAnalysis.reason}）`
+                    : '规则扫描'}
+              </div>
+              {selectedReport.semanticAnalysis.kind === 'model' && selectedReport.semanticAssessments ? (
+                <details className="security-semantic-details">
+                  <summary>查看 16 项智能判断</summary>
+                  <div className="security-findings">
+                    {(Object.entries(selectedReport.semanticAssessments) as Array<[
+                      SemanticDimension,
+                      SemanticAssessment,
+                    ]>)
+                      .sort((left, right) => Number(right[1].detected) - Number(left[1].detected))
+                      .map(([dimension, assessment]) => (
+                        <div className="security-finding-location" key={dimension}>
+                          <strong>{semanticDimensionLabel[dimension]}</strong>
+                          {' · '}{assessment.detected ? '命中' : '未命中'}
+                          {' · '}{Math.round(assessment.confidence * 100)}%
+                          {assessment.reason ? <p>{assessment.reason}</p> : null}
+                        </div>
+                      ))}
+                  </div>
+                </details>
+              ) : null}
               {selectedReport.findings.length === 0 ? (
                 <div className="security-safe-empty">
                   <ShieldCheckmarkRegular className="icon" />
@@ -272,7 +326,12 @@ const SecurityScanPage = () => {
                         {finding.filePath || 'Skill 整体'}
                         {finding.filePath ? `:${finding.startLine}:${finding.startColumn}` : ''}
                         <span>
-                          {finding.category} · 置信度 {confidenceLabel[finding.confidence]} · {finding.ruleId}
+                          {finding.category} · 置信度 {confidenceLabel[finding.confidence]}
+                          {finding.confidenceScore !== null
+                            ? ` (${Math.round(finding.confidenceScore * 100)}%)`
+                            : ''}
+                          {' · '}{finding.detector === 'model' ? '智能判断' : '规则'}
+                          {' · '}{finding.ruleId}
                         </span>
                       </div>
                       {finding.evidence ? <pre>{finding.evidence}</pre> : null}

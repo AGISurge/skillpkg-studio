@@ -103,6 +103,7 @@ const discoverSkillEntries = async (installPath) => {
     skills.push({
       skillId: entry.name,
       name: metadata.name || entry.name,
+      description: metadata.description || '',
       markdown,
       entryPath,
       realPath,

@@ -1,7 +1,7 @@
 const crypto = require('crypto');
 
-const POLICY_VERSION = '2.2.0';
-const ANALYZER_VERSION = '2.1.0';
+const POLICY_VERSION = '2.3.0';
+const ANALYZER_VERSION = '2.2.0';
 const SCANNER_VERSION = '1.0.0';
 
 const SEVERITY_RANK = {
@@ -251,6 +251,10 @@ const normalizeFinding = (finding) => {
     policyVersion: finding.policyVersion || '',
     analyzerVersion: finding.analyzerVersion || '',
     scannerVersion: finding.scannerVersion || '',
+    detector: finding.detector === 'model' ? 'model' : 'rule',
+    confidenceScore: Number.isFinite(finding.confidenceScore)
+      ? finding.confidenceScore
+      : null,
   };
   return { ...normalized, fingerprint: finding.fingerprint || createFingerprint(normalized) };
 };
@@ -277,7 +281,10 @@ const aggregateFindings = (rawFindings) => {
   const featureSet = new Set(findings
     .filter((finding) => (
       finding.confidence === 'high'
-      || (finding.confidence === 'medium' && /^(?:SCRIPT_|MANIFEST_)/.test(finding.ruleId))
+      || (
+        finding.confidence === 'medium'
+        && /^(?:SCRIPT_|MANIFEST_|LLM_)/.test(finding.ruleId)
+      )
     ))
     .flatMap((finding) => finding.features || []));
   const combinations = [

@@ -12,9 +12,22 @@ module.exports = {
   // release asset names identical by generating a GitHub-safe name up front.
   artifactName: 'SkillPKG-Studio-${version}-${arch}.${ext}',
   compression: 'maximum',
-  beforeBuild: async () => false,
+  asar: true,
   files: [
     '**/*',
+    '!node_modules/node-llama-cpp/bins/**/*',
+    'node_modules/node-llama-cpp/bins/${os}-${arch}*/**/*',
+    '!node_modules/node-llama-cpp/llama/localBuilds/**/*',
+    'node_modules/node-llama-cpp/llama/localBuilds/${os}-${arch}*/**/*',
+    '!node_modules/@node-llama-cpp/*/bins/**/*',
+    'node_modules/@node-llama-cpp/${os}-${arch}*/bins/**/*',
+    '!**/*.gguf',
+    '!security-models/**/*',
+  ],
+  asarUnpack: [
+    'node_modules/node-llama-cpp/bins',
+    'node_modules/node-llama-cpp/llama/localBuilds',
+    'node_modules/@node-llama-cpp/*',
   ],
   publish: [
     githubUpdateProvider,

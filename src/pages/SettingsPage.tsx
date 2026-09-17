@@ -5,6 +5,7 @@ import {
   ArrowDownloadRegular,
   ArrowUploadRegular,
   DesktopRegular,
+  DeleteRegular,
   EyeOffRegular,
   EyeRegular,
   FolderOpenRegular,
@@ -20,6 +21,7 @@ import {
 } from "../components/ui/input-group";
 import { useAppContext } from "../AppContext";
 import { Button } from "@/components/ui/button";
+import type { SecurityModelState } from "../security/types";
 
 type ThemeMode = "system" | "light" | "dark";
 type DbInfo = {
@@ -68,6 +70,9 @@ const SettingsPage = () => {
   const [dbInfo, setDbInfo] = useState<DbInfo | null>(null);
   const [dbStatus, setDbStatus] = useState("");
   const [dbActionPending, setDbActionPending] = useState(false);
+  const [modelState, setModelState] = useState<SecurityModelState | null>(null);
+  const [modelStatus, setModelStatus] = useState("");
+  const [modelActionPending, setModelActionPending] = useState(false);
 
   const refreshDbInfo = useCallback(async () => {
     const info = await window.skillpkg?.getDbInfo?.();
@@ -77,6 +82,48 @@ const SettingsPage = () => {
   useEffect(() => {
     refreshDbInfo();
   }, [refreshDbInfo]);
+
+  useEffect(() => {
+    let active = true;
+    void window.skillpkg?.getSecurityModelState?.().then((state) => {
+      if (active) setModelState(state);
+    });
+    const unsubscribe = window.skillpkg?.onSecurityModelState?.((state) => {
+      if (active) setModelState(state);
+    });
+    return () => {
+      active = false;
+      unsubscribe?.();
+    };
+  }, []);
+
+  const runModelAction = async (
+    action: (() => Promise<{ ok: boolean; reason?: string }>) | undefined,
+    successMessage: string,
+  ) => {
+    if (!action) return;
+    setModelActionPending(true);
+    setModelStatus("");
+    try {
+      const result = await action();
+      if (result.ok) setModelStatus(successMessage);
+      else if (result.reason !== "canceled") {
+        setModelStatus(result.reason === "busy"
+          ? "安全扫描正在使用模型，请等待扫描结束。"
+          : `模型操作失败：${result.reason || "未知错误"}`);
+      }
+    } finally {
+      setModelActionPending(false);
+    }
+  };
+
+  const handleDeleteModel = async () => {
+    if (!window.confirm("删除本地智能模型？之后的安全扫描会使用规则判断。")) return;
+    await runModelAction(
+      window.skillpkg?.deleteSecurityModel,
+      "本地智能模型已删除。",
+    );
+  };
 
   const handleOpenDbLocation = async () => {
     setDbStatus("");
@@ -260,6 +307,112 @@ const SettingsPage = () => {
         <div className="settings-path-row">
           <span>{installPath || "正在读取默认路径"}</span>
         </div>
+      </section>
+
+      <section className="settings-section">
+        <div className="settings-section-head">
+          <div>
+            <h2>本地智能模型</h2>
+            <p>Qwen3.5 2B Q4_K_M，仅用于本机安全扫描。模型不会随应用安装。</p>
+            <div className="settings-db-meta">
+              <span>
+                <strong>状态</strong>
+                {modelState?.kind === "ready"
+                  ? "可用"
+                  : modelState?.kind === "downloading"
+                    ? `下载中 ${Math.round(modelState.percent)}%`
+                    : modelState?.kind === "verifying"
+                      ? "正在校验"
+                      : modelState?.kind === "error"
+                        ? "错误"
+                        : "未安装"}
+              </span>
+              <span>
+                <strong>大小</strong>
+                {modelState?.kind === "ready"
+                  ? formatBytes(modelState.size)
+                  : formatBytes(1_280_835_840)}
+              </span>
+              {modelState?.kind === "ready" ? (
+                <span>
+                  <strong>来源</strong>
+                  {modelState.source === "import" ? "本地导入" : modelState.source === "download" ? "固定源下载" : "已有文件"}
+                </span>
+              ) : null}
+            </div>
+          </div>
+          <div className="settings-db-actions">
+            {modelState?.kind === "downloading" ? (
+              <Button
+                size="xs"
+                variant="outline"
+                onClick={() => {
+                  void runModelAction(
+                    window.skillpkg?.cancelSecurityModelDownload,
+                    "模型下载已取消。",
+                  );
+                }}
+              >
+                取消下载
+              </Button>
+            ) : modelState?.kind === "ready" ? (
+              <Button
+                size="xs"
+                variant="outline"
+                disabled={modelActionPending}
+                onClick={() => { void handleDeleteModel(); }}
+              >
+                <DeleteRegular className="icon" />
+                删除
+              </Button>
+            ) : (
+              <>
+                <Button
+                  size="xs"
+                  variant="outline"
+                  disabled={modelActionPending || modelState?.kind === "verifying"}
+                  onClick={() => {
+                    void runModelAction(
+                      window.skillpkg?.downloadSecurityModel,
+                      "本地智能模型已下载。",
+                    );
+                  }}
+                >
+                  <ArrowDownloadRegular className="icon" />
+                  下载
+                </Button>
+                <Button
+                  size="xs"
+                  variant="outline"
+                  disabled={modelActionPending || modelState?.kind === "verifying"}
+                  onClick={() => {
+                    void runModelAction(
+                      window.skillpkg?.importSecurityModel,
+                      "本地智能模型已导入。",
+                    );
+                  }}
+                >
+                  <ArrowUploadRegular className="icon" />
+                  导入
+                </Button>
+              </>
+            )}
+          </div>
+        </div>
+        {modelState?.kind === "downloading" ? (
+          <div className="security-progress-track" aria-label={`模型下载进度 ${Math.round(modelState.percent)}%`}>
+            <span style={{ width: `${modelState.percent}%` }} />
+          </div>
+        ) : null}
+        {modelState?.kind === "ready" ? (
+          <div className="settings-path-row" title={modelState.sha256}>
+            <span>SHA-256 {modelState.sha256}</span>
+          </div>
+        ) : null}
+        {modelState?.kind === "error" ? (
+          <div className="settings-db-status error">{modelState.error}</div>
+        ) : null}
+        {modelStatus ? <div className="settings-db-status">{modelStatus}</div> : null}
       </section>
 
       <section className="settings-section">

@@ -13,6 +13,16 @@ const {
   getEffectiveLevel,
   normalizeFinding,
 } = require('./policyEngine');
+const {
+  SEMANTIC_MODEL_ID,
+  SEMANTIC_POLICY_VERSION,
+  SEMANTIC_PROMPT_VERSION,
+  SEMANTIC_SCHEMA_VERSION,
+  assessmentsToFindings,
+  createSemanticCacheKey,
+  parseSemanticAssessments,
+  validateSemanticEvidence,
+} = require('./semanticPolicy');
 
 const COVERAGE_RANK = { complete: 0, partial: 1, incomplete: 2 };
 const MAX_EVENT_RATE_MS = 100;
@@ -121,7 +131,13 @@ const fileFailureResult = (file, error) => ({
   })],
 });
 
-const createSecurityService = ({ store, workerPath, emit }) => {
+const createSecurityService = ({
+  store,
+  workerPath,
+  emit,
+  modelService,
+  inferenceService,
+}) => {
   const activeTasks = new Map();
   const tasksById = new Map();
 
@@ -135,6 +151,8 @@ const createSecurityService = ({ store, workerPath, emit }) => {
     currentSkillId: task.currentSkillId || '',
     currentSkillName: task.currentSkillName || '',
     currentFile: task.currentFile || '',
+    semanticChunkIndex: task.semanticChunkIndex || 0,
+    semanticChunkCount: task.semanticChunkCount || 0,
     processedFiles: task.processedFiles || 0,
     totalFiles: task.totalFiles || 0,
     completedSkills: task.completedSkills || 0,
@@ -169,14 +187,23 @@ const createSecurityService = ({ store, workerPath, emit }) => {
     updateAnalysisProgress(task);
   };
 
-  const createReport = ({ task, inventory, fileResults }) => {
+  const createReport = ({ task, inventory, fileResults, semantic }) => {
     const fileDigests = new Map(fileResults.map((result) => [result.filePath, result.digest]));
+    const fileFindings = semantic.analysis.kind === 'model'
+      ? [
+          ...fileResults.flatMap((result) => result.deterministicFindings || result.findings || []),
+          ...assessmentsToFindings(semantic.assessments),
+        ]
+      : fileResults.flatMap((result) => [
+          ...(result.deterministicFindings || []),
+          ...(result.instructionFindings || result.findings || []),
+        ]);
     const findings = aggregateFindings([
       ...inventory.findings.map((finding) => ({ ...finding, fileDigest: '' })),
-      ...fileResults.flatMap((result) => (result.findings || []).map((finding) => ({
+      ...fileFindings.map((finding) => ({
         ...finding,
-        fileDigest: result.digest,
-      }))),
+        fileDigest: finding.fileDigest || fileDigests.get(finding.filePath) || '',
+      })),
     ]).map((finding) => normalizeFinding({
       ...finding,
       fileDigest: finding.fileDigest || fileDigests.get(finding.filePath) || '',
@@ -219,6 +246,8 @@ const createSecurityService = ({ store, workerPath, emit }) => {
       scannerVersion: SCANNER_VERSION,
       scannedAt,
       runId: task.id,
+      semanticAnalysis: semantic.analysis,
+      semanticAssessments: semantic.analysis.kind === 'model' ? semantic.assessments : null,
       findings,
     };
   };
@@ -276,6 +305,143 @@ const createSecurityService = ({ store, workerPath, emit }) => {
     return fileResults;
   };
 
+  const analyzeSemantics = async (task, inventory, fileResults) => {
+    if (task.modelSnapshot.kind === 'missing') {
+      return {
+        analysis: { kind: 'rules', reason: 'model-missing' },
+        assessments: null,
+        cache: null,
+      };
+    }
+    if (task.modelSnapshot.kind !== 'ready' || !inferenceService) {
+      return {
+        analysis: { kind: 'fallback', reason: 'model-invalid' },
+        assessments: null,
+        cache: null,
+      };
+    }
+
+    const inventoryFiles = new Map(inventory.files.map((file) => [file.relativePath, file]));
+    const semanticResults = fileResults.filter((result) => result.semanticEligible);
+    const documents = [];
+    try {
+      for (const result of semanticResults) {
+        if (task.cancelRequested) throw new Error('security-scan-canceled');
+        const file = inventoryFiles.get(result.filePath);
+        if (!file) {
+          return {
+            analysis: { kind: 'fallback', reason: 'corpus-changed' },
+            assessments: null,
+            cache: null,
+          };
+        }
+        const content = await fs.readFile(file.fullPath);
+        const digest = crypto.createHash('sha256').update(content).digest('hex');
+        if (digest !== result.digest) {
+          return {
+            analysis: { kind: 'fallback', reason: 'corpus-changed' },
+            assessments: null,
+            cache: null,
+          };
+        }
+        documents.push({ filePath: result.filePath, content: content.toString('utf8') });
+      }
+    } catch (error) {
+      if (task.cancelRequested) throw error;
+      return {
+        analysis: { kind: 'fallback', reason: 'corpus-changed' },
+        assessments: null,
+        cache: null,
+      };
+    }
+
+    const corpusDigest = crypto.createHash('sha256').update(
+      semanticResults
+        .map((result) => `${result.filePath}\0${result.digest}`)
+        .sort()
+        .join('\n'),
+    ).digest('hex');
+    const cacheKey = createSemanticCacheKey({
+      corpusDigest,
+      modelSha256: task.modelSnapshot.modelSha256,
+      promptVersion: task.semanticPolicy.promptVersion,
+      schemaVersion: task.semanticPolicy.schemaVersion,
+      policyVersion: task.semanticPolicy.policyVersion,
+    });
+    if (task.mode === 'incremental') {
+      const cached = store.getSemanticCache?.(
+        task.libraryPath,
+        inventory.skillId,
+        cacheKey,
+      );
+      if (cached?.assessments) {
+        const parsed = parseSemanticAssessments(cached.assessments);
+        const validated = parsed.ok
+          ? validateSemanticEvidence(parsed.assessments, documents)
+          : parsed;
+        if (validated.ok) {
+          return {
+            analysis: {
+              kind: 'model',
+              modelId: SEMANTIC_MODEL_ID,
+              modelSha256: task.modelSnapshot.modelSha256,
+              policyVersion: task.semanticPolicy.policyVersion,
+            },
+            assessments: validated.assessments,
+            cache: null,
+          };
+        }
+      }
+    }
+
+    task.phase = 'semantic';
+    task.currentSkillId = inventory.skillId;
+    task.currentSkillName = inventory.name;
+    task.currentFile = '';
+    task.semanticChunkIndex = 0;
+    task.semanticChunkCount = 0;
+    emitProgress(task, true);
+    const result = await inferenceService.analyze({
+      modelSnapshot: task.modelSnapshot,
+      skillName: inventory.name,
+      description: inventory.description || '',
+      documents,
+      signal: task.abortController.signal,
+      onChunk: ({ index, count }) => {
+        task.semanticChunkIndex = index;
+        task.semanticChunkCount = count;
+        emitProgress(task, true);
+      },
+    });
+    if (task.cancelRequested) throw new Error('security-scan-canceled');
+    if (!result.ok) {
+      return {
+        analysis: { kind: 'fallback', reason: result.reason },
+        assessments: null,
+        cache: null,
+      };
+    }
+    const cache = {
+      cacheKey,
+      corpusDigest,
+      modelSha256: task.modelSnapshot.modelSha256,
+      promptVersion: task.semanticPolicy.promptVersion,
+      schemaVersion: task.semanticPolicy.schemaVersion,
+      semanticPolicyVersion: task.semanticPolicy.policyVersion,
+      assessments: result.assessments,
+    };
+    return {
+      analysis: {
+        kind: 'model',
+        modelId: SEMANTIC_MODEL_ID,
+        modelSha256: task.modelSnapshot.modelSha256,
+        policyVersion: task.semanticPolicy.policyVersion,
+      },
+      assessments: result.assessments,
+      cache,
+    };
+  };
+
   const runScan = async (task) => {
     let pool = null;
     try {
@@ -323,16 +489,25 @@ const createSecurityService = ({ store, workerPath, emit }) => {
         task.currentSkillId = inventory.skillId;
         task.currentSkillName = inventory.name;
         task.currentFile = '';
+        task.phase = 'analyzing';
+        task.semanticChunkIndex = 0;
+        task.semanticChunkCount = 0;
         emitProgress(task);
         const fileResults = await analyzeInventory(task, inventory, pool);
-        const report = createReport({ task, inventory, fileResults });
-        const savedReport = await store.saveReport(report, fileResults);
+        const semantic = await analyzeSemantics(task, inventory, fileResults);
+        const report = createReport({ task, inventory, fileResults, semantic });
+        const savedReport = await store.saveReport(report, fileResults, semantic.cache);
         task.completedSkills += 1;
         task.findingsCount += report.findingCount;
         await persistTask(task);
+        const {
+          findings: _findings,
+          semanticAssessments: _semanticAssessments,
+          ...reportSummary
+        } = savedReport;
         emitEvent({
           type: 'report-updated',
-          report: { ...savedReport, findings: undefined },
+          report: reportSummary,
           task: publicTask(task),
         });
       }
@@ -382,6 +557,9 @@ const createSecurityService = ({ store, workerPath, emit }) => {
     const active = activeTasks.get(libraryPath);
     if (active?.status === 'scanning') return publicTask(active);
     if (active) activeTasks.delete(libraryPath);
+    const modelSnapshot = modelService
+      ? await modelService.getSnapshot()
+      : { kind: 'missing' };
     const task = {
       id: crypto.randomUUID(),
       libraryPath,
@@ -399,12 +577,21 @@ const createSecurityService = ({ store, workerPath, emit }) => {
       currentSkillId: '',
       currentSkillName: '',
       currentFile: '',
+      semanticChunkIndex: 0,
+      semanticChunkCount: 0,
       startedAt: new Date().toISOString(),
       completedAt: null,
       error: null,
       cancelRequested: false,
       lastEventAt: 0,
       pool: null,
+      abortController: new AbortController(),
+      modelSnapshot,
+      semanticPolicy: {
+        policyVersion: SEMANTIC_POLICY_VERSION,
+        promptVersion: SEMANTIC_PROMPT_VERSION,
+        schemaVersion: SEMANTIC_SCHEMA_VERSION,
+      },
     };
     activeTasks.set(libraryPath, task);
     tasksById.set(task.id, task);
@@ -417,6 +604,7 @@ const createSecurityService = ({ store, workerPath, emit }) => {
     const task = tasksById.get(taskId);
     if (!task || task.status !== 'scanning') return { ok: false, reason: 'not-running' };
     task.cancelRequested = true;
+    task.abortController.abort(new Error('security-scan-canceled'));
     if (task.pool) await task.pool.close('security-scan-canceled').catch(() => {});
     return { ok: true };
   };
@@ -443,6 +631,9 @@ const createSecurityService = ({ store, workerPath, emit }) => {
     getReport: ({ installPath, skillId }) => store.getReport(path.normalize(String(installPath || '')), String(skillId || '')),
     getScanState,
     listReports: ({ installPath }) => store.listReports(path.normalize(String(installPath || ''))),
+    isModelBusy: () => Array.from(activeTasks.values()).some((task) => (
+      task.status === 'scanning' && task.modelSnapshot?.kind === 'ready'
+    )),
     startScan,
   };
 };

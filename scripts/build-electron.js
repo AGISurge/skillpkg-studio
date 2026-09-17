@@ -38,7 +38,12 @@ async function buildEntry({ entryPoint, outfile }) {
     platform: 'node',
     format: 'cjs',
     target: 'node22',
-    external: ['electron', 'electron/main'],
+    external: [
+      'electron',
+      'electron/main',
+      'node-llama-cpp',
+      'node-llama-cpp/*',
+    ],
     legalComments: 'none',
     minify: true,
     sourcemap: false,

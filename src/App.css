@@ -1766,6 +1766,33 @@ body:not([data-theme='light']) .discover-type-pill.solution {
   margin-top: 14px;
 }
 
+.security-semantic-details {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  background: var(--surface-bg);
+}
+
+.security-semantic-details summary {
+  cursor: pointer;
+  color: var(--text-soft);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.security-semantic-details .security-finding-location {
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.security-semantic-details .security-finding-location p {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--text-soft);
+  line-height: 1.5;
+}
+
 .security-finding {
   padding: 14px;
   border: 1px solid var(--border-subtle);

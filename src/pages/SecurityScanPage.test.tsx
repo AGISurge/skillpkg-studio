@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { useAppContext } from '../AppContext';
 import { useSecurityScan } from '../security/SecurityScanContext';
-import type { SecurityReport, SecurityReportSummary } from '../security/types';
+import type { SecurityReport, SecurityReportSummary, SemanticAssessments } from '../security/types';
 import SecurityScanPage from './SecurityScanPage';
 
 jest.mock('../AppContext', () => ({
@@ -32,6 +32,7 @@ const summary: SecurityReportSummary = {
   scannerVersion: '1.0.0',
   scannedAt: '2026-09-16T00:00:00.000Z',
   runId: 'task-1',
+  semanticAnalysis: { kind: 'rules', reason: 'model-missing' },
 };
 
 const report: SecurityReport = {
@@ -57,7 +58,10 @@ const report: SecurityReport = {
     policyVersion: '1.0.0',
     analyzerVersion: '1.0.0',
     scannerVersion: '1.0.0',
+    detector: 'rule',
+    confidenceScore: null,
   }],
+  semanticAssessments: null,
 };
 
 test('shows live progress, risk level, and finding details', async () => {
@@ -87,6 +91,8 @@ test('shows live progress, risk level, and finding details', async () => {
       currentSkillId: 'danger-skill',
       currentSkillName: 'Danger Skill',
       currentFile: 'scripts/run.sh',
+      semanticChunkIndex: 0,
+      semanticChunkCount: 0,
       processedFiles: 4,
       totalFiles: 10,
       completedSkills: 0,
@@ -144,4 +150,68 @@ test('waits for the user before starting the first scan', () => {
   expect(startScan).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole('button', { name: /开始安全扫描/ }));
   expect(startScan).toHaveBeenCalledWith('incremental');
+});
+
+test('shows all model dimensions only for a successful semantic analysis', async () => {
+  const miss = () => ({ detected: false, confidence: 0.1, evidence: [], reason: '' });
+  const semanticAssessments: SemanticAssessments = {
+    prompt_injection: { detected: true, confidence: 0.9, evidence: [], reason: '' },
+    instruction_override: miss(),
+    authorization_bypass: miss(),
+    sensitive_data_access: miss(),
+    data_exfiltration: miss(),
+    destructive_actions: miss(),
+    privilege_escalation: miss(),
+    security_control_bypass: miss(),
+    persistence: miss(),
+    remote_code_execution: miss(),
+    unexpected_network_access: miss(),
+    remote_code_download: miss(),
+    stealth_behavior: miss(),
+    obfuscation: miss(),
+    scope_expansion: miss(),
+    behavior_description_mismatch: miss(),
+  };
+  const modelSummary: SecurityReportSummary = {
+    ...summary,
+    semanticAnalysis: {
+      kind: 'model',
+      modelId: 'qwen3.5-2b-q4_k_m',
+      modelSha256: 'model-sha',
+      policyVersion: '1.0.0',
+    },
+  };
+  mockedUseAppContext.mockReturnValue({
+    installPath: '/tmp/skills',
+    localSkills: [{
+      id: 'danger-skill',
+      name: 'Danger Skill',
+      version: '1.0.0',
+      description: '',
+      author: '',
+      tags: [],
+      files: [],
+    }],
+  } as unknown as ReturnType<typeof useAppContext>);
+  mockedUseSecurityScan.mockReturnValue({
+    task: null,
+    reports: [modelSummary],
+    loading: false,
+    error: '',
+    startScan: jest.fn(async () => undefined),
+    cancelScan: jest.fn(async () => undefined),
+    loadReport: jest.fn(async () => ({
+      ...report,
+      ...modelSummary,
+      semanticAssessments,
+    })),
+    refresh: jest.fn(async () => undefined),
+  });
+
+  render(<SecurityScanPage />);
+
+  expect(await screen.findByText('智能语义 + 确定性检查')).toBeInTheDocument();
+  expect(screen.getByText('查看 16 项智能判断')).toBeInTheDocument();
+  expect(screen.getByText('提示词注入')).toBeInTheDocument();
+  expect(screen.getAllByText(/未命中/)).toHaveLength(15);
 });

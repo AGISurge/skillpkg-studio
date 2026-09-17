@@ -252,6 +252,9 @@ function writeStagedPackageJson() {
     version: rootPackage.version,
     private: true,
     main: 'main.cjs',
+    dependencies: {
+      'node-llama-cpp': rootPackage.dependencies['node-llama-cpp'],
+    },
   };
 
   fs.writeFileSync(
@@ -276,6 +279,13 @@ function prepareStagedApp() {
 
 function main() {
   const options = parseArgs(process.argv.slice(2));
+  if (options.platform === 'all') {
+    throw new Error(
+      'Cross-platform packaging from one machine is not supported. '
+      + 'Use dist:mac, dist:win, or dist:linux on the matching platform, '
+      + 'or use the release workflow.',
+    );
+  }
   const buildStartedAt = Date.now();
 
   printSigningNotes(options);

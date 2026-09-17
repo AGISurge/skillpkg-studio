@@ -3,7 +3,7 @@ const fs = require('fs');
 const fsp = require('fs/promises');
 const crypto = require('crypto');
 const { parentPort } = require('worker_threads');
-const { analyzeTextFile } = require('./analyzers');
+const { analyzeTextFileDetailed } = require('./analyzers');
 const { POLICY, normalizeFinding } = require('./policyEngine');
 
 const isInside = (targetPath, rootPath) => {
@@ -34,6 +34,12 @@ const looksBinary = (buffer) => {
     if (value < 9 || (value > 13 && value < 32)) controlCount += 1;
   }
   return sample.length > 0 && controlCount / sample.length > 0.08;
+};
+
+const isSemanticDocument = (filePath) => {
+  const extension = path.extname(filePath).slice(1).toLowerCase();
+  return ['md', 'mdx', 'txt', 'rst'].includes(extension)
+    || path.basename(filePath).toUpperCase() === 'SKILL.MD';
 };
 
 const readSampledText = async (filePath, size) => {
@@ -87,7 +93,13 @@ const analyzeFile = async (job) => {
       mtimeMs: Math.round(stat.mtimeMs),
       digest,
       coverage: job.cached.coverage,
-      findings: job.cached.findings,
+      findings: [
+        ...(job.cached.deterministicFindings || []),
+        ...(job.cached.instructionFindings || []),
+      ],
+      deterministicFindings: job.cached.deterministicFindings || [],
+      instructionFindings: job.cached.instructionFindings || [],
+      semanticEligible: isSemanticDocument(job.file.relativePath),
       cacheHit: true,
     };
   }
@@ -99,6 +111,9 @@ const analyzeFile = async (job) => {
       digest,
       coverage: job.metadataCoverage || 'complete',
       findings: [],
+      deterministicFindings: [],
+      instructionFindings: [],
+      semanticEligible: false,
     };
   }
   const sampled = uncachedRead || (oversized
@@ -117,31 +132,53 @@ const analyzeFile = async (job) => {
       digest,
       coverage: 'incomplete',
       findings: [unknownBinaryFinding(job.file)],
+      deterministicFindings: [unknownBinaryFinding(job.file)],
+      instructionFindings: [],
+      semanticEligible: false,
     };
   }
 
-  let findings;
+  const deterministicFindings = [];
+  const instructionFindings = [];
   if (oversized) {
     const headContent = resolvedSample.head.toString('utf8');
     const tailContent = resolvedSample.tail.toString('utf8');
     const tailLineCount = (tailContent.match(/\n/g) || []).length + 1;
     const tailLineOffset = Math.max(0, lineBreaks + 1 - tailLineCount);
-    findings = [
-      ...analyzeTextFile({ filePath: job.file.relativePath, content: headContent }),
-      ...analyzeTextFile({ filePath: job.file.relativePath, content: tailContent }).map((finding) => ({
+    const headAnalysis = analyzeTextFileDetailed({
+      filePath: job.file.relativePath,
+      content: headContent,
+    });
+    const tailAnalysis = analyzeTextFileDetailed({
+      filePath: job.file.relativePath,
+      content: tailContent,
+    });
+    deterministicFindings.push(
+      ...headAnalysis.deterministicFindings,
+      ...tailAnalysis.deterministicFindings.map((finding) => ({
         ...finding,
         startLine: finding.startLine + tailLineOffset,
         endLine: finding.endLine + tailLineOffset,
       })),
-    ];
+    );
+    instructionFindings.push(
+      ...headAnalysis.instructionFindings,
+      ...tailAnalysis.instructionFindings.map((finding) => ({
+        ...finding,
+        startLine: finding.startLine + tailLineOffset,
+        endLine: finding.endLine + tailLineOffset,
+      })),
+    );
   } else {
-    findings = analyzeTextFile({
+    const analysis = analyzeTextFileDetailed({
       filePath: job.file.relativePath,
       content: resolvedSample.toString('utf8'),
     });
+    deterministicFindings.push(...analysis.deterministicFindings);
+    instructionFindings.push(...analysis.instructionFindings);
   }
   if (oversized) {
-    findings.push(normalizeFinding({
+    deterministicFindings.push(normalizeFinding({
       ruleId: 'FILE_TEXT_TOO_LARGE',
       title: '大文本文件仅扫描首尾片段',
       category: 'scan-coverage',
@@ -153,6 +190,7 @@ const analyzeFile = async (job) => {
       remediation: '拆分文件或移除不必要的大块内容后重新扫描。',
     }));
   }
+  const findings = [...deterministicFindings, ...instructionFindings];
   return {
     filePath: job.file.relativePath,
     size: stat.size,
@@ -160,6 +198,9 @@ const analyzeFile = async (job) => {
     digest,
     coverage: oversized ? 'incomplete' : 'complete',
     findings,
+    deterministicFindings,
+    instructionFindings,
+    semanticEligible: isSemanticDocument(job.file.relativePath),
   };
 };
 
