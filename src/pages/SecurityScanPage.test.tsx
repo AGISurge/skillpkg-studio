@@ -128,6 +128,61 @@ test('shows live progress, risk level, and finding details', async () => {
   expect(cancelScan).toHaveBeenCalledTimes(1);
 });
 
+test('shows semantic chunk progress while inference is running', () => {
+  mockedUseAppContext.mockReturnValue({
+    installPath: '/tmp/skills',
+    localSkills: [{
+      id: 'danger-skill',
+      name: 'Danger Skill',
+      version: '1.0.0',
+      description: '',
+      author: '',
+      tags: [],
+      files: [],
+    }],
+  } as unknown as ReturnType<typeof useAppContext>);
+  mockedUseSecurityScan.mockReturnValue({
+    task: {
+      id: 'task-1',
+      libraryPath: '/tmp/skills',
+      mode: 'incremental',
+      status: 'scanning',
+      phase: 'semantic',
+      percent: 41,
+      currentSkillId: 'danger-skill',
+      currentSkillName: 'Danger Skill',
+      currentFile: '',
+      semanticChunkIndex: 1,
+      semanticChunkCount: 3,
+      semanticCompletedChunks: 0,
+      semanticTotalChunks: 3,
+      semanticInFlightChunks: 1,
+      processedFiles: 10,
+      totalFiles: 10,
+      completedSkills: 0,
+      totalSkills: 1,
+      findingsCount: 0,
+      startedAt: '2026-09-16T00:00:00.000Z',
+      completedAt: null,
+      error: null,
+      runtime: { sequences: 1, fileWorkers: 8, batchSize: 2048 },
+    },
+    reports: [],
+    loading: false,
+    error: '',
+    startScan: jest.fn(async () => undefined),
+    cancelScan: jest.fn(async () => undefined),
+    loadReport: jest.fn(async () => null),
+    refresh: jest.fn(async () => undefined),
+  } as unknown as ReturnType<typeof useSecurityScan>);
+
+  render(<SecurityScanPage />);
+
+  expect(screen.getByText('正在扫描：Danger Skill / 语义块 0/3 · 1 进行中')).toBeInTheDocument();
+  expect(screen.getByText('推理 1 路')).toBeInTheDocument();
+  expect(screen.getByText('batch 2048')).toBeInTheDocument();
+});
+
 test('waits for the user before starting the first scan', () => {
   const startScan = jest.fn(async () => undefined);
   mockedUseAppContext.mockReturnValue({

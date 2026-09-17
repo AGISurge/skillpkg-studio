@@ -11,6 +11,7 @@ const {
   CONTEXT_SIZE,
   MAX_CHUNKS,
   MAX_OUTPUT_TOKENS,
+  MAX_SAFE_SEQUENCES,
   resolveCapabilities,
 } = require('./hostCapabilities');
 const { createLimiter } = require('./asyncPool');
@@ -77,7 +78,7 @@ const createSecurityInferenceService = ({
   capabilities: capabilityOverrides,
 } = {}) => {
   const capabilities = resolveCapabilities(capabilityOverrides);
-  const limiter = createLimiter(capabilities.sequences);
+  const limiter = createLimiter(MAX_SAFE_SEQUENCES);
   let loadChain = Promise.resolve();
   let adapter = null;
   let adapterModelPath = '';
@@ -140,8 +141,8 @@ const createSecurityInferenceService = ({
     };
 
     try {
-      await Promise.all(chunks.map(async (chunk, index) => {
-        if (failure || skillSignal?.aborted) return;
+      for (let index = 0; index < chunks.length; index += 1) {
+        if (failure || skillSignal?.aborted) break;
         onChunk?.({ index: index + 1, count: chunks.length, done: false });
         await limiter.acquire();
         const chunkTimeout = createTimeout(chunkTimeoutMs, 'chunk-timeout');
@@ -156,19 +157,19 @@ const createSecurityInferenceService = ({
                   : 'inference-failed',
               });
             }
-            return;
+            break;
           }
           const output = await loadedAdapter.generate({
             prompt: createUserPrompt({
               skillName,
               description,
-              chunk,
+              chunk: chunks[index],
               chunkIndex: index,
               chunkCount: chunks.length,
             }),
             signal: chunkSignal,
           });
-          if (failure) return;
+          if (failure) break;
           if (chunkSignal?.aborted) {
             fail({
               ok: false,
@@ -176,38 +177,39 @@ const createSecurityInferenceService = ({
                 ? 'timeout'
                 : 'inference-failed',
             });
-            return;
+            break;
           }
           if (!hasExactlyOneDimensionKey(output)) {
             fail({ ok: false, reason: 'schema-invalid' });
-            return;
+            break;
           }
           let parsed;
           try {
             parsed = JSON.parse(output);
           } catch (_error) {
             fail({ ok: false, reason: 'schema-invalid' });
-            return;
+            break;
           }
           const shaped = parseSemanticAssessments(parsed);
           if (!shaped.ok) {
             fail(shaped);
-            return;
+            break;
           }
           const evidenced = validateSemanticEvidence(shaped.assessments, documents);
           if (!evidenced.ok) {
             fail(evidenced);
-            return;
+            break;
           }
           chunkAssessments[index] = evidenced.assessments;
           onChunk?.({ index: index + 1, count: chunks.length, done: true });
         } catch (error) {
           fail({ ok: false, reason: classifyFailure(error, chunkSignal) });
+          break;
         } finally {
           chunkTimeout.dispose();
           limiter.release();
         }
-      }));
+      }
       if (failure) return failure;
       if (skillSignal?.aborted) {
         return {
@@ -226,6 +228,7 @@ const createSecurityInferenceService = ({
         chunkCount: chunks.length,
         diagnostics: loadedAdapter.diagnostics || {
           sequences: capabilities.sequences,
+          batchSize: capabilities.batchSize,
         },
       };
     } catch (error) {

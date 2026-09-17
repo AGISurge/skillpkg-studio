@@ -22,7 +22,8 @@ const {
   parseSemanticAssessments,
 } = require('./semanticPolicy');
 const { detectHostCapabilities, resolveCapabilities } = require('./hostCapabilities');
-const { createMutex, mapPool } = require('./asyncPool');
+const { splitSemanticDocuments } = require('./semanticChunker');
+const { createLimiter, createMutex, mapPool } = require('./asyncPool');
 
 const COVERAGE_RANK = { complete: 0, partial: 1, incomplete: 2 };
 const MAX_EVENT_RATE_MS = 100;
@@ -158,6 +159,7 @@ const createSecurityService = ({
     semanticChunkCount: task.semanticChunkCount || 0,
     semanticCompletedChunks: task.semanticCompletedChunks || 0,
     semanticTotalChunks: task.semanticTotalChunks || 0,
+    semanticInFlightChunks: task.semanticInFlightChunks || 0,
     processedFiles: task.processedFiles || 0,
     totalFiles: task.totalFiles || 0,
     completedSkills: task.completedSkills || 0,
@@ -169,6 +171,7 @@ const createSecurityService = ({
     runtime: task.runtime || {
       sequences: capabilities.sequences,
       fileWorkers: capabilities.fileWorkers,
+      batchSize: capabilities.batchSize,
     },
   });
 
@@ -182,15 +185,22 @@ const createSecurityService = ({
     emitEvent({ type: 'progress', task: publicTask(task) });
   };
 
-  const updateAnalysisProgress = (task) => {
+  const updateAnalysisProgress = (task, force = false) => {
     const fileRatio = task.totalWorkUnits
       ? task.processedWorkUnits / task.totalWorkUnits
       : task.totalFiles ? task.processedFiles / task.totalFiles : 1;
-    const skillRatio = task.totalSkills ? task.completedSkills / task.totalSkills : 0;
-    task.percent = 10 + Math.min(1, fileRatio) * 50 + Math.min(1, skillRatio) * 37;
+    const registered = task.semanticRegisteredSkills || 0;
+    const estimatedChunks = Math.max(
+      (task.semanticTotalChunks || 0) + Math.max(0, (task.totalSkills || 0) - registered),
+      1,
+    );
+    const chunkRatio = Math.min(1, (
+      (task.semanticCompletedChunks || 0) + (task.semanticInFlightChunks || 0) * 0.35
+    ) / estimatedChunks);
+    task.percent = 10 + Math.min(1, fileRatio) * 25 + chunkRatio * 62;
     if (task.semanticInFlight > 0) task.phase = 'semantic';
     else if (task.analyzingInFlight > 0) task.phase = 'analyzing';
-    emitProgress(task);
+    emitProgress(task, force);
   };
 
   const markFileProcessed = (task, file) => {
@@ -317,8 +327,16 @@ const createSecurityService = ({
     return fileResults;
   };
 
+  const noteSemanticSkipped = (task) => {
+    task.semanticRegisteredSkills += 1;
+    task.semanticTotalChunks += 1;
+    task.semanticCompletedChunks += 1;
+    updateAnalysisProgress(task, true);
+  };
+
   const analyzeSemantics = async (task, inventory, fileResults) => {
     if (task.modelSnapshot.kind === 'missing') {
+      noteSemanticSkipped(task);
       return {
         analysis: { kind: 'rules', reason: 'model-missing' },
         assessments: null,
@@ -326,6 +344,7 @@ const createSecurityService = ({
       };
     }
     if (task.modelSnapshot.kind !== 'ready' || !inferenceService) {
+      noteSemanticSkipped(task);
       return {
         analysis: { kind: 'fallback', reason: 'model-invalid' },
         assessments: null,
@@ -336,6 +355,7 @@ const createSecurityService = ({
     const inventoryFiles = new Map(inventory.files.map((file) => [file.relativePath, file]));
     const semanticResults = fileResults.filter((result) => result.semanticEligible);
     if (!semanticResults.length) {
+      noteSemanticSkipped(task);
       return {
         analysis: { kind: 'rules', reason: 'no-semantic-corpus' },
         assessments: null,
@@ -365,6 +385,7 @@ const createSecurityService = ({
       if (cached?.assessments) {
         const parsed = parseSemanticAssessments(cached.assessments);
         if (parsed.ok) {
+          noteSemanticSkipped(task);
           return {
             analysis: {
               kind: 'model',
@@ -385,6 +406,7 @@ const createSecurityService = ({
       return sum + (file?.size || 0);
     }, 0);
     if (totalBytes > maxCorpusBytes) {
+      noteSemanticSkipped(task);
       return {
         analysis: { kind: 'fallback', reason: 'corpus-too-large' },
         assessments: null,
@@ -393,76 +415,87 @@ const createSecurityService = ({
     }
 
     const documents = [];
-    try {
-      for (const result of semanticResults) {
-        if (task.cancelRequested) throw new Error('security-scan-canceled');
-        const file = inventoryFiles.get(result.filePath);
-        if (!file) {
-          return {
-            analysis: { kind: 'fallback', reason: 'corpus-changed' },
-            assessments: null,
-            cache: null,
-          };
-        }
-        if (typeof result.textContent === 'string') {
-          const digest = crypto.createHash('sha256').update(result.textContent).digest('hex');
-          if (digest !== result.digest) {
-            return {
-              analysis: { kind: 'fallback', reason: 'corpus-changed' },
-              assessments: null,
-              cache: null,
-            };
-          }
-          documents.push({ filePath: result.filePath, content: result.textContent });
-          continue;
-        }
-        const content = await fs.readFile(file.fullPath);
-        const digest = crypto.createHash('sha256').update(content).digest('hex');
-        if (digest !== result.digest) {
-          return {
-            analysis: { kind: 'fallback', reason: 'corpus-changed' },
-            assessments: null,
-            cache: null,
-          };
-        }
-        documents.push({ filePath: result.filePath, content: content.toString('utf8') });
-      }
-    } catch (error) {
-      if (task.cancelRequested) throw error;
+    const skipChanged = () => {
+      noteSemanticSkipped(task);
       return {
         analysis: { kind: 'fallback', reason: 'corpus-changed' },
         assessments: null,
         cache: null,
       };
+    };
+    try {
+      for (const result of semanticResults) {
+        if (task.cancelRequested) throw new Error('security-scan-canceled');
+        const file = inventoryFiles.get(result.filePath);
+        if (!file) return skipChanged();
+        if (typeof result.textContent === 'string') {
+          const digest = crypto.createHash('sha256').update(result.textContent).digest('hex');
+          if (digest !== result.digest) return skipChanged();
+          documents.push({ filePath: result.filePath, content: result.textContent });
+          continue;
+        }
+        const content = await fs.readFile(file.fullPath);
+        const digest = crypto.createHash('sha256').update(content).digest('hex');
+        if (digest !== result.digest) return skipChanged();
+        documents.push({ filePath: result.filePath, content: content.toString('utf8') });
+      }
+    } catch (error) {
+      if (task.cancelRequested) throw error;
+      return skipChanged();
     }
 
+    const chunks = splitSemanticDocuments(documents, capabilities);
+    if (!chunks) {
+      noteSemanticSkipped(task);
+      return {
+        analysis: { kind: 'fallback', reason: 'corpus-too-large' },
+        assessments: null,
+        cache: null,
+      };
+    }
+
+    const reservedChunks = Math.max(chunks.length, 1);
     task.currentSkillId = inventory.skillId;
     task.currentSkillName = inventory.name;
     task.currentFile = '';
-    emitProgress(task, true);
-    const counted = { current: false };
-    const result = await inferenceService.analyze({
-      modelSnapshot: task.modelSnapshot,
-      skillName: inventory.name,
-      description: inventory.description || '',
-      documents,
-      signal: task.abortController.signal,
-      onChunk: ({ index, count, done }) => {
-        if (!counted.current) {
-          counted.current = true;
-          task.semanticTotalChunks += count;
-        }
-        task.semanticChunkIndex = index;
-        task.semanticChunkCount = count;
-        if (done) task.semanticCompletedChunks += 1;
-        emitProgress(task, true);
-      },
-    });
-    if (result.diagnostics?.gpuLayers != null) {
+    task.semanticRegisteredSkills += 1;
+    task.semanticTotalChunks += reservedChunks;
+    task.semanticInFlightChunks += 1;
+    task.semanticChunkIndex = 0;
+    task.semanticChunkCount = chunks.length;
+    updateAnalysisProgress(task, true);
+
+    let completedForSkill = 0;
+    let result;
+    try {
+      result = await inferenceService.analyze({
+        modelSnapshot: task.modelSnapshot,
+        skillName: inventory.name,
+        description: inventory.description || '',
+        documents,
+        signal: task.abortController.signal,
+        onChunk: ({ index, count, done }) => {
+          task.semanticChunkIndex = index;
+          task.semanticChunkCount = count;
+          if (done) {
+            completedForSkill += 1;
+            task.semanticCompletedChunks += 1;
+          }
+          updateAnalysisProgress(task, true);
+        },
+      });
+    } finally {
+      const remaining = reservedChunks - completedForSkill;
+      if (remaining > 0) task.semanticCompletedChunks += remaining;
+      task.semanticInFlightChunks = Math.max(0, task.semanticInFlightChunks - 1);
+      updateAnalysisProgress(task, true);
+    }
+    if (result.diagnostics) {
       task.runtime = {
         ...task.runtime,
-        gpuLayers: result.diagnostics.gpuLayers,
+        gpuLayers: result.diagnostics.gpuLayers ?? task.runtime.gpuLayers,
         sequences: result.diagnostics.sequences || task.runtime.sequences,
+        batchSize: result.diagnostics.batchSize || task.runtime.batchSize,
       };
     }
     if (task.cancelRequested) throw new Error('security-scan-canceled');
@@ -513,6 +546,7 @@ const createSecurityService = ({
   const runScan = async (task) => {
     let pool = null;
     const saveLock = createMutex();
+    const semanticLimiter = createLimiter(2);
     try {
       const rootStat = await fs.stat(task.libraryPath);
       if (!rootStat.isDirectory()) throw new Error('统一技能库路径不是目录。');
@@ -567,6 +601,11 @@ const createSecurityService = ({
           updateAnalysisProgress(task);
           const fileResults = await analyzeInventory(task, inventory, pool);
           if (task.cancelRequested) throw new Error('security-scan-canceled');
+          await semanticLimiter.acquire();
+          if (task.cancelRequested) {
+            semanticLimiter.release();
+            throw new Error('security-scan-canceled');
+          }
           task.semanticInFlight += 1;
           updateAnalysisProgress(task);
           try {
@@ -592,6 +631,7 @@ const createSecurityService = ({
             });
           } finally {
             task.semanticInFlight = Math.max(0, task.semanticInFlight - 1);
+            semanticLimiter.release();
           }
         } finally {
           task.analyzingInFlight = Math.max(0, task.analyzingInFlight - 1);
@@ -670,11 +710,14 @@ const createSecurityService = ({
       semanticChunkCount: 0,
       semanticCompletedChunks: 0,
       semanticTotalChunks: 0,
+      semanticInFlightChunks: 0,
+      semanticRegisteredSkills: 0,
       analyzingInFlight: 0,
       semanticInFlight: 0,
       runtime: {
         sequences: capabilities.sequences,
         fileWorkers: capabilities.fileWorkers,
+        batchSize: capabilities.batchSize,
       },
       startedAt: new Date().toISOString(),
       completedAt: null,

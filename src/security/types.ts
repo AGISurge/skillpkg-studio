@@ -119,6 +119,7 @@ export type SecurityScanProgress = {
   semanticChunkCount: number;
   semanticCompletedChunks?: number;
   semanticTotalChunks?: number;
+  semanticInFlightChunks?: number;
   processedFiles: number;
   totalFiles: number;
   completedSkills: number;
@@ -131,6 +132,7 @@ export type SecurityScanProgress = {
     sequences: number;
     fileWorkers: number;
     gpuLayers?: number | string;
+    batchSize?: number;
   } | null;
 };
 

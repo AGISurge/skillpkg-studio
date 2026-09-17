@@ -5,8 +5,21 @@ const CONTEXT_SIZE = 8192;
 const MAX_OUTPUT_TOKENS = 1024;
 const PROMPT_RESERVE_TOKENS = 512;
 const MAX_CHUNKS = 8;
+// Qwen3.5 hybrid recurrent memory (GatedDeltaNet) is not safe with
+// parallel sequences. Keep one sequence and spend RAM on a larger batch.
+const MAX_SAFE_SEQUENCES = 1;
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+
+const chooseBatchSize = ({ appleSilicon, totalmem }) => {
+  if (appleSilicon) {
+    if (totalmem >= 24 * GIB) return 2048;
+    if (totalmem >= 12 * GIB) return 1024;
+    return 512;
+  }
+  if (totalmem >= 24 * GIB) return 1024;
+  return 512;
+};
 
 const detectHostCapabilities = ({
   platform = process.platform,
@@ -16,19 +29,17 @@ const detectHostCapabilities = ({
 } = {}) => {
   const appleSilicon = platform === 'darwin' && arch === 'arm64';
   const intelMac = platform === 'darwin' && arch === 'x64';
-  const sequences = appleSilicon
-    ? (totalmem >= 24 * GIB ? 4 : totalmem >= 12 * GIB ? 2 : 1)
-    : 1;
+  const batchSize = chooseBatchSize({ appleSilicon, totalmem });
   const fileWorkers = Math.min(Math.max(cpuCount - 1, 1), appleSilicon ? 8 : 6);
   return {
     appleSilicon,
     intelMac,
     gpuLayers: 'max',
     flashAttention: true,
-    sequences,
+    sequences: MAX_SAFE_SEQUENCES,
     fileWorkers,
     inventoryConcurrency: fileWorkers,
-    batchSize: Math.min(CONTEXT_SIZE, 512 * sequences),
+    batchSize,
     threads: intelMac ? { min: Math.max(cpuCount - 2, 1) } : null,
     contextSize: CONTEXT_SIZE,
     maxOutputTokens: MAX_OUTPUT_TOKENS,
@@ -41,16 +52,21 @@ const detectHostCapabilities = ({
 const resolveCapabilities = (overrides = {}) => {
   const detected = detectHostCapabilities();
   const merged = { ...detected, ...overrides };
-  merged.sequences = clamp(Number(merged.sequences) || detected.sequences, 1, 6);
+  merged.sequences = clamp(
+    Number(merged.sequences) || detected.sequences,
+    1,
+    MAX_SAFE_SEQUENCES,
+  );
   merged.fileWorkers = clamp(Number(merged.fileWorkers) || detected.fileWorkers, 1, 16);
   merged.inventoryConcurrency = clamp(
     Number(merged.inventoryConcurrency) || merged.fileWorkers,
     1,
     16,
   );
-  merged.batchSize = Math.min(
+  merged.batchSize = clamp(
+    Number(merged.batchSize) || detected.batchSize,
+    256,
     merged.contextSize || CONTEXT_SIZE,
-    Number(merged.batchSize) || 512 * merged.sequences,
   );
   merged.documentTokenBudget = (merged.contextSize || CONTEXT_SIZE)
     - (merged.maxOutputTokens || MAX_OUTPUT_TOKENS)
@@ -63,6 +79,7 @@ module.exports = {
   CONTEXT_SIZE,
   MAX_CHUNKS,
   MAX_OUTPUT_TOKENS,
+  MAX_SAFE_SEQUENCES,
   PROMPT_RESERVE_TOKENS,
   detectHostCapabilities,
   resolveCapabilities,

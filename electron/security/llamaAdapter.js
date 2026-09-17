@@ -1,31 +1,19 @@
 const { SEMANTIC_JSON_SCHEMA } = require('./semanticPolicy');
 const { SEMANTIC_SYSTEM_PROMPT } = require('./semanticPrompt');
-const { CONTEXT_SIZE, MAX_OUTPUT_TOKENS, resolveCapabilities } = require('./hostCapabilities');
-const { createLimiter } = require('./asyncPool');
+const {
+  CONTEXT_SIZE,
+  MAX_OUTPUT_TOKENS,
+  MAX_SAFE_SEQUENCES,
+  resolveCapabilities,
+} = require('./hostCapabilities');
+const { createMutex } = require('./asyncPool');
 
-const createContextWithFallback = async (model, capabilities) => {
-  const attempts = [capabilities.sequences];
-  if (capabilities.sequences > 1) attempts.push(1);
-  let lastError;
-  for (const sequences of attempts) {
-    try {
-      const options = {
-        contextSize: capabilities.contextSize || CONTEXT_SIZE,
-        sequences,
-        flashAttention: capabilities.flashAttention !== false,
-        batchSize: Math.min(
-          capabilities.contextSize || CONTEXT_SIZE,
-          capabilities.batchSize || 512 * sequences,
-        ),
-      };
-      if (capabilities.threads) options.threads = capabilities.threads;
-      const context = await model.createContext(options);
-      return { context, sequences };
-    } catch (error) {
-      lastError = error;
-    }
+const disposeQuietly = async (value) => {
+  try {
+    await value?.dispose?.();
+  } catch (_error) {
+    // Native llama objects can already be torn down during abort.
   }
-  throw lastError;
 };
 
 const createNodeLlamaAdapter = async ({
@@ -42,25 +30,19 @@ const createNodeLlamaAdapter = async ({
     defaultContextFlashAttention: capabilities.flashAttention !== false,
   });
   const grammar = await llama.createGrammarForJsonSchema(SEMANTIC_JSON_SCHEMA);
-  const { context, sequences: sequenceCount } = await createContextWithFallback(model, capabilities);
-  const slots = [];
-  for (let index = 0; index < sequenceCount; index += 1) {
-    const sequence = context.getSequence();
-    slots.push({
-      sequence,
-      session: new module.LlamaChatSession({
-        contextSequence: sequence,
-        autoDisposeSequence: false,
-        systemPrompt: SEMANTIC_SYSTEM_PROMPT,
-      }),
-    });
-  }
-  const limiter = createLimiter(slots.length);
-  const idleSlots = [...slots];
+  const context = await model.createContext({
+    contextSize: capabilities.contextSize || CONTEXT_SIZE,
+    sequences: MAX_SAFE_SEQUENCES,
+    flashAttention: capabilities.flashAttention !== false,
+    batchSize: capabilities.batchSize,
+    ...(capabilities.threads ? { threads: capabilities.threads } : {}),
+  });
+  const generateLock = createMutex();
   let disposed = false;
 
   const diagnostics = {
-    sequences: slots.length,
+    sequences: MAX_SAFE_SEQUENCES,
+    batchSize: capabilities.batchSize,
     contextSize: context.contextSize || capabilities.contextSize || CONTEXT_SIZE,
     gpuLayers: model.gpuLayers ?? capabilities.gpuLayers,
     flashAttention: capabilities.flashAttention !== false,
@@ -70,36 +52,35 @@ const createNodeLlamaAdapter = async ({
     diagnostics,
     async generate({ prompt, signal }) {
       if (disposed) throw new Error('inference-adapter-disposed');
-      await limiter.acquire();
-      const slot = idleSlots.pop();
-      try {
-        if (!slot) throw new Error('inference-sequence-missing');
-        slot.session.resetChatHistory?.();
-        return await slot.session.prompt(prompt, {
-          grammar,
-          maxTokens: capabilities.maxOutputTokens || MAX_OUTPUT_TOKENS,
-          temperature: 0,
-          signal,
-          budgets: { thoughtTokens: 0 },
+      return generateLock(async () => {
+        if (disposed) throw new Error('inference-adapter-disposed');
+        const sequence = context.getSequence();
+        const session = new module.LlamaChatSession({
+          contextSequence: sequence,
+          autoDisposeSequence: false,
+          systemPrompt: SEMANTIC_SYSTEM_PROMPT,
         });
-      } finally {
-        if (slot) {
-          slot.session.resetChatHistory?.();
-          idleSlots.push(slot);
+        try {
+          return await session.prompt(prompt, {
+            grammar,
+            maxTokens: capabilities.maxOutputTokens || MAX_OUTPUT_TOKENS,
+            temperature: 0,
+            signal,
+            budgets: { thoughtTokens: 0 },
+          });
+        } finally {
+          // Dispose the sequence instead of resetChatHistory(). The latter
+          // reads hybrid recurrent KV from the Electron main thread while
+          // llama_decode may still be running on a libuv worker.
+          session.dispose?.({ disposeSequence: true });
         }
-        limiter.release();
-      }
+      });
     },
     async dispose() {
       disposed = true;
-      limiter.failWaiting(new Error('inference-adapter-disposed'));
-      for (const slot of slots) {
-        slot.session.dispose?.({ disposeSequence: true });
-      }
-      slots.length = 0;
-      await context.dispose?.();
-      await model.dispose?.();
-      await llama.dispose?.();
+      await disposeQuietly(context);
+      await disposeQuietly(model);
+      await disposeQuietly(llama);
     },
   };
 };

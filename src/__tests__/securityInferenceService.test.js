@@ -68,7 +68,7 @@ describe('security inference service', () => {
     }])).toBeNull();
   });
 
-  test('loads lazily and limits in-flight generation to the sequence pool', async () => {
+  test('loads lazily and serializes generation for the hybrid model', async () => {
     let active = 0;
     let maxActive = 0;
     const prompts = [];
@@ -86,7 +86,7 @@ describe('security inference service', () => {
     }));
     const service = createSecurityInferenceService({
       adapterFactory,
-      capabilities: { sequences: 2 },
+      capabilities: { sequences: 4 },
     });
     const input = {
       modelSnapshot,
@@ -102,7 +102,7 @@ describe('security inference service', () => {
     ]);
     expect(results.every((result) => result.ok)).toBe(true);
     expect(adapterFactory).toHaveBeenCalledTimes(1);
-    expect(maxActive).toBe(2);
+    expect(maxActive).toBe(1);
     expect(prompts[0]).toContain('Frontmatter description: Formats text');
     expect(prompts[0]).toContain('# Sample');
 

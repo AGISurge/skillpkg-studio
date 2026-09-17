@@ -158,10 +158,11 @@ const SecurityScanPage = () => {
     } else if (task.currentSkillName) {
       parts.push(task.currentSkillName);
     }
-    if (task.semanticTotalChunks) {
-      parts.push(`语义块 ${task.semanticCompletedChunks || 0}/${task.semanticTotalChunks}`);
-    } else if (task.phase === 'semantic' && task.semanticChunkCount) {
-      parts.push(`语义分块 ${task.semanticChunkIndex}/${task.semanticChunkCount}`);
+    const totalChunks = task.semanticTotalChunks || 0;
+    const inFlightChunks = task.semanticInFlightChunks || 0;
+    if (totalChunks || inFlightChunks || task.phase === 'semantic') {
+      const label = `语义块 ${task.semanticCompletedChunks || 0}/${totalChunks}`;
+      parts.push(inFlightChunks ? `${label} · ${inFlightChunks} 进行中` : label);
     } else if (task.currentFile) {
       parts.push(task.currentFile);
     }
@@ -219,6 +220,7 @@ const SecurityScanPage = () => {
           <span>Skill {task?.completedSkills || 0} / {task?.totalSkills || localSkills.length}</span>
           <span>已记录 {task?.findingsCount || 0} 项发现</span>
           {task?.runtime?.sequences ? <span>推理 {task.runtime.sequences} 路</span> : null}
+          {task?.runtime?.batchSize ? <span>batch {task.runtime.batchSize}</span> : null}
           {task?.completedAt ? <span>更新于 {formatTime(task.completedAt)}</span> : null}
         </div>
         {(error || task?.error) ? (
