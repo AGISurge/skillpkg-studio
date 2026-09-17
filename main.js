@@ -73,6 +73,7 @@ const {
 const {
   createSecurityModelService,
 } = require('./electron/security/securityModelService');
+const { detectHostCapabilities } = require('./electron/security/hostCapabilities');
 
 const isDev = !app.isPackaged;
 const appRoot = __dirname;
@@ -590,7 +591,8 @@ const registerIpcHandlers = () => {
   const securityWorkerPath = isDev
     ? path.join(appRoot, 'electron', 'security', 'worker.js')
     : path.join(appRoot, 'security-worker.cjs');
-  securityInferenceService = createSecurityInferenceService();
+  const hostCapabilities = detectHostCapabilities();
+  securityInferenceService = createSecurityInferenceService({ capabilities: hostCapabilities });
   let securityService = null;
   const securityModelService = createSecurityModelService({
     userDataPath: app.getPath('userData'),
@@ -610,6 +612,7 @@ const registerIpcHandlers = () => {
     workerPath: securityWorkerPath,
     modelService: securityModelService,
     inferenceService: securityInferenceService,
+    hostCapabilities,
     emit: (event) => BrowserWindow.getAllWindows().forEach((window) => {
       window.webContents.send('security-scan-event', event);
     }),

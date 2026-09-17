@@ -3,8 +3,8 @@ const { normalizeFinding, redactEvidence } = require('./policyEngine');
 
 const SEMANTIC_MODEL_ID = 'qwen3.5-2b-q4_k_m';
 const SEMANTIC_POLICY_VERSION = '1.0.0';
-const SEMANTIC_PROMPT_VERSION = '1.0.0';
-const SEMANTIC_SCHEMA_VERSION = '1.0.0';
+const SEMANTIC_PROMPT_VERSION = '1.1.0';
+const SEMANTIC_SCHEMA_VERSION = '1.1.0';
 const SEMANTIC_CONFIDENCE_THRESHOLD = 0.6;
 
 const SEMANTIC_DIMENSIONS = Object.freeze([
@@ -172,11 +172,11 @@ const SEMANTIC_JSON_SCHEMA = {
             filePath: { type: 'string' },
             startLine: { type: 'integer', minimum: 1 },
             endLine: { type: 'integer', minimum: 1 },
-            quote: { type: 'string' },
+            quote: { type: 'string', maxLength: 800 },
           },
         },
       },
-      reason: { type: 'string' },
+      reason: { type: 'string', maxLength: 240 },
     },
   }])),
 };
@@ -265,7 +265,7 @@ const validateSemanticEvidence = (assessments, documents) => {
     validated[dimension] = {
       ...assessment,
       evidence,
-      reason: redactEvidence(assessment.reason).slice(0, 600),
+      reason: redactEvidence(assessment.reason).slice(0, 240),
     };
   }
   return { ok: true, assessments: validated };

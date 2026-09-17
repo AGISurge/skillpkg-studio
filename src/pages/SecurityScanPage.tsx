@@ -113,14 +113,18 @@ const SecurityScanPage = () => {
       skillId: skill.id,
       name: skill.name,
       report: reportsById.get(skill.id) || null,
-      scanning: task?.status === 'scanning' && task.currentSkillId === skill.id,
+      scanning: task?.status === 'scanning' && (
+        (task.activeSkillIds && task.activeSkillIds.length
+          ? task.activeSkillIds.includes(skill.id)
+          : task.currentSkillId === skill.id)
+      ),
     })).sort((left, right) => {
       if (left.scanning !== right.scanning) return left.scanning ? -1 : 1;
       const leftRank = left.report ? levelMeta[left.report.effectiveLevel].rank : 3;
       const rightRank = right.report ? levelMeta[right.report.effectiveLevel].rank : 3;
       return leftRank - rightRank || left.name.localeCompare(right.name);
     });
-  }, [localSkills, reports, task?.currentSkillId, task?.status]);
+  }, [localSkills, reports, task?.activeSkillIds, task?.currentSkillId, task?.status]);
 
   useEffect(() => {
     if (selectedSkillId && rows.some((row) => row.skillId === selectedSkillId)) return;
@@ -146,14 +150,23 @@ const SecurityScanPage = () => {
   const scanning = task?.status === 'scanning';
   const hasPreviousScan = Boolean(task || reports.length);
   const percent = scanning || task ? task?.percent || 0 : 0;
-  const currentTarget = task?.currentSkillName
-    ? [
-        task.currentSkillName,
-        task?.phase === 'semantic' && task.semanticChunkCount
-          ? `语义分块 ${task.semanticChunkIndex}/${task.semanticChunkCount}`
-          : task.currentFile,
-      ].filter(Boolean).join(' / ')
-    : '等待扫描任务';
+  const currentTarget = (() => {
+    if (!task) return '等待扫描任务';
+    const parts = [];
+    if (task.activeSkillIds && task.activeSkillIds.length > 1) {
+      parts.push(`${task.activeSkillIds.length} 个 Skill 并行`);
+    } else if (task.currentSkillName) {
+      parts.push(task.currentSkillName);
+    }
+    if (task.semanticTotalChunks) {
+      parts.push(`语义块 ${task.semanticCompletedChunks || 0}/${task.semanticTotalChunks}`);
+    } else if (task.phase === 'semantic' && task.semanticChunkCount) {
+      parts.push(`语义分块 ${task.semanticChunkIndex}/${task.semanticChunkCount}`);
+    } else if (task.currentFile) {
+      parts.push(task.currentFile);
+    }
+    return parts.join(' / ') || '等待扫描任务';
+  })();
   const currentStatusText = scanning
     ? `正在扫描：${currentTarget}`
     : task?.phase === 'completed'
@@ -205,6 +218,7 @@ const SecurityScanPage = () => {
           <span>文件 {task?.processedFiles || 0} / {task?.totalFiles || 0}</span>
           <span>Skill {task?.completedSkills || 0} / {task?.totalSkills || localSkills.length}</span>
           <span>已记录 {task?.findingsCount || 0} 项发现</span>
+          {task?.runtime?.sequences ? <span>推理 {task.runtime.sequences} 路</span> : null}
           {task?.completedAt ? <span>更新于 {formatTime(task.completedAt)}</span> : null}
         </div>
         {(error || task?.error) ? (

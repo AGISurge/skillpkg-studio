@@ -38,7 +38,7 @@ export type SemanticAssessment = {
 export type SemanticAssessments = Record<SemanticDimension, SemanticAssessment>;
 
 export type SemanticAnalysis =
-  | { kind: 'rules'; reason: 'model-missing' | 'legacy-report' }
+  | { kind: 'rules'; reason: 'model-missing' | 'legacy-report' | 'no-semantic-corpus' }
   | {
       kind: 'model';
       modelId: 'qwen3.5-2b-q4_k_m';
@@ -114,8 +114,11 @@ export type SecurityScanProgress = {
   currentSkillId: string;
   currentSkillName: string;
   currentFile: string;
+  activeSkillIds?: string[];
   semanticChunkIndex: number;
   semanticChunkCount: number;
+  semanticCompletedChunks?: number;
+  semanticTotalChunks?: number;
   processedFiles: number;
   totalFiles: number;
   completedSkills: number;
@@ -124,6 +127,11 @@ export type SecurityScanProgress = {
   startedAt: string;
   completedAt: string | null;
   error: string | null;
+  runtime?: {
+    sequences: number;
+    fileWorkers: number;
+    gpuLayers?: number | string;
+  } | null;
 };
 
 export type SecurityFinding = {

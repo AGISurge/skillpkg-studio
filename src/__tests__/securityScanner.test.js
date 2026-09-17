@@ -673,4 +673,60 @@ describe('offline security scanner', () => {
       policyVersion: '1.0.0',
     });
   });
+
+  test('runs semantic inference for multiple skills at once', async () => {
+    await fs.mkdir(path.join(tempRoot, 'skill-a'));
+    await fs.mkdir(path.join(tempRoot, 'skill-b'));
+    await fs.writeFile(path.join(tempRoot, 'skill-a', 'SKILL.md'), '---\nname: A\ndescription: A\n---\nSafe text.');
+    await fs.writeFile(path.join(tempRoot, 'skill-b', 'SKILL.md'), '---\nname: B\ndescription: B\n---\nSafe text.');
+    const reports = new Map();
+    let active = 0;
+    let maxActive = 0;
+    let emitResolver = null;
+    const completed = new Promise((resolve) => {
+      emitResolver = resolve;
+    });
+    const service = createSecurityService({
+      store: {
+        saveTask: async () => {},
+        getLatestTask: () => null,
+        getFileCache: () => null,
+        getSemanticCache: () => null,
+        saveReport: async (report) => {
+          const saved = { ...report, id: report.skillId };
+          reports.set(report.skillId, saved);
+          return saved;
+        },
+        removeMissingReports: async () => {},
+        listReports: () => Array.from(reports.values()),
+        getReport: (_libraryPath, skillId) => reports.get(skillId) || null,
+      },
+      workerPath: path.resolve(__dirname, '../../electron/security/worker.js'),
+      modelService: {
+        getSnapshot: async () => ({
+          kind: 'ready',
+          modelId: 'qwen3.5-2b-q4_k_m',
+          modelPath: '/tmp/model.gguf',
+          modelSha256: 'model-sha',
+        }),
+      },
+      inferenceService: {
+        analyze: async () => {
+          active += 1;
+          maxActive = Math.max(maxActive, active);
+          await new Promise((resolve) => setTimeout(resolve, 40));
+          active -= 1;
+          return { ok: true, assessments: emptySemanticAssessments() };
+        },
+      },
+      emit: (event) => {
+        if (event.type === 'completed') emitResolver?.();
+      },
+    });
+
+    await service.startScan({ installPath: tempRoot, mode: 'full' });
+    await completed;
+    expect(reports.size).toBe(2);
+    expect(maxActive).toBe(2);
+  });
 });

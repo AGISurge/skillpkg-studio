@@ -1,6 +1,5 @@
 const path = require('path');
 const fs = require('fs/promises');
-const os = require('os');
 const crypto = require('crypto');
 const { Worker } = require('worker_threads');
 const { collectSkillInventory, discoverSkillEntries } = require('./inventoryCollector');
@@ -21,8 +20,9 @@ const {
   assessmentsToFindings,
   createSemanticCacheKey,
   parseSemanticAssessments,
-  validateSemanticEvidence,
 } = require('./semanticPolicy');
+const { detectHostCapabilities, resolveCapabilities } = require('./hostCapabilities');
+const { createMutex, mapPool } = require('./asyncPool');
 
 const COVERAGE_RANK = { complete: 0, partial: 1, incomplete: 2 };
 const MAX_EVENT_RATE_MS = 100;
@@ -137,7 +137,9 @@ const createSecurityService = ({
   emit,
   modelService,
   inferenceService,
+  hostCapabilities,
 }) => {
+  const capabilities = resolveCapabilities(hostCapabilities || detectHostCapabilities());
   const activeTasks = new Map();
   const tasksById = new Map();
 
@@ -151,8 +153,11 @@ const createSecurityService = ({
     currentSkillId: task.currentSkillId || '',
     currentSkillName: task.currentSkillName || '',
     currentFile: task.currentFile || '',
+    activeSkillIds: [...(task.activeSkillIds || [])],
     semanticChunkIndex: task.semanticChunkIndex || 0,
     semanticChunkCount: task.semanticChunkCount || 0,
+    semanticCompletedChunks: task.semanticCompletedChunks || 0,
+    semanticTotalChunks: task.semanticTotalChunks || 0,
     processedFiles: task.processedFiles || 0,
     totalFiles: task.totalFiles || 0,
     completedSkills: task.completedSkills || 0,
@@ -161,6 +166,10 @@ const createSecurityService = ({
     startedAt: task.startedAt,
     completedAt: task.completedAt || null,
     error: task.error || null,
+    runtime: task.runtime || {
+      sequences: capabilities.sequences,
+      fileWorkers: capabilities.fileWorkers,
+    },
   });
 
   const emitEvent = (event) => emit?.(event);
@@ -174,10 +183,13 @@ const createSecurityService = ({
   };
 
   const updateAnalysisProgress = (task) => {
-    const ratio = task.totalWorkUnits
+    const fileRatio = task.totalWorkUnits
       ? task.processedWorkUnits / task.totalWorkUnits
       : task.totalFiles ? task.processedFiles / task.totalFiles : 1;
-    task.percent = 10 + Math.min(1, ratio) * 85;
+    const skillRatio = task.totalSkills ? task.completedSkills / task.totalSkills : 0;
+    task.percent = 10 + Math.min(1, fileRatio) * 50 + Math.min(1, skillRatio) * 37;
+    if (task.semanticInFlight > 0) task.phase = 'semantic';
+    else if (task.analyzingInFlight > 0) task.phase = 'analyzing';
     emitProgress(task);
   };
 
@@ -323,33 +335,9 @@ const createSecurityService = ({
 
     const inventoryFiles = new Map(inventory.files.map((file) => [file.relativePath, file]));
     const semanticResults = fileResults.filter((result) => result.semanticEligible);
-    const documents = [];
-    try {
-      for (const result of semanticResults) {
-        if (task.cancelRequested) throw new Error('security-scan-canceled');
-        const file = inventoryFiles.get(result.filePath);
-        if (!file) {
-          return {
-            analysis: { kind: 'fallback', reason: 'corpus-changed' },
-            assessments: null,
-            cache: null,
-          };
-        }
-        const content = await fs.readFile(file.fullPath);
-        const digest = crypto.createHash('sha256').update(content).digest('hex');
-        if (digest !== result.digest) {
-          return {
-            analysis: { kind: 'fallback', reason: 'corpus-changed' },
-            assessments: null,
-            cache: null,
-          };
-        }
-        documents.push({ filePath: result.filePath, content: content.toString('utf8') });
-      }
-    } catch (error) {
-      if (task.cancelRequested) throw error;
+    if (!semanticResults.length) {
       return {
-        analysis: { kind: 'fallback', reason: 'corpus-changed' },
+        analysis: { kind: 'rules', reason: 'no-semantic-corpus' },
         assessments: null,
         cache: null,
       };
@@ -376,10 +364,7 @@ const createSecurityService = ({
       );
       if (cached?.assessments) {
         const parsed = parseSemanticAssessments(cached.assessments);
-        const validated = parsed.ok
-          ? validateSemanticEvidence(parsed.assessments, documents)
-          : parsed;
-        if (validated.ok) {
+        if (parsed.ok) {
           return {
             analysis: {
               kind: 'model',
@@ -387,32 +372,99 @@ const createSecurityService = ({
               modelSha256: task.modelSnapshot.modelSha256,
               policyVersion: task.semanticPolicy.policyVersion,
             },
-            assessments: validated.assessments,
+            assessments: parsed.assessments,
             cache: null,
           };
         }
       }
     }
 
-    task.phase = 'semantic';
+    const maxCorpusBytes = capabilities.documentTokenBudget * capabilities.maxChunks * 2;
+    const totalBytes = semanticResults.reduce((sum, result) => {
+      const file = inventoryFiles.get(result.filePath);
+      return sum + (file?.size || 0);
+    }, 0);
+    if (totalBytes > maxCorpusBytes) {
+      return {
+        analysis: { kind: 'fallback', reason: 'corpus-too-large' },
+        assessments: null,
+        cache: null,
+      };
+    }
+
+    const documents = [];
+    try {
+      for (const result of semanticResults) {
+        if (task.cancelRequested) throw new Error('security-scan-canceled');
+        const file = inventoryFiles.get(result.filePath);
+        if (!file) {
+          return {
+            analysis: { kind: 'fallback', reason: 'corpus-changed' },
+            assessments: null,
+            cache: null,
+          };
+        }
+        if (typeof result.textContent === 'string') {
+          const digest = crypto.createHash('sha256').update(result.textContent).digest('hex');
+          if (digest !== result.digest) {
+            return {
+              analysis: { kind: 'fallback', reason: 'corpus-changed' },
+              assessments: null,
+              cache: null,
+            };
+          }
+          documents.push({ filePath: result.filePath, content: result.textContent });
+          continue;
+        }
+        const content = await fs.readFile(file.fullPath);
+        const digest = crypto.createHash('sha256').update(content).digest('hex');
+        if (digest !== result.digest) {
+          return {
+            analysis: { kind: 'fallback', reason: 'corpus-changed' },
+            assessments: null,
+            cache: null,
+          };
+        }
+        documents.push({ filePath: result.filePath, content: content.toString('utf8') });
+      }
+    } catch (error) {
+      if (task.cancelRequested) throw error;
+      return {
+        analysis: { kind: 'fallback', reason: 'corpus-changed' },
+        assessments: null,
+        cache: null,
+      };
+    }
+
     task.currentSkillId = inventory.skillId;
     task.currentSkillName = inventory.name;
     task.currentFile = '';
-    task.semanticChunkIndex = 0;
-    task.semanticChunkCount = 0;
     emitProgress(task, true);
+    const counted = { current: false };
     const result = await inferenceService.analyze({
       modelSnapshot: task.modelSnapshot,
       skillName: inventory.name,
       description: inventory.description || '',
       documents,
       signal: task.abortController.signal,
-      onChunk: ({ index, count }) => {
+      onChunk: ({ index, count, done }) => {
+        if (!counted.current) {
+          counted.current = true;
+          task.semanticTotalChunks += count;
+        }
         task.semanticChunkIndex = index;
         task.semanticChunkCount = count;
+        if (done) task.semanticCompletedChunks += 1;
         emitProgress(task, true);
       },
     });
+    if (result.diagnostics?.gpuLayers != null) {
+      task.runtime = {
+        ...task.runtime,
+        gpuLayers: result.diagnostics.gpuLayers,
+        sequences: result.diagnostics.sequences || task.runtime.sequences,
+      };
+    }
     if (task.cancelRequested) throw new Error('security-scan-canceled');
     if (!result.ok) {
       return {
@@ -442,8 +494,25 @@ const createSecurityService = ({
     };
   };
 
+  const trackSkill = (task, inventory, active) => {
+    if (active) {
+      if (!task.activeSkillIds.includes(inventory.skillId)) {
+        task.activeSkillIds.push(inventory.skillId);
+      }
+      task.currentSkillId = inventory.skillId;
+      task.currentSkillName = inventory.name;
+      return;
+    }
+    task.activeSkillIds = task.activeSkillIds.filter((skillId) => skillId !== inventory.skillId);
+    if (task.currentSkillId === inventory.skillId) {
+      task.currentSkillId = task.activeSkillIds[0] || '';
+      task.currentSkillName = '';
+    }
+  };
+
   const runScan = async (task) => {
     let pool = null;
+    const saveLock = createMutex();
     try {
       const rootStat = await fs.stat(task.libraryPath);
       if (!rootStat.isDirectory()) throw new Error('统一技能库路径不是目录。');
@@ -453,23 +522,28 @@ const createSecurityService = ({
       emitProgress(task, true);
       const skillEntries = await discoverSkillEntries(task.libraryPath);
       task.totalSkills = skillEntries.length;
-      const inventories = [];
-      for (let index = 0; index < skillEntries.length; index += 1) {
-        if (task.cancelRequested) throw new Error('security-scan-canceled');
-        const skill = skillEntries[index];
-        task.currentSkillId = skill.skillId;
-        task.currentSkillName = skill.name;
-        task.currentFile = '';
-        task.percent = skillEntries.length ? (index / skillEntries.length) * 10 : 10;
-        emitProgress(task);
-        const inventory = await collectSkillInventory(skill, {
-          onFile: (_targetSkill, file) => {
-            task.currentFile = file.relativePath;
-            emitProgress(task);
-          },
-        });
-        inventories.push(inventory);
-      }
+      let inventoried = 0;
+      const inventories = await mapPool(
+        skillEntries,
+        capabilities.inventoryConcurrency,
+        async (skill) => {
+          if (task.cancelRequested) throw new Error('security-scan-canceled');
+          task.currentSkillId = skill.skillId;
+          task.currentSkillName = skill.name;
+          task.currentFile = '';
+          const inventory = await collectSkillInventory(skill, {
+            onFile: (_targetSkill, file) => {
+              task.currentFile = file.relativePath;
+              emitProgress(task);
+            },
+          });
+          inventoried += 1;
+          task.percent = skillEntries.length ? (inventoried / skillEntries.length) * 10 : 10;
+          emitProgress(task);
+          return inventory;
+        },
+      );
+      if (task.cancelRequested) throw new Error('security-scan-canceled');
       task.totalFiles = inventories.reduce((sum, inventory) => sum + inventory.files.length, 0);
       task.totalWorkUnits = inventories.reduce(
         (sum, inventory) => sum + inventory.files.reduce(
@@ -482,39 +556,53 @@ const createSecurityService = ({
       task.percent = 10;
       emitProgress(task, true);
 
-      pool = new WorkerPool(workerPath, Math.min(Math.max(os.cpus().length - 1, 1), 4));
+      pool = new WorkerPool(workerPath, capabilities.fileWorkers);
       task.pool = pool;
-      for (const inventory of inventories) {
+      await Promise.all(inventories.map(async (inventory) => {
         if (task.cancelRequested) throw new Error('security-scan-canceled');
-        task.currentSkillId = inventory.skillId;
-        task.currentSkillName = inventory.name;
-        task.currentFile = '';
-        task.phase = 'analyzing';
-        task.semanticChunkIndex = 0;
-        task.semanticChunkCount = 0;
+        trackSkill(task, inventory, true);
         emitProgress(task);
-        const fileResults = await analyzeInventory(task, inventory, pool);
-        const semantic = await analyzeSemantics(task, inventory, fileResults);
-        const report = createReport({ task, inventory, fileResults, semantic });
-        const savedReport = await store.saveReport(report, fileResults, semantic.cache);
-        task.completedSkills += 1;
-        task.findingsCount += report.findingCount;
-        await persistTask(task);
-        const {
-          findings: _findings,
-          semanticAssessments: _semanticAssessments,
-          ...reportSummary
-        } = savedReport;
-        emitEvent({
-          type: 'report-updated',
-          report: reportSummary,
-          task: publicTask(task),
-        });
-      }
+        try {
+          task.analyzingInFlight += 1;
+          updateAnalysisProgress(task);
+          const fileResults = await analyzeInventory(task, inventory, pool);
+          if (task.cancelRequested) throw new Error('security-scan-canceled');
+          task.semanticInFlight += 1;
+          updateAnalysisProgress(task);
+          try {
+            const semantic = await analyzeSemantics(task, inventory, fileResults);
+            const report = createReport({ task, inventory, fileResults, semantic });
+            await saveLock(async () => {
+              if (task.cancelRequested) throw new Error('security-scan-canceled');
+              const savedReport = await store.saveReport(report, fileResults, semantic.cache);
+              task.completedSkills += 1;
+              task.findingsCount += report.findingCount;
+              updateAnalysisProgress(task);
+              await persistTask(task);
+              const {
+                findings: _findings,
+                semanticAssessments: _semanticAssessments,
+                ...reportSummary
+              } = savedReport;
+              emitEvent({
+                type: 'report-updated',
+                report: reportSummary,
+                task: publicTask(task),
+              });
+            });
+          } finally {
+            task.semanticInFlight = Math.max(0, task.semanticInFlight - 1);
+          }
+        } finally {
+          task.analyzingInFlight = Math.max(0, task.analyzingInFlight - 1);
+          trackSkill(task, inventory, false);
+        }
+      }));
 
       task.phase = 'finalizing';
       task.percent = 97;
       task.currentFile = '';
+      task.activeSkillIds = [];
       emitProgress(task, true);
       await store.removeMissingReports(
         task.libraryPath,
@@ -577,8 +665,17 @@ const createSecurityService = ({
       currentSkillId: '',
       currentSkillName: '',
       currentFile: '',
+      activeSkillIds: [],
       semanticChunkIndex: 0,
       semanticChunkCount: 0,
+      semanticCompletedChunks: 0,
+      semanticTotalChunks: 0,
+      analyzingInFlight: 0,
+      semanticInFlight: 0,
+      runtime: {
+        sequences: capabilities.sequences,
+        fileWorkers: capabilities.fileWorkers,
+      },
       startedAt: new Date().toISOString(),
       completedAt: null,
       error: null,

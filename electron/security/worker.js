@@ -80,6 +80,27 @@ const analyzeFile = async (job) => {
   const stat = await fsp.stat(realPath);
   if (!stat.isFile()) throw new Error('security-entry-not-file');
   const oversized = stat.size > POLICY.limits.maxFullTextBytes;
+  if (
+    job.cached
+    && job.cached.size === stat.size
+    && job.cached.mtimeMs === Math.round(stat.mtimeMs)
+  ) {
+    return {
+      filePath: job.file.relativePath,
+      size: stat.size,
+      mtimeMs: Math.round(stat.mtimeMs),
+      digest: job.cached.digest,
+      coverage: job.cached.coverage,
+      findings: [
+        ...(job.cached.deterministicFindings || []),
+        ...(job.cached.instructionFindings || []),
+      ],
+      deterministicFindings: job.cached.deterministicFindings || [],
+      instructionFindings: job.cached.instructionFindings || [],
+      semanticEligible: isSemanticDocument(job.file.relativePath),
+      cacheHit: true,
+    };
+  }
   const uncachedRead = job.cached || job.metadataOnly
     ? null
     : oversized
@@ -201,6 +222,9 @@ const analyzeFile = async (job) => {
     deterministicFindings,
     instructionFindings,
     semanticEligible: isSemanticDocument(job.file.relativePath),
+    textContent: !oversized && isSemanticDocument(job.file.relativePath)
+      ? resolvedSample.toString('utf8')
+      : undefined,
   };
 };
 
