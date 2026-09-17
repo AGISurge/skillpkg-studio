@@ -179,7 +179,7 @@ const SettingsPage = () => {
     }
     if (!appUpdateState) return "正在读取版本";
     if (updateStatus === "checking") return "正在检测";
-    if (updateStatus === "available") return "下载更新";
+    if (updateStatus === "available") return "更新";
     if (updateStatus === "downloading") {
       const percent = Math.round(appUpdateState.percent || 0);
       return percent > 0 ? `下载中 ${percent}%` : "下载中";
@@ -278,7 +278,7 @@ const SettingsPage = () => {
               onClick={() => setApiKeyVisible((current) => !current)}
               aria-label={apiKeyVisible ? "隐藏 API Key" : "显示 API Key"}
             >
-             
+
               {apiKeyVisible ? (
                 <EyeOffRegular className="icon" />
               ) : (
@@ -313,7 +313,7 @@ const SettingsPage = () => {
         <div className="settings-section-head">
           <div>
             <h2>本地智能模型</h2>
-            <p>Qwen3.5 2B Q4_K_M，仅用于本机安全扫描。模型不会随应用安装。</p>
+            <p>Qwen3.5 2B Q4_K_M，仅用于本机安全扫描。</p>
             <div className="settings-db-meta">
               <span>
                 <strong>状态</strong>
