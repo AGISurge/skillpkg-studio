@@ -21,6 +21,12 @@ const expectedNativePrefix = (platform, arch) => {
   return `linux-${arch}`;
 };
 
+const toPosixAsarPath = (file) => String(file).replaceAll('\\', '/');
+
+const hasPackedLlamaRuntime = (asarFiles) => (
+  asarFiles.some((file) => toPosixAsarPath(file).includes('node_modules/node-llama-cpp/'))
+);
+
 const verifyPackage = async ({ platform, arch }) => {
   const asarPaths = walk(distDir).filter((file) => path.basename(file) === 'app.asar');
   if (asarPaths.length !== 1) {
@@ -28,7 +34,7 @@ const verifyPackage = async ({ platform, arch }) => {
   }
   const asarPath = asarPaths[0];
   const resourcesDir = path.dirname(asarPath);
-  const asarFiles = asar.listPackage(asarPath);
+  const asarFiles = asar.listPackage(asarPath).map(toPosixAsarPath);
   const unpackedFiles = walk(path.join(resourcesDir, 'app.asar.unpacked'));
   const nativePrefix = expectedNativePrefix(platform, arch);
   const llamaNativeFiles = unpackedFiles.filter((file) => (
@@ -39,7 +45,7 @@ const verifyPackage = async ({ platform, arch }) => {
   if (!llamaNativeFiles.length) {
     throw new Error(`Missing unpacked ${nativePrefix} node-llama-cpp binary.`);
   }
-  if (!asarFiles.some((file) => file.includes('node_modules/node-llama-cpp/'))) {
+  if (!hasPackedLlamaRuntime(asarFiles)) {
     throw new Error('node-llama-cpp runtime files are missing from app.asar.');
   }
   const mainBundle = asar.extractFile(asarPath, 'main.cjs').toString('utf8');
@@ -69,4 +75,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { expectedNativePrefix, verifyPackage };
+module.exports = { expectedNativePrefix, hasPackedLlamaRuntime, verifyPackage };

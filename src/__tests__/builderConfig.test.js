@@ -1,5 +1,8 @@
 const builderConfig = require('../../electron-builder.config.cjs');
-const { expectedNativePrefix } = require('../../scripts/verify-electron-package');
+const {
+  expectedNativePrefix,
+  hasPackedLlamaRuntime,
+} = require('../../scripts/verify-electron-package');
 
 test('uses GitHub-safe default updater artifact names', () => {
   expect(builderConfig.artifactName).toBe(
@@ -40,4 +43,19 @@ test('checks the release matrix against target-specific native packages', () => 
   expect(expectedNativePrefix('mac', 'arm64')).toBe('mac-arm64');
   expect(expectedNativePrefix('linux', 'x64')).toBe('linux-x64');
   expect(expectedNativePrefix('win', 'x64')).toBe('win-x64');
+});
+
+test('detects node-llama-cpp in POSIX asar listings', () => {
+  expect(hasPackedLlamaRuntime([
+    '/node_modules/node-llama-cpp/package.json',
+  ])).toBe(true);
+});
+
+test('detects node-llama-cpp in Windows asar listings', () => {
+  expect(hasPackedLlamaRuntime([
+    '\\node_modules\\node-llama-cpp\\package.json',
+  ])).toBe(true);
+  expect(hasPackedLlamaRuntime([
+    '\\node_modules\\other\\package.json',
+  ])).toBe(false);
 });
