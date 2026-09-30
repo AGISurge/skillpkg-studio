@@ -1529,7 +1529,9 @@ body:not([data-theme='light']) .discover-type-pill.solution {
   background: transparent;
   color: var(--app-text);
   text-align: left;
+  font-size: 12px;
   cursor: pointer;
+  font-family: var(--font-sans);
 }
 .skill-check-tree-row:hover, .skill-check-tree-row.active { background: var(--surface-bg-hover); }
 .skill-check-tree-row > .icon, .skill-check-tree-row > span > .icon { width: 16px; height: 16px; flex-shrink: 0; }
