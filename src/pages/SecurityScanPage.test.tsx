@@ -93,6 +93,7 @@ test('shows live progress, risk level, and finding details', async () => {
       currentFile: 'scripts/run.sh',
       semanticChunkIndex: 0,
       semanticChunkCount: 0,
+      semanticProgress: { stage: 'loading', percent: 55 },
       processedFiles: 4,
       totalFiles: 10,
       completedSkills: 0,
@@ -116,6 +117,7 @@ test('shows live progress, risk level, and finding details', async () => {
   expect(screen.getByText('正在扫描：Danger Skill / scripts/run.sh')).toBeInTheDocument();
   expect(screen.getByLabelText('扫描进度 42%')).toBeInTheDocument();
   expect(screen.getByText('文件 4 / 10')).toBeInTheDocument();
+  expect(screen.getByText('正在加载模型 55%')).toBeInTheDocument();
   expect(screen.getByRole('button', { name: /取消扫描/ })).toBeInTheDocument();
   expect(startScan).not.toHaveBeenCalled();
 

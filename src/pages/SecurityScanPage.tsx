@@ -8,6 +8,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useAppContext } from '../AppContext';
 import { Button } from '../components/ui/button';
 import { useSecurityScan } from '../security/SecurityScanContext';
+import { semanticProgressLabel } from '../security/semanticProgress';
 import { coverageLabel, levelMeta, LevelBadge, SecurityFindings } from '../security/SecurityFindings';
 import type {
   SecurityReport,
@@ -185,6 +186,7 @@ const SecurityScanPage = () => {
           <span>文件 {task?.processedFiles || 0} / {task?.totalFiles || 0}</span>
           <span>Skill {task?.completedSkills || 0} / {task?.totalSkills || localSkills.length}</span>
           <span>已记录 {task?.findingsCount || 0} 项发现</span>
+          {task?.semanticProgress ? <span>{semanticProgressLabel(task.semanticProgress)}</span> : null}
           {task?.runtime?.sequences ? <span>推理 {task.runtime.sequences} 路</span> : null}
           {task?.runtime?.batchSize ? <span>batch {task.runtime.batchSize}</span> : null}
           {task?.completedAt ? <span>更新于 {formatTime(task.completedAt)}</span> : null}

@@ -2,14 +2,15 @@ const { detectHostCapabilities, resolveCapabilities } = require('../../electron/
 const { estimateTokens, splitSemanticDocuments } = require('../../electron/security/semanticChunker');
 const { createLimiter, mapPool } = require('../../electron/security/asyncPool');
 const { createNodeLlamaAdapter } = require('../../electron/security/llamaAdapter');
-const { emptySemanticAssessments, SEMANTIC_JSON_SCHEMA } = require('../../electron/security/semanticPolicy');
+const { emptySemanticAssessments } = require('../../electron/security/semanticPolicy');
+const { createGenerationSchema } = require('../../electron/security/semanticProtocol');
 const { SEMANTIC_SYSTEM_PROMPT } = require('../../electron/security/semanticPrompt');
 
 describe('host capabilities', () => {
   test('reserves 2048 output tokens for all semantic dimensions within the existing context', () => {
     const capabilities = resolveCapabilities();
     expect(capabilities.maxOutputTokens).toBe(2048);
-    expect(capabilities.documentTokenBudget).toBe(5632);
+    expect(capabilities.documentTokenBudget).toBe(5120);
     expect(capabilities.documentTokenBudget + capabilities.maxOutputTokens + capabilities.promptReserveTokens)
       .toBe(capabilities.contextSize);
   });
@@ -24,7 +25,7 @@ describe('host capabilities', () => {
       sequences: 1,
       batchSize: 2048,
       fileWorkers: 8,
-      gpuLayers: 'max',
+      gpuLayers: 'auto',
       flashAttention: true,
     }));
   });
@@ -95,6 +96,7 @@ describe('async pool', () => {
 
 describe('llama adapter', () => {
   test('reuses one context, disables thinking, and serializes hybrid generation', async () => {
+    const generationSchema = createGenerationSchema([{ id: 1 }]);
     const prompts = [];
     let contextCount = 0;
     let maxBusy = 0;
@@ -120,7 +122,7 @@ describe('llama adapter', () => {
           };
         },
         createGrammarForJsonSchema: async (schema) => {
-          expect(schema).toBe(SEMANTIC_JSON_SCHEMA);
+          expect(schema).toBe(generationSchema);
           return {};
         },
         dispose: async () => undefined,
@@ -160,8 +162,8 @@ describe('llama adapter', () => {
       llamaModule,
     });
     const [first, second] = await Promise.all([
-      adapter.generate({ prompt: 'one' }),
-      adapter.generate({ prompt: 'two' }),
+      adapter.generate({ prompt: 'one', schema: generationSchema }),
+      adapter.generate({ prompt: 'two', schema: generationSchema }),
     ]);
     expect(first).toContain('prompt_injection');
     expect(second).toContain('prompt_injection');

@@ -3,7 +3,7 @@ const os = require('os');
 const GIB = 1024 ** 3;
 const CONTEXT_SIZE = 8192;
 const MAX_OUTPUT_TOKENS = 2048;
-const PROMPT_RESERVE_TOKENS = 512;
+const PROMPT_RESERVE_TOKENS = 1024;
 const MAX_CHUNKS = 8;
 // Qwen3.5 hybrid recurrent memory (GatedDeltaNet) is not safe with
 // parallel sequences. Keep one sequence and spend RAM on a larger batch.
@@ -34,7 +34,7 @@ const detectHostCapabilities = ({
   return {
     appleSilicon,
     intelMac,
-    gpuLayers: 'max',
+    gpuLayers: 'auto',
     flashAttention: true,
     sequences: MAX_SAFE_SEQUENCES,
     fileWorkers,

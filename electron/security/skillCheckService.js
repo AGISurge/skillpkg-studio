@@ -174,9 +174,10 @@ const createSkillCheckService = ({ tempRoot, emit, ...engineOptions }) => {
       currentFile: task.currentFile, findingsCount: task.findingsCount,
       startedAt: task.startedAt, completedAt: task.completedAt, error: task.error,
       semanticAnalysis: runState.report?.semanticAnalysis || null,
+      semanticProgress: task.semanticProgress,
     });
     run.service = createSecurityService({
-      ...engineOptions, store, progressByFiles: true,
+      ...engineOptions, store, equalFileWeights: true,
       discoverEntries: async () => [{
         skillId: candidate.id, name: candidate.name, description: candidate.description,
         markdown: await fs.readFile(path.join(realPath, 'SKILL.md'), 'utf8'),

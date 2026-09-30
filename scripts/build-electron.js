@@ -70,6 +70,10 @@ async function main() {
       entryPoint: 'electron/security/worker.js',
       outfile: path.join(options.outDir, 'security-worker.cjs'),
     }),
+    buildEntry({
+      entryPoint: 'electron/security/inferenceProcess.js',
+      outfile: path.join(options.outDir, 'security-inference.cjs'),
+    }),
   ]);
   copySqlWasm(options.outDir);
 

@@ -8,6 +8,7 @@ const documentWrapperTokens = (filePath) => estimateTokens(
 
 const windowTokens = (filePath, content) => (
   documentWrapperTokens(filePath) + estimateTokens(content)
+    + content.split('\n').length * estimateTokens('[99999] ')
 );
 
 const splitSemanticDocuments = (documents, options = {}) => {

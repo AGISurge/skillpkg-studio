@@ -140,7 +140,7 @@ const createSecurityService = ({
   inferenceService,
   hostCapabilities,
   discoverEntries = discoverSkillEntries,
-  progressByFiles = false,
+  equalFileWeights = false,
   onInventory,
   onFileStarted,
   onFileResult,
@@ -156,7 +156,7 @@ const createSecurityService = ({
     mode: task.mode,
     status: task.status,
     phase: task.phase,
-    percent: Math.max(0, Math.min(100, Math.round(task.percent || 0))),
+    percent: Math.max(0, Math.min(task.status === 'completed' ? 100 : 99, Math.round(task.percent || 0))),
     currentSkillId: task.currentSkillId || '',
     currentSkillName: task.currentSkillName || '',
     currentFile: task.currentFile || '',
@@ -166,6 +166,7 @@ const createSecurityService = ({
     semanticCompletedChunks: task.semanticCompletedChunks || 0,
     semanticTotalChunks: task.semanticTotalChunks || 0,
     semanticInFlightChunks: task.semanticInFlightChunks || 0,
+    semanticProgress: task.semanticProgress || null,
     processedFiles: task.processedFiles || 0,
     totalFiles: task.totalFiles || 0,
     completedSkills: task.completedSkills || 0,
@@ -192,7 +193,9 @@ const createSecurityService = ({
   };
 
   const updateAnalysisProgress = (task, force = false) => {
-    const fileRatio = task.totalWorkUnits
+    const fileRatio = equalFileWeights && task.totalFiles
+      ? task.processedFiles / task.totalFiles
+      : task.totalWorkUnits
       ? task.processedWorkUnits / task.totalWorkUnits
       : task.totalFiles ? task.processedFiles / task.totalFiles : 1;
     const registered = task.semanticRegisteredSkills || 0;
@@ -201,11 +204,11 @@ const createSecurityService = ({
       1,
     );
     const chunkRatio = Math.min(1, (
-      (task.semanticCompletedChunks || 0) + (task.semanticInFlightChunks || 0) * 0.35
+      (task.semanticCompletedChunks || 0) + [...task.semanticFractions.values()].reduce((sum, value) => sum + value, 0)
     ) / estimatedChunks);
-    task.percent = progressByFiles
-      ? (task.totalFiles ? task.processedFiles / task.totalFiles * 100 : 0)
-      : 10 + Math.min(1, fileRatio) * 25 + chunkRatio * 62;
+    const hasModel = task.modelSnapshot.kind === 'ready' && Boolean(inferenceService);
+    const percent = 10 + Math.min(1, fileRatio) * (hasModel ? 25 : 87) + (hasModel ? chunkRatio * 62 : 0);
+    task.percent = Math.max(task.percent, Math.min(97, percent));
     if (task.semanticInFlight > 0) task.phase = 'semantic';
     else if (task.analyzingInFlight > 0) task.phase = 'analyzing';
     emitProgress(task, force);
@@ -485,19 +488,36 @@ const createSecurityService = ({
         documents,
         signal: task.abortController.signal,
         onChunk: ({ index, count, done }) => {
+          task.currentSkillId = inventory.skillId;
+          task.currentSkillName = inventory.name;
           task.semanticChunkIndex = index;
           task.semanticChunkCount = count;
           if (done) {
             completedForSkill += 1;
             task.semanticCompletedChunks += 1;
+            task.semanticFractions.delete(inventory.skillId);
           }
           updateAnalysisProgress(task, true);
+        },
+        onProgress: (progress) => {
+          const stageChanged = task.semanticProgress?.stage !== progress.stage;
+          task.currentSkillId = inventory.skillId;
+          task.currentSkillName = inventory.name;
+          task.currentFile = '';
+          task.semanticProgress = progress;
+          if (progress.stage === 'generating') {
+            task.semanticFractions.set(inventory.skillId,
+              Math.min(0.95, progress.completedDimensions / progress.totalDimensions * 0.95));
+          }
+          updateAnalysisProgress(task, stageChanged);
         },
       });
     } finally {
       const remaining = reservedChunks - completedForSkill;
       if (remaining > 0) task.semanticCompletedChunks += remaining;
       task.semanticInFlightChunks = Math.max(0, task.semanticInFlightChunks - 1);
+      task.semanticFractions.delete(inventory.skillId);
+      task.semanticProgress = null;
       updateAnalysisProgress(task, true);
     }
     if (result.diagnostics) {
@@ -582,7 +602,7 @@ const createSecurityService = ({
             },
           });
           inventoried += 1;
-          task.percent = progressByFiles ? 0 : skillEntries.length ? (inventoried / skillEntries.length) * 10 : 10;
+          task.percent = skillEntries.length ? (inventoried / skillEntries.length) * 10 : 10;
           onInventory?.(inventory);
           emitProgress(task);
           return inventory;
@@ -598,7 +618,7 @@ const createSecurityService = ({
         0,
       );
       task.phase = 'analyzing';
-      task.percent = progressByFiles ? 0 : 10;
+      task.percent = 10;
       emitProgress(task, true);
 
       pool = new WorkerPool(workerPath, capabilities.fileWorkers);
@@ -651,7 +671,7 @@ const createSecurityService = ({
       }));
 
       task.phase = 'finalizing';
-      task.percent = progressByFiles ? 100 : 97;
+      task.percent = 97;
       task.currentFile = '';
       task.activeSkillIds = [];
       emitProgress(task, true);
@@ -724,6 +744,8 @@ const createSecurityService = ({
       semanticTotalChunks: 0,
       semanticInFlightChunks: 0,
       semanticRegisteredSkills: 0,
+      semanticProgress: null,
+      semanticFractions: new Map(),
       analyzingInFlight: 0,
       semanticInFlight: 0,
       runtime: {

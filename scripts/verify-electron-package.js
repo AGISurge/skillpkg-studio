@@ -48,9 +48,12 @@ const verifyPackage = async ({ platform, arch }) => {
   if (!hasPackedLlamaRuntime(asarFiles)) {
     throw new Error('node-llama-cpp runtime files are missing from app.asar.');
   }
-  const mainBundle = asar.extractFile(asarPath, 'main.cjs').toString('utf8');
-  if (!mainBundle.includes('import("node-llama-cpp")')) {
-    throw new Error('The Main bundle does not preserve the external node-llama-cpp import.');
+  const inferenceBundle = asar.extractFile(asarPath, 'security-inference.cjs').toString('utf8');
+  if (!inferenceBundle.includes('import("node-llama-cpp")')) {
+    throw new Error('The inference process bundle does not preserve the external node-llama-cpp import.');
+  }
+  if (asar.extractFile(asarPath, 'main.cjs').toString('utf8').includes('import("node-llama-cpp")')) {
+    throw new Error('Native inference must not be included in the Main process bundle.');
   }
   const ggufFiles = [...asarFiles, ...walk(resourcesDir)]
     .filter((file) => file.toLowerCase().endsWith('.gguf'));

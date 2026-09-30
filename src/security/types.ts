@@ -120,6 +120,7 @@ export type SecurityScanProgress = {
   semanticCompletedChunks?: number;
   semanticTotalChunks?: number;
   semanticInFlightChunks?: number;
+  semanticProgress?: SemanticProgress | null;
   processedFiles: number;
   totalFiles: number;
   completedSkills: number;
@@ -135,6 +136,13 @@ export type SecurityScanProgress = {
     batchSize?: number;
   } | null;
 };
+
+export type SemanticProgress =
+  | { stage: 'queued' }
+  | { stage: 'loading'; percent: number }
+  | { stage: 'generating'; chunkIndex: number; chunkCount: number; generatedTokens: number;
+      completedDimensions: number; totalDimensions: number }
+  | { stage: 'validating'; chunkIndex: number; chunkCount: number };
 
 export type SecurityFinding = {
   id?: string;

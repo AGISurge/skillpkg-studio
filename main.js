@@ -5,6 +5,7 @@ const {
   dialog,
   net,
   shell,
+  utilityProcess,
 } = require('electron/main');
 const path = require('path');
 const fs = require('fs/promises');
@@ -600,7 +601,16 @@ const registerIpcHandlers = () => {
     ? path.join(appRoot, 'electron', 'security', 'worker.js')
     : path.join(appRoot, 'security-worker.cjs');
   const hostCapabilities = detectHostCapabilities();
-  securityInferenceService = createSecurityInferenceService({ capabilities: hostCapabilities });
+  securityInferenceService = createSecurityInferenceService({
+    capabilities: hostCapabilities,
+    processPath: isDev
+      ? path.join(appRoot, 'electron', 'security', 'inferenceProcess.js')
+      : path.join(appRoot, 'security-inference.cjs'),
+    processFactory: (modulePath) => utilityProcess.fork(modulePath, [], {
+      serviceName: 'Skill security inference',
+      stdio: 'ignore',
+    }),
+  });
   let securityService = null;
   const securityModelService = createSecurityModelService({
     userDataPath: app.getPath('userData'),

@@ -2,9 +2,9 @@ const crypto = require('crypto');
 const { normalizeFinding, redactEvidence } = require('./policyEngine');
 
 const SEMANTIC_MODEL_ID = 'qwen3.5-2b-q4_k_m';
-const SEMANTIC_POLICY_VERSION = '1.0.0';
-const SEMANTIC_PROMPT_VERSION = '1.1.0';
-const SEMANTIC_SCHEMA_VERSION = '1.1.0';
+const SEMANTIC_POLICY_VERSION = '1.1.0';
+const SEMANTIC_PROMPT_VERSION = '1.2.0';
+const SEMANTIC_SCHEMA_VERSION = '2.0.0';
 const SEMANTIC_CONFIDENCE_THRESHOLD = 0.6;
 
 const SEMANTIC_DIMENSIONS = Object.freeze([
@@ -150,34 +150,39 @@ const DIMENSION_METADATA = {
   },
 };
 
+const assessmentSchema = (detected) => ({
+  type: 'object',
+  additionalProperties: false,
+  required: ['detected', 'confidence', 'evidence', 'reason'],
+  properties: {
+    detected: { const: detected },
+    confidence: { type: 'number', minimum: 0, maximum: 1 },
+    evidence: {
+      type: 'array',
+      minItems: detected ? 1 : 0,
+      maxItems: detected ? 2 : 0,
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['filePath', 'startLine', 'endLine', 'quote'],
+        properties: {
+          filePath: { type: 'string' },
+          startLine: { type: 'integer', minimum: 1 },
+          endLine: { type: 'integer', minimum: 1 },
+          quote: { type: 'string', maxLength: 800 },
+        },
+      },
+    },
+    reason: detected ? { type: 'string', maxLength: 240 } : { const: '' },
+  },
+});
+
 const SEMANTIC_JSON_SCHEMA = {
   type: 'object',
   additionalProperties: false,
   required: [...SEMANTIC_DIMENSIONS],
   properties: Object.fromEntries(SEMANTIC_DIMENSIONS.map((dimension) => [dimension, {
-    type: 'object',
-    additionalProperties: false,
-    required: ['detected', 'confidence', 'evidence', 'reason'],
-    properties: {
-      detected: { type: 'boolean' },
-      confidence: { type: 'number', minimum: 0, maximum: 1 },
-      evidence: {
-        type: 'array',
-        maxItems: 2,
-        items: {
-          type: 'object',
-          additionalProperties: false,
-          required: ['filePath', 'startLine', 'endLine', 'quote'],
-          properties: {
-            filePath: { type: 'string' },
-            startLine: { type: 'integer', minimum: 1 },
-            endLine: { type: 'integer', minimum: 1 },
-            quote: { type: 'string', maxLength: 800 },
-          },
-        },
-      },
-      reason: { type: 'string', maxLength: 240 },
-    },
+    oneOf: [assessmentSchema(false), assessmentSchema(true)],
   }])),
 };
 

@@ -1,296 +1,144 @@
-const {
-  SEMANTIC_DIMENSIONS,
-  mergeSemanticAssessments,
-  parseSemanticAssessments,
-  validateSemanticEvidence,
-  emptySemanticAssessments,
-} = require('./semanticPolicy');
-const { createUserPrompt, createPrompt, SEMANTIC_SYSTEM_PROMPT } = require('./semanticPrompt');
-const { splitSemanticDocuments, estimateTokens } = require('./semanticChunker');
-const {
-  CONTEXT_SIZE,
-  MAX_CHUNKS,
-  MAX_OUTPUT_TOKENS,
-  MAX_SAFE_SEQUENCES,
-  resolveCapabilities,
-} = require('./hostCapabilities');
-const { createLimiter } = require('./asyncPool');
-const { createNodeLlamaAdapter } = require('./llamaAdapter');
+const path = require('path');
+const { fork } = require('child_process');
+const { resolveCapabilities } = require('./hostCapabilities');
 
-const CHUNK_TIMEOUT_MS = 60_000;
-const SKILL_TIMEOUT_MS = 8 * 60_000;
-const TIMEOUT_SIGNAL = Symbol('semantic-timeout-signal');
-
-const createAbortSignal = (signals) => {
-  const active = signals.filter(Boolean);
-  if (!active.length) return undefined;
-  if (typeof AbortSignal.any === 'function') return AbortSignal.any(active);
-  const controller = new AbortController();
-  const abort = (signal) => {
-    if (controller.signal.aborted) return;
-    if (signal[TIMEOUT_SIGNAL]) controller.signal[TIMEOUT_SIGNAL] = signal[TIMEOUT_SIGNAL];
-    controller.abort(signal.reason);
-  };
-  for (const signal of active) {
-    if (signal.aborted) {
-      abort(signal);
-      break;
-    }
-    signal.addEventListener('abort', () => abort(signal), { once: true });
-  }
-  return controller.signal;
+const defaultProcessFactory = (processPath) => {
+  const child = fork(processPath, [], { stdio: ['ignore', 'ignore', 'ignore', 'ipc'] });
+  child.postMessage = (message) => child.send(message);
+  return child;
 };
 
-const createTimeout = (milliseconds, reason) => {
-  const controller = new AbortController();
-  controller.signal[TIMEOUT_SIGNAL] = reason;
-  const timer = setTimeout(() => controller.abort(new Error(reason)), milliseconds);
-  timer.unref?.();
-  return { controller, dispose: () => clearTimeout(timer) };
-};
-
-const hasExactlyOneDimensionKey = (output) => SEMANTIC_DIMENSIONS.every((dimension) => {
-  const escaped = dimension.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  return (String(output).match(new RegExp(`"${escaped}"\\s*:`, 'g')) || []).length === 1;
-});
-
-const classifyFailure = (error, signal) => {
-  if (signal?.aborted) {
-    if (signal[TIMEOUT_SIGNAL]) return 'timeout';
-    const reason = String(
-      signal.reason?.message
-      || signal.reason
-      || error?.message
-      || error
-      || '',
-    );
-    return reason.includes('timeout') ? 'timeout' : 'inference-failed';
-  }
-  if (error?.code === 'SEMANTIC_SCHEMA_INVALID') return 'schema-invalid';
-  if (error?.code === 'SEMANTIC_EVIDENCE_INVALID') return 'evidence-invalid';
-  return 'inference-failed';
-};
-
+// One shared FIFO owns the model for both library scans and single-Skill checks.
+// Electron supplies utilityProcess.fork; Node uses fork for integration tests.
 const createSecurityInferenceService = ({
-  adapterFactory = createNodeLlamaAdapter,
-  chunkTimeoutMs = CHUNK_TIMEOUT_MS,
-  skillTimeoutMs = SKILL_TIMEOUT_MS,
-  capabilities: capabilityOverrides,
+  processPath = path.join(__dirname, 'inferenceProcess.js'),
+  processFactory = defaultProcessFactory,
+  capabilities: overrides,
+  chunkTimeoutMs = 60_000,
+  skillTimeoutMs = 8 * 60_000,
+  loadTimeoutMs = 120_000,
+  cancelGraceMs = 2_000,
 } = {}) => {
-  const capabilities = resolveCapabilities(capabilityOverrides);
-  const limiter = createLimiter(MAX_SAFE_SEQUENCES);
-  let loadChain = Promise.resolve();
-  let adapter = null;
-  let adapterModelPath = '';
+  const capabilities = resolveCapabilities(overrides);
+  const queue = [];
+  let child = null;
+  let active = null;
+  let sequence = 0;
   let disposed = false;
-  let running = 0;
-  const shutdownController = new AbortController();
 
-  const loadAdapter = (modelPath) => {
-    const run = loadChain.then(async () => {
-      if (adapter && adapterModelPath === modelPath) return adapter;
-      if (adapter) await adapter.dispose();
-      adapter = await adapterFactory({
-        modelPath,
-        capabilities,
-      });
-      adapterModelPath = modelPath;
-      return adapter;
-    });
-    loadChain = run.then(() => undefined, () => undefined);
-    return run;
+  const stopChild = () => {
+    const previous = child;
+    child = null;
+    previous?.kill();
   };
-
-  const analyzeNow = async ({
-    modelSnapshot,
-    skillName,
-    description,
-    documents,
-    signal,
-    onChunk,
-  }) => {
-    if (disposed) return { ok: false, reason: 'inference-failed' };
-    const chunks = splitSemanticDocuments(documents, capabilities);
-    if (!chunks) return { ok: false, reason: 'corpus-too-large' };
-    if (!chunks.length) {
-      return { ok: true, assessments: emptySemanticAssessments(), chunkCount: 0 };
-    }
-
-    let loadedAdapter;
-    try {
-      loadedAdapter = await loadAdapter(modelSnapshot.modelPath);
-    } catch (_error) {
-      return { ok: false, reason: 'load-failed' };
-    }
-
-    const skillTimeout = createTimeout(skillTimeoutMs, 'skill-timeout');
-    const cancelChunks = new AbortController();
-    const skillSignal = createAbortSignal([
-      signal,
-      shutdownController.signal,
-      skillTimeout.controller.signal,
-      cancelChunks.signal,
-    ]);
-    const chunkAssessments = new Array(chunks.length);
-    let failure = null;
-
-    const fail = (result) => {
-      if (failure) return;
-      failure = result;
-      cancelChunks.abort(new Error(result.reason));
-    };
-
-    try {
-      for (let index = 0; index < chunks.length; index += 1) {
-        if (failure || skillSignal?.aborted) break;
-        onChunk?.({ index: index + 1, count: chunks.length, done: false });
-        await limiter.acquire();
-        const chunkTimeout = createTimeout(chunkTimeoutMs, 'chunk-timeout');
-        const chunkSignal = createAbortSignal([skillSignal, chunkTimeout.controller.signal]);
-        try {
-          if (failure || chunkSignal?.aborted) {
-            if (!failure) {
-              fail({
-                ok: false,
-                reason: String(chunkSignal.reason || '').includes('timeout')
-                  ? 'timeout'
-                  : 'inference-failed',
-              });
-            }
-            break;
-          }
-          const output = await loadedAdapter.generate({
-            prompt: createUserPrompt({
-              skillName,
-              description,
-              chunk: chunks[index],
-              chunkIndex: index,
-              chunkCount: chunks.length,
-            }),
-            signal: chunkSignal,
-          });
-          if (failure) break;
-          if (chunkSignal?.aborted) {
-            fail({
-              ok: false,
-              reason: String(chunkSignal.reason || '').includes('timeout')
-                ? 'timeout'
-                : 'inference-failed',
-            });
-            break;
-          }
-          if (!hasExactlyOneDimensionKey(output)) {
-            fail({ ok: false, reason: 'schema-invalid' });
-            break;
-          }
-          let parsed;
-          try {
-            parsed = JSON.parse(output);
-          } catch (_error) {
-            fail({ ok: false, reason: 'schema-invalid' });
-            break;
-          }
-          const shaped = parseSemanticAssessments(parsed);
-          if (!shaped.ok) {
-            fail(shaped);
-            break;
-          }
-          const evidenced = validateSemanticEvidence(shaped.assessments, documents);
-          if (!evidenced.ok) {
-            fail(evidenced);
-            break;
-          }
-          chunkAssessments[index] = evidenced.assessments;
-          onChunk?.({ index: index + 1, count: chunks.length, done: true });
-        } catch (error) {
-          fail({ ok: false, reason: classifyFailure(error, chunkSignal) });
-          break;
-        } finally {
-          chunkTimeout.dispose();
-          limiter.release();
+  const finish = (job, result) => {
+    clearTimeout(job.timer);
+    clearTimeout(job.stageTimer);
+    clearTimeout(job.cancelTimer);
+    job.input.signal?.removeEventListener('abort', job.abort);
+    if (active === job) active = null;
+    job.resolve(result);
+    dispatch();
+  };
+  const failProcess = (current) => {
+    if (child !== current) return;
+    child = null;
+    current.kill();
+    if (active) finish(active, { ok: false, reason: 'inference-failed' });
+  };
+  const ensureChild = () => {
+    if (child) return child;
+    const current = processFactory(processPath);
+    child = current;
+    current.on('message', (message) => {
+      if (child !== current || !active || message.id !== active.id) return;
+      const job = active;
+      if (message.type === 'chunk') job.input.onChunk?.(message.chunk);
+      if (message.type === 'progress') {
+        const progress = message.progress;
+        if (progress.stage === 'generating' && job.chunkIndex !== progress.chunkIndex) {
+          job.chunkIndex = progress.chunkIndex;
+          clearTimeout(job.stageTimer);
+          job.stageTimer = setTimeout(() => {
+            stopChild();
+            finish(job, { ok: false, reason: 'timeout' });
+          }, chunkTimeoutMs + cancelGraceMs);
         }
+        if (progress.stage === 'validating') clearTimeout(job.stageTimer);
+        job.input.onProgress?.(progress);
       }
-      if (failure) return failure;
-      if (skillSignal?.aborted) {
-        return {
-          ok: false,
-          reason: String(skillSignal.reason || '').includes('timeout')
-            ? 'timeout'
-            : 'inference-failed',
-        };
-      }
-      if (chunkAssessments.some((entry) => !entry)) {
-        return { ok: false, reason: 'inference-failed' };
-      }
-      return {
-        ok: true,
-        assessments: mergeSemanticAssessments(chunkAssessments),
-        chunkCount: chunks.length,
-        diagnostics: loadedAdapter.diagnostics || {
-          sequences: capabilities.sequences,
-          batchSize: capabilities.batchSize,
-        },
-      };
-    } catch (error) {
-      return failure || { ok: false, reason: classifyFailure(error, skillSignal) };
-    } finally {
-      skillTimeout.dispose();
-    }
+      if (message.type === 'result') finish(job, message.result);
+    });
+    current.on('error', () => failProcess(current));
+    current.on('exit', () => failProcess(current));
+    return current;
   };
-
-  const analyze = async (input) => {
-    if (disposed) return { ok: false, reason: 'inference-failed' };
-    running += 1;
+  const dispatch = () => {
+    if (disposed || active || !queue.length) return;
+    const job = queue.shift();
+    active = job;
+    // This watchdog runs outside native inference, including synchronous native calls.
+    job.timer = setTimeout(() => {
+      stopChild();
+      finish(job, { ok: false, reason: 'timeout' });
+    }, loadTimeoutMs + skillTimeoutMs);
+    job.stageTimer = setTimeout(() => {
+      stopChild();
+      finish(job, { ok: false, reason: 'timeout' });
+    }, loadTimeoutMs);
     try {
-      return await analyzeNow(input);
-    } finally {
-      running -= 1;
+      const current = ensureChild();
+      const { signal, onChunk, onProgress, ...input } = job.input;
+      current.postMessage({
+        type: 'analyze', id: job.id, input,
+        options: { capabilities, chunkTimeoutMs, skillTimeoutMs, loadTimeoutMs },
+      });
+    } catch (_error) {
+      stopChild();
+      finish(job, { ok: false, reason: 'load-failed' });
     }
   };
-
-  const dispose = async () => {
-    disposed = true;
-    shutdownController.abort(new Error('inference-service-disposed'));
-    limiter.failWaiting(new Error('inference-service-disposed'));
-    while (running > 0) {
-      await new Promise((resolve) => setTimeout(resolve, 20));
-    }
-    if (adapter) await adapter.dispose();
-    adapter = null;
-    adapterModelPath = '';
+  const analyze = (input) => {
+    if (disposed || input.signal?.aborted) return Promise.resolve({ ok: false, reason: 'inference-failed' });
+    return new Promise((resolve) => {
+      const job = { id: ++sequence, input, resolve, timer: null, cancelTimer: null, abort: null };
+      job.abort = () => {
+        if (active !== job) {
+          const index = queue.indexOf(job);
+          if (index >= 0) queue.splice(index, 1);
+          finish(job, { ok: false, reason: 'inference-failed' });
+          return;
+        }
+        try {
+          child?.postMessage({ type: 'cancel', id: job.id, reason: String(input.signal.reason?.message || 'scan-canceled') });
+        } catch (_error) {
+          stopChild();
+          finish(job, { ok: false, reason: 'inference-failed' });
+          return;
+        }
+        job.cancelTimer = setTimeout(() => {
+          stopChild();
+          finish(job, { ok: false, reason: 'inference-failed' });
+        }, cancelGraceMs);
+      };
+      input.signal?.addEventListener('abort', job.abort, { once: true });
+      queue.push(job);
+      input.onProgress?.({ stage: 'queued' });
+      dispatch();
+    });
   };
-
   const releaseIdle = async () => {
-    if (running || !adapter) return false;
-    await loadChain.catch(() => {});
-    if (running || !adapter) return false;
-    await adapter.dispose();
-    adapter = null;
-    adapterModelPath = '';
+    if (active || queue.length || !child) return false;
+    stopChild();
     return true;
   };
-
-  return {
-    analyze,
-    dispose,
-    isBusy: () => running > 0,
-    releaseIdle,
-    getCapabilities: () => capabilities,
+  const dispose = async () => {
+    disposed = true;
+    stopChild();
+    for (const job of queue.splice(0)) finish(job, { ok: false, reason: 'inference-failed' });
+    if (active) finish(active, { ok: false, reason: 'inference-failed' });
   };
+  return { analyze, releaseIdle, dispose, isBusy: () => Boolean(active || queue.length), getCapabilities: () => capabilities };
 };
 
-module.exports = {
-  CHUNK_TIMEOUT_MS,
-  CONTEXT_SIZE,
-  MAX_CHUNKS,
-  MAX_OUTPUT_TOKENS,
-  SEMANTIC_SYSTEM_PROMPT,
-  SKILL_TIMEOUT_MS,
-  createNodeLlamaAdapter,
-  createPrompt,
-  createSecurityInferenceService,
-  createUserPrompt,
-  estimateTokens,
-  hasExactlyOneDimensionKey,
-  splitSemanticDocuments,
-};
+module.exports = { createSecurityInferenceService };

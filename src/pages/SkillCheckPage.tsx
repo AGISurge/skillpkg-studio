@@ -10,6 +10,7 @@ import {
 } from "@fluentui/react-icons";
 import { Button } from "../components/ui/button";
 import { SkillCheckTree } from "../components/SkillCheckTree";
+import { semanticProgressLabel } from "../security/semanticProgress";
 import {
   coverageLabel,
   levelMeta,
@@ -381,7 +382,11 @@ const SkillCheckPage = () => {
             </div>
             <div
               className="security-progress-track"
-              aria-label={`文件检查进度 ${percent}%`}
+              role="progressbar"
+              aria-label="安全扫描进度"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={percent}
             >
               <span style={{ width: `${percent}%` }} />
             </div>
@@ -389,6 +394,7 @@ const SkillCheckPage = () => {
               <span>
                 文件 {state.task.processedFiles} / {state.task.totalFiles}
               </span>
+              {state.task.semanticProgress ? <span>{semanticProgressLabel(state.task.semanticProgress)}</span> : null}
               <span>
                 已记录{" "}
                 {state.report?.findingCount ??

@@ -12,6 +12,7 @@ export type SkillCheckFile = { path: string; kind: 'file' | 'link' } & (
 export type SkillCheckTask = Pick<SecurityScanProgress,
   'id' | 'status' | 'phase' | 'percent' | 'processedFiles' | 'totalFiles' | 'currentFile'
   | 'findingsCount' | 'startedAt' | 'completedAt' | 'error'
+  | 'semanticProgress'
 >;
 export type SkillCheckState = {
   task: SkillCheckTask | null;

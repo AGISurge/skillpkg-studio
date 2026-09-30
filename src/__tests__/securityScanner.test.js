@@ -16,7 +16,7 @@ const { analyzeFile } = require('../../electron/security/worker');
 const { createSecurityService } = require('../../electron/security/securityService');
 const { createSecurityStore, ensureSecuritySchema } = require('../../electron/security/securityStore');
 const initSqlJs = require('sql.js');
-const { emptySemanticAssessments } = require('../../electron/security/semanticPolicy');
+const { emptySemanticAssessments, SEMANTIC_POLICY_VERSION } = require('../../electron/security/semanticPolicy');
 
 global.TextDecoder = global.TextDecoder || TextDecoder;
 global.TextEncoder = global.TextEncoder || TextEncoder;
@@ -670,7 +670,7 @@ describe('offline security scanner', () => {
       kind: 'model',
       modelId: 'qwen3.5-2b-q4_k_m',
       modelSha256: 'model-sha',
-      policyVersion: '1.0.0',
+      policyVersion: SEMANTIC_POLICY_VERSION,
     });
   });
 

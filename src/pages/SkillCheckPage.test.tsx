@@ -41,7 +41,7 @@ const api = {
   getDroppedFilePath: jest.fn(() => '/dropped'),
 };
 const choose = async (label = '选择文件夹') => {
-  fireEvent.click(screen.getByRole('button', { name: '选择Skill' }));
+  fireEvent.click(screen.getByRole('button', { name: '选择 Skill' }));
   fireEvent.click(screen.getByRole('menuitem', { name: label }));
   await waitFor(() => expect(api.prepareSkillCheckSource).toHaveBeenCalled());
 };
@@ -93,20 +93,22 @@ test('multi-Skill source selects exactly one and cancellation preserves the exis
   await waitFor(() => expect(api.startSkillCheck).toHaveBeenCalledWith({ sessionId: 'multi', candidateId: 'b' }));
 });
 
-test('shows semantic phase at 100% and keeps cancellation available', async () => {
-  current = { ...result, report: null, task: result.task && { ...result.task, phase: 'semantic', status: 'scanning', completedAt: null } };
+test('shows semantic progress below 100% and keeps cancellation available', async () => {
+  current = { ...result, report: null, task: result.task && { ...result.task, phase: 'semantic', status: 'scanning', completedAt: null, percent: 66, semanticProgress: { stage: 'generating', chunkIndex: 1, chunkCount: 2, completedDimensions: 8, totalDimensions: 16, generatedTokens: 500 } } };
   render(<SkillCheckPage />);
   expect(await screen.findByText('正在智能判断')).toBeInTheDocument();
-  expect(screen.getByText('100%')).toBeInTheDocument();
+  expect(screen.getByText('66%')).toBeInTheDocument();
+  expect(screen.getByText('智能判断 1 / 2 · 已分析 8 / 16 项')).toBeInTheDocument();
+  expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '66');
   expect(screen.queryByText('扫描完成')).not.toBeInTheDocument();
-  expect(screen.queryByRole('button', { name: '选择Skill' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: '选择 Skill' })).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: '取消扫描' }));
   await waitFor(() => expect(api.cancelSkillCheck).toHaveBeenCalledWith({ taskId: 'task' }));
 });
 
 test('drops one source through the Electron path bridge and refuses multiple sources', async () => {
   const view = render(<SkillCheckPage />);
-  const zone = screen.getByText('拖入一个 Skill 文件夹或 ZIP 压缩包，检查其中的安全风险。');
+  const zone = screen.getByText('拖入 Skill 目录或 ZIP 包，开始安全检测');
   fireEvent.drop(zone, { dataTransfer: { files: [new File(['a'], 'one.zip'), new File(['b'], 'two.zip')] } });
   expect(screen.getByRole('alert')).toHaveTextContent('请每次拖入一个文件夹或 ZIP');
   expect(api.prepareSkillCheckSource).not.toHaveBeenCalled();
