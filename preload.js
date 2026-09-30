@@ -1,4 +1,4 @@
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
 contextBridge.exposeInMainWorld('skillpkg', {
   platform: process.platform,
@@ -18,6 +18,19 @@ contextBridge.exposeInMainWorld('skillpkg', {
   migrateInstallPath: (payload) =>
     ipcRenderer.invoke('migrate-install-path', payload),
   selectImportZip: () => ipcRenderer.invoke('select-import-zip'),
+  getDroppedFilePath: (file) => webUtils.getPathForFile(file),
+  selectSkillCheckSource: (payload) => ipcRenderer.invoke('select-skill-check-source', payload),
+  prepareSkillCheckSource: (payload) => ipcRenderer.invoke('prepare-skill-check-source', payload),
+  discardSkillCheckSource: (payload) => ipcRenderer.invoke('discard-skill-check-source', payload),
+  startSkillCheck: (payload) => ipcRenderer.invoke('start-skill-check', payload),
+  getSkillCheckState: () => ipcRenderer.invoke('get-skill-check-state'),
+  cancelSkillCheck: (payload) => ipcRenderer.invoke('cancel-skill-check', payload),
+  onSkillCheckState: (callback) => {
+    if (typeof callback !== 'function') return () => {};
+    const listener = (_event, state) => callback(state);
+    ipcRenderer.on('skill-check-state', listener);
+    return () => ipcRenderer.removeListener('skill-check-state', listener);
+  },
   importSkillSource: (payload) => ipcRenderer.invoke('import-skill-source', payload),
   scanImportCandidates: (payload) =>
     ipcRenderer.invoke('scan-import-candidates', payload),

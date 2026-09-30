@@ -21,6 +21,7 @@ import FavoritesPage from './pages/FavoritesPage';
 import AgentsPage from './pages/AgentsPage';
 import SettingsPage from './pages/SettingsPage';
 import SecurityScanPage from './pages/SecurityScanPage';
+import SkillCheckPage from './pages/SkillCheckPage';
 import { SecurityScanProvider } from './security/SecurityScanContext';
 
 const AppDialogs = () => {
@@ -170,6 +171,7 @@ const AppRoutes = () => (
         <Route path={routePaths.localOrganize} element={<LocalOrganizePage />} />
         <Route path={routePaths.local} element={<LocalPage />} />
         <Route path={routePaths.security} element={<SecurityScanPage />} />
+        <Route path={routePaths.skillCheck} element={<SkillCheckPage />} />
         <Route path={routePaths.skillGroups} element={<SkillGroupsPage />} />
         <Route path={routePaths.favorites} element={<FavoritesPage />} />
         <Route path={routePaths.agents} element={<AgentsPage />} />

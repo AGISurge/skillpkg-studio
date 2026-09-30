@@ -458,6 +458,8 @@
 }
 
 .app-shell-darwin .topbar {
+  /* Match the native traffic-light center configured in main.js. */
+  flex: 0 0 34px;
   -webkit-app-region: drag;
 }
 
@@ -470,6 +472,11 @@
 
 .topbar-left {
   gap: 4px;
+}
+
+.app-shell-darwin.sidebar-collapsed .topbar-left {
+  /* Keep the sidebar toggle to the right of the native traffic lights. */
+  padding-left: 75px;
 }
 
 .topbar-icon-button {
@@ -1383,9 +1390,11 @@ body:not([data-theme='light']) .discover-type-pill.solution {
   color: inherit;
   display: flex;
   align-items: flex-start;
+  align-items: center;
   gap: 10px;
   text-align: left;
   cursor: pointer;
+  font-size:13px;
 }
 
 .import-menu-item:hover {
@@ -1490,6 +1499,43 @@ body:not([data-theme='light']) .discover-type-pill.solution {
   flex-direction: column;
   gap: 12px;
 }
+
+.skill-check-dropzone {
+  flex: 1;
+  min-height: 280px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 14px;
+  padding: 32px;
+  border: 2px dashed var(--border-subtle);
+  border-radius: 18px;
+  background: var(--panel-bg);
+}
+.skill-check-dropzone.dragging { border-color: var(--brand); background: var(--surface-bg-hover); }
+.skill-check-dropzone h2, .skill-check-dropzone p { margin: 0; }
+.skill-check-empty-icon { width: 52px; height: 52px; color: var(--brand); }
+.skill-check-dropzone p, .skill-check-hint { color: var(--text-muted); text-align: center; }
+.skill-check-hint { font-size: 12px; }
+.skill-check-tree-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 0;
+  background: transparent;
+  color: var(--app-text);
+  text-align: left;
+  cursor: pointer;
+}
+.skill-check-tree-row:hover, .skill-check-tree-row.active { background: var(--surface-bg-hover); }
+.skill-check-tree-row > .icon, .skill-check-tree-row > span > .icon { width: 16px; height: 16px; flex-shrink: 0; }
+.skill-check-tree-name { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.skill-check-tree-row .security-level { flex-shrink: 0; font-size: 10px; }
+.skill-check-page .security-detail-header h2 { overflow-wrap: anywhere; }
 
 .security-progress-card {
   flex: 0 0 auto;

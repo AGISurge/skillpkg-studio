@@ -8,20 +8,13 @@ import { useEffect, useMemo, useState } from 'react';
 import { useAppContext } from '../AppContext';
 import { Button } from '../components/ui/button';
 import { useSecurityScan } from '../security/SecurityScanContext';
+import { coverageLabel, levelMeta, LevelBadge, SecurityFindings } from '../security/SecurityFindings';
 import type {
-  SecurityFinding,
-  SecurityLevel,
   SecurityReport,
   SecurityReportSummary,
   SemanticAssessment,
   SemanticDimension,
 } from '../security/types';
-
-const levelMeta: Record<SecurityLevel, { label: string; rank: number }> = {
-  dangerous: { label: '危险', rank: 0 },
-  suspicious: { label: '可疑', rank: 1 },
-  safe: { label: '安全', rank: 2 },
-};
 
 const phaseLabel: Record<string, string> = {
   idle: '等待扫描',
@@ -32,26 +25,6 @@ const phaseLabel: Record<string, string> = {
   completed: '扫描完成',
   canceled: '扫描已取消',
   error: '扫描失败',
-};
-
-const severityLabel: Record<SecurityFinding['severity'], string> = {
-  critical: '危险',
-  high: '高',
-  medium: '中',
-  low: '低',
-  info: '提示',
-};
-
-const coverageLabel = {
-  complete: '完整',
-  partial: '部分',
-  incomplete: '不完整',
-} as const;
-
-const confidenceLabel: Record<SecurityFinding['confidence'], string> = {
-  high: '高',
-  medium: '中',
-  low: '低',
 };
 
 const semanticDimensionLabel: Record<SemanticDimension, string> = {
@@ -85,12 +58,6 @@ type SkillRow = {
   report: SecurityReportSummary | null;
   scanning: boolean;
 };
-
-const LevelBadge = ({ level, partial }: { level: SecurityLevel; partial?: boolean }) => (
-  <span className={`security-level security-level-${level}`}>
-    {levelMeta[level].label}{partial ? ' · 扫描不完整' : ''}
-  </span>
-);
 
 const SecurityScanPage = () => {
   const { installPath, localSkills } = useAppContext();
@@ -329,35 +296,7 @@ const SecurityScanPage = () => {
                   </div>
                 </div>
               ) : (
-                <div className="security-findings">
-                  {selectedReport.findings.map((finding) => (
-                    <article className="security-finding" key={finding.id || finding.fingerprint}>
-                      <div className="security-finding-title">
-                        <span className={`security-severity security-severity-${finding.severity}`}>
-                          {severityLabel[finding.severity]}
-                        </span>
-                        <strong>{finding.title}</strong>
-                      </div>
-                      <div className="security-finding-location">
-                        {finding.filePath || 'Skill 整体'}
-                        {finding.filePath ? `:${finding.startLine}:${finding.startColumn}` : ''}
-                        <span>
-                          {finding.category} · 置信度 {confidenceLabel[finding.confidence]}
-                          {finding.confidenceScore !== null
-                            ? ` (${Math.round(finding.confidenceScore * 100)}%)`
-                            : ''}
-                          {' · '}{finding.detector === 'model' ? '智能判断' : '规则'}
-                          {' · '}{finding.ruleId}
-                        </span>
-                      </div>
-                      {finding.evidence ? <pre>{finding.evidence}</pre> : null}
-                      <p>{finding.message}</p>
-                      <div className="security-remediation">
-                        <strong>建议：</strong>{finding.remediation}
-                      </div>
-                    </article>
-                  ))}
-                </div>
+                <SecurityFindings findings={selectedReport.findings} />
               )}
             </>
           )}

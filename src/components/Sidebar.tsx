@@ -59,7 +59,6 @@ const Sidebar = ({
   agents,
   selectedAgentId,
   agentSkillCounts,
-  installedByAgent,
   onSelectAgent,
   onRefreshAgents,
   refreshingAgents,
@@ -77,11 +76,11 @@ const Sidebar = ({
 
   return (
     <aside className={`sidebar ${isFloating ? 'floating' : ''}`}>
-      <div className="sidebar-head">
+      <div className="sidebar-head mt-3">
         <div className="flex justify-start gap-2 items-center">
           <img src={logoSrc} className="size-8" alt="SkillPKG Logo" />
           <div>
-            <div className="font-bold font-sans-serif">SkillPKG Studio</div>
+            <div className="font-bold">SkillPKG Studio</div>
           </div>
         </div>
       </div>

@@ -67,6 +67,7 @@ const {
   ensureSecuritySchema,
 } = require('./electron/security/securityStore');
 const { createSecurityService } = require('./electron/security/securityService');
+const { createSkillCheckService } = require('./electron/security/skillCheckService');
 const {
   createSecurityInferenceService,
 } = require('./electron/security/securityInferenceService');
@@ -114,7 +115,13 @@ const createWindow = () => {
     minWidth: 1120,
     height: 768,
     ...(iconPath ? { icon: iconPath } : {}),
-    ...(process.platform === 'darwin' ? { titleBarStyle: 'hiddenInset' } : {}),
+    ...(process.platform === 'darwin'
+      ? {
+          titleBarStyle: 'hiddenInset',
+          // Center the 14px native buttons on the toolbar: 15px inset + 34px / 2.
+          trafficLightPosition: { x: 12, y: 25 },
+        }
+      : {}),
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -151,6 +158,7 @@ let dbInitError = null;
 let dbSaveQueue = Promise.resolve();
 let sqlModule = null;
 let securityInferenceService = null;
+let skillCheckService = null;
 
 const getDatabasePath = () =>
   path.join(app.getPath('userData'), 'skillpkg.sqlite');
@@ -600,6 +608,7 @@ const registerIpcHandlers = () => {
     isBusy: () => (
       securityInferenceService?.isBusy()
       || securityService?.isModelBusy()
+      || skillCheckService?.isModelBusy()
       || false
     ),
     prepareMutation: () => securityInferenceService.releaseIdle(),
@@ -618,6 +627,16 @@ const registerIpcHandlers = () => {
     }),
   });
   const groupLibrary = createGroupLibraryGuard();
+  skillCheckService = createSkillCheckService({
+    tempRoot: path.join(app.getPath('temp'), 'skillpkg-studio', 'skill-checks'),
+    workerPath: securityWorkerPath,
+    modelService: securityModelService,
+    inferenceService: securityInferenceService,
+    hostCapabilities,
+    emit: (state) => BrowserWindow.getAllWindows().forEach((window) => {
+      window.webContents.send('skill-check-state', state);
+    }),
+  });
   const requireCurrentLibrary = (installPath) => {
     if (!groupLibrary.accepts(installPath)) throw new Error('本地库路径已变化，请刷新后重试。');
   };
@@ -712,6 +731,22 @@ const registerIpcHandlers = () => {
     const { scanImportCandidates } = require('./electron/importService');
     return scanImportCandidates(payload || {});
   });
+
+  handle('select-skill-check-source', async (_event, payload) => {
+    const kind = payload?.kind;
+    if (kind !== 'folder' && kind !== 'zip') throw new Error('无效的来源类型。');
+    const result = await dialog.showOpenDialog({
+      title: '选择Skill',
+      properties: [kind === 'folder' ? 'openDirectory' : 'openFile'],
+      ...(kind === 'zip' ? { filters: [{ name: 'ZIP 压缩包', extensions: ['zip'] }] } : {}),
+    });
+    return result.canceled ? null : result.filePaths?.[0] || null;
+  });
+  handle('prepare-skill-check-source', (_event, payload) => skillCheckService.prepareSource(payload || {}));
+  handle('discard-skill-check-source', (_event, payload) => skillCheckService.discardSession(payload || {}));
+  handle('start-skill-check', (_event, payload) => skillCheckService.startScan(payload || {}));
+  handle('get-skill-check-state', () => skillCheckService.getState());
+  handle('cancel-skill-check', (_event, payload) => skillCheckService.cancelScan(payload || {}));
 
   handle('get-security-scan-state', async (_event, payload) => {
     requireCurrentLibrary(payload?.installPath);
@@ -1013,6 +1048,7 @@ app.on('ready', async () => {
 });
 
 app.on('window-all-closed', () => {
+  void skillCheckService?.reset().catch(() => {});
   if (process.platform !== 'darwin') {
     app.quit();
   }
@@ -1023,7 +1059,8 @@ app.on('before-quit', (event) => {
   if (securityShutdownStarted || !securityInferenceService) return;
   event.preventDefault();
   securityShutdownStarted = true;
-  void securityInferenceService.dispose()
+  void Promise.resolve(skillCheckService?.reset())
+    .then(() => securityInferenceService.dispose())
     .catch(() => {})
     .finally(() => app.quit());
 });

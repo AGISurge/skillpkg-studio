@@ -34,6 +34,11 @@ module.exports = {
     configure: {
       moduleNameMapper: {
         "^@/(.*)$": "<rootDir>/src/$1",
+        // Jest 27 does not resolve this Radix conditional package export.
+        "^@radix-ui/primitive/is-development$": require.resolve(
+          "@radix-ui/primitive/is-development",
+          { paths: [path.dirname(require.resolve("radix-ui"))] },
+        ),
       },
     },
   },

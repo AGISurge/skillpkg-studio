@@ -139,6 +139,12 @@ const createSecurityService = ({
   modelService,
   inferenceService,
   hostCapabilities,
+  discoverEntries = discoverSkillEntries,
+  progressByFiles = false,
+  onInventory,
+  onFileStarted,
+  onFileResult,
+  onSettled,
 }) => {
   const capabilities = resolveCapabilities(hostCapabilities || detectHostCapabilities());
   const activeTasks = new Map();
@@ -176,7 +182,7 @@ const createSecurityService = ({
   });
 
   const emitEvent = (event) => emit?.(event);
-  const persistTask = (task) => store.saveTask(publicTask(task));
+  const persistTask = async (task) => store.saveTask(publicTask(task));
 
   const emitProgress = (task, force = false) => {
     const now = Date.now();
@@ -197,7 +203,9 @@ const createSecurityService = ({
     const chunkRatio = Math.min(1, (
       (task.semanticCompletedChunks || 0) + (task.semanticInFlightChunks || 0) * 0.35
     ) / estimatedChunks);
-    task.percent = 10 + Math.min(1, fileRatio) * 25 + chunkRatio * 62;
+    task.percent = progressByFiles
+      ? (task.totalFiles ? task.processedFiles / task.totalFiles * 100 : 0)
+      : 10 + Math.min(1, fileRatio) * 25 + chunkRatio * 62;
     if (task.semanticInFlight > 0) task.phase = 'semantic';
     else if (task.analyzingInFlight > 0) task.phase = 'analyzing';
     emitProgress(task, force);
@@ -314,12 +322,14 @@ const createSecurityService = ({
       task.currentSkillId = inventory.skillId;
       task.currentSkillName = inventory.name;
       task.currentFile = file.relativePath;
+      onFileStarted?.(file);
       emitProgress(task);
     }).catch((error) => {
       if (task.cancelRequested) throw error;
       return fileFailureResult(file, error);
     }).then((result) => {
       if (task.cancelRequested) throw new Error('security-scan-canceled');
+      onFileResult?.(file, result);
       markFileProcessed(task, file);
       return result;
     })));
@@ -554,7 +564,7 @@ const createSecurityService = ({
       task.status = 'scanning';
       task.percent = 0;
       emitProgress(task, true);
-      const skillEntries = await discoverSkillEntries(task.libraryPath);
+      const skillEntries = await discoverEntries(task.libraryPath);
       task.totalSkills = skillEntries.length;
       let inventoried = 0;
       const inventories = await mapPool(
@@ -572,7 +582,8 @@ const createSecurityService = ({
             },
           });
           inventoried += 1;
-          task.percent = skillEntries.length ? (inventoried / skillEntries.length) * 10 : 10;
+          task.percent = progressByFiles ? 0 : skillEntries.length ? (inventoried / skillEntries.length) * 10 : 10;
+          onInventory?.(inventory);
           emitProgress(task);
           return inventory;
         },
@@ -587,7 +598,7 @@ const createSecurityService = ({
         0,
       );
       task.phase = 'analyzing';
-      task.percent = 10;
+      task.percent = progressByFiles ? 0 : 10;
       emitProgress(task, true);
 
       pool = new WorkerPool(workerPath, capabilities.fileWorkers);
@@ -640,7 +651,7 @@ const createSecurityService = ({
       }));
 
       task.phase = 'finalizing';
-      task.percent = 97;
+      task.percent = progressByFiles ? 100 : 97;
       task.currentFile = '';
       task.activeSkillIds = [];
       emitProgress(task, true);
@@ -675,6 +686,7 @@ const createSecurityService = ({
       task.pool = null;
       activeTasks.delete(task.libraryPath);
       tasksById.delete(task.id);
+      await onSettled?.(publicTask(task));
     }
   };
 

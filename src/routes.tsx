@@ -28,6 +28,7 @@ export const routePaths = {
   discoverDetail: '/discover/:publicId',
   local: '/local',
   security: '/security',
+  skillCheck: '/skill-check',
   skillGroups: '/skill-groups',
   localOrganize: '/local/organize',
   favorites: '/favorites',
@@ -56,7 +57,14 @@ export const menuRoutes: RouteConfig[] = [
   {
     id: 'security',
     path: routePaths.security,
-    label: '安全扫描',
+    label: '全量安全扫描',
+    icon: ShieldTaskRegular,
+    showInMenu: true,
+  },
+  {
+    id: 'skill-check',
+    path: routePaths.skillCheck,
+    label: '检查此 Skill',
     icon: ShieldTaskRegular,
     showInMenu: true,
   },

@@ -17,6 +17,7 @@ import type {
   SecurityScanEvent,
   SecurityScanProgress,
 } from '../security/types';
+import type { SkillCheckSource, SkillCheckSourceKind, SkillCheckState } from '../security/skillCheckTypes';
 
 export type AppUpdateStatus =
   | 'idle'
@@ -157,6 +158,14 @@ declare global {
       getSecurityScanState: (payload: {
         installPath: string;
       }) => Promise<SecurityScanProgress | null>;
+      getDroppedFilePath: (file: File) => string;
+      selectSkillCheckSource: (payload: { kind: SkillCheckSourceKind }) => Promise<string | null>;
+      prepareSkillCheckSource: (payload: { sourcePath: string }) => Promise<SkillCheckSource>;
+      discardSkillCheckSource: (payload: { sessionId: string }) => Promise<void>;
+      startSkillCheck: (payload: { sessionId: string; candidateId: string }) => Promise<SkillCheckState>;
+      getSkillCheckState: () => Promise<SkillCheckState>;
+      cancelSkillCheck: (payload: { taskId: string }) => Promise<{ ok: boolean; reason?: string }>;
+      onSkillCheckState: (callback: (state: SkillCheckState) => void) => () => void;
       listSecurityReports: (payload: {
         installPath: string;
       }) => Promise<SecurityReportSummary[]>;
