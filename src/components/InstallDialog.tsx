@@ -1,11 +1,7 @@
 import { CheckmarkCircleRegular, DismissCircleRegular } from '@fluentui/react-icons';
 import type { Agent, Skill } from '../types/models';
 import { Button } from './ui/button';
-
-const getAgentPathLabel = (agent: Agent) =>
-  agent.skillPath
-    ? `当前路径: ${agent.skillPath}`
-    : `Mac: ${agent.pathMac} · Linux: ${agent.pathLinux || agent.pathMac} · Windows: ${agent.pathWindows}`;
+import InstallAgentSelector from './InstallAgentSelector';
 
 /**
  * 安装确认弹窗参数。
@@ -16,6 +12,7 @@ type InstallDialogProps = {
   agents: Agent[];
   selectedAgents: Set<string>;
   onToggleAgent: (id: string) => void;
+  onInvertSelection: () => void;
   conflict: boolean;
   onOverwrite: () => void;
   onKeep: () => void;
@@ -34,6 +31,7 @@ const InstallDialog = ({
   agents,
   selectedAgents,
   onToggleAgent,
+  onInvertSelection,
   conflict,
   onOverwrite,
   onKeep,
@@ -56,22 +54,13 @@ const InstallDialog = ({
           </button>
         </div>
         <div className="dialog-body">
-          {agents.map((agent) => (
-            <label key={agent.id} className="dialog-option">
-              <input
-                type="checkbox"
-                checked={selectedAgents.has(agent.id)}
-                onChange={() => onToggleAgent(agent.id)}
-                disabled={submitting}
-              />
-              <div>
-                <div className="option-title">{agent.name}</div>
-                <div className="option-subtitle">
-                  {getAgentPathLabel(agent)}
-                </div>
-              </div>
-            </label>
-          ))}
+          <InstallAgentSelector
+            agents={agents}
+            selectedAgents={selectedAgents}
+            submitting={submitting}
+            onToggleAgent={onToggleAgent}
+            onInvertSelection={onInvertSelection}
+          />
           {conflict ? (
             <div className="notice">
               已存在同名 Skill。请选择覆盖或保留。
@@ -80,7 +69,7 @@ const InstallDialog = ({
         </div>
         <div className="dialog-footer">
           <Button type="button" variant="ghost" size="sm" onClick={onOpenSkillPath} disabled={submitting}>
-            查看位置
+            打开技能所在目录
           </Button>
           {conflict ? (
             <Button type="button" variant="ghost" size="sm" onClick={onKeep} disabled={submitting}>

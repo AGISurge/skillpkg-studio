@@ -2772,6 +2772,7 @@ body:not([data-theme='light']) .discover-type-pill.solution {
   width: min(560px, 92vw);
 }
 
+.install-dialog,
 .batch-install-dialog {
   width: min(640px, 92vw);
 }
@@ -2784,6 +2785,7 @@ body:not([data-theme='light']) .discover-type-pill.solution {
 .install-dialog > .dialog-body,
 .batch-install-dialog > .dialog-body {
   min-height: 0;
+  max-height: 400px;
   overflow-y: auto;
   overscroll-behavior-y: contain;
 }
@@ -2795,6 +2797,68 @@ body:not([data-theme='light']) .discover-type-pill.solution {
 .batch-install-dialog > .dialog-footer,
 .batch-install-dialog > .dialog-body > * {
   flex-shrink: 0;
+}
+
+.install-agent-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.install-agent-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.install-agent-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.install-agent-grid .install-agent-option {
+  min-width: 0;
+  margin: 0;
+  padding: 10px;
+  cursor: pointer;
+}
+
+.install-agent-option .option-title {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.install-agent-option:has(input:checked) {
+  border-color: var(--brand);
+  background: var(--accent-bg);
+}
+
+.install-agent-option:focus-within {
+  outline: 2px solid var(--brand);
+  outline-offset: -2px;
+}
+
+.install-agent-path-popover {
+  z-index: 20;
+  max-width: min(420px, calc(100vw - 32px));
+  padding: 10px 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  background: var(--dialog-bg);
+  color: var(--app-text);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  font-size: 12px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 520px) {
+  .install-agent-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .install-path-dialog {

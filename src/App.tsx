@@ -86,6 +86,9 @@ const AppDialogs = () => {
             return next;
           });
         }}
+        onInvertSelection={() => {
+          setDialogAgents((prev) => new Set(agents.filter((agent) => !prev.has(agent.id)).map((agent) => agent.id)));
+        }}
         conflict={installConflict}
         onOverwrite={() => confirmInstall(true)}
         onKeep={() => {
@@ -123,6 +126,9 @@ const AppDialogs = () => {
             else next.add(id);
             return next;
           });
+        }}
+        onInvertSelection={() => {
+          setBatchInstallAgents((prev) => new Set(agents.filter((agent) => !prev.has(agent.id)).map((agent) => agent.id)));
         }}
         onClose={closeBatchInstallDialog}
         onConfirm={confirmBatchInstall}
