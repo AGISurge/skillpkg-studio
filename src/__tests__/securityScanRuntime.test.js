@@ -6,6 +6,13 @@ const { emptySemanticAssessments, SEMANTIC_JSON_SCHEMA } = require('../../electr
 const { SEMANTIC_SYSTEM_PROMPT } = require('../../electron/security/semanticPrompt');
 
 describe('host capabilities', () => {
+  test('reserves 2048 output tokens for all semantic dimensions within the existing context', () => {
+    const capabilities = resolveCapabilities();
+    expect(capabilities.maxOutputTokens).toBe(2048);
+    expect(capabilities.documentTokenBudget).toBe(5632);
+    expect(capabilities.documentTokenBudget + capabilities.maxOutputTokens + capabilities.promptReserveTokens)
+      .toBe(capabilities.contextSize);
+  });
   test('keeps hybrid inference serial and uses a large Metal batch on 32GB Apple Silicon', () => {
     expect(detectHostCapabilities({
       platform: 'darwin',
@@ -118,9 +125,14 @@ describe('llama adapter', () => {
         },
         dispose: async () => undefined,
       }),
+      QwenChatWrapper: class {
+        constructor(options) { Object.assign(this, options); }
+      },
       LlamaChatSession: class {
-        constructor({ systemPrompt }) {
+        constructor({ systemPrompt, chatWrapper }) {
           expect(systemPrompt).toBe(SEMANTIC_SYSTEM_PROMPT);
+          expect(chatWrapper).toBeInstanceOf(llamaModule.QwenChatWrapper);
+          expect(chatWrapper).toMatchObject({ variation: '3.5', thoughts: 'discourage' });
         }
 
         resetChatHistory() {
@@ -129,7 +141,7 @@ describe('llama adapter', () => {
 
         async prompt(prompt, options) {
           expect(options.budgets).toEqual({ thoughtTokens: 0 });
-          expect(options.maxTokens).toBe(1024);
+          expect(options.maxTokens).toBe(2048);
           prompts.push(prompt);
           busy += 1;
           maxBusy = Math.max(maxBusy, busy);

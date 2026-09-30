@@ -59,6 +59,8 @@ const createNodeLlamaAdapter = async ({
           contextSequence: sequence,
           autoDisposeSequence: false,
           systemPrompt: SEMANTIC_SYSTEM_PROMPT,
+          // Auto-opened thoughts can consume the opening JSON token even with a zero thought budget.
+          chatWrapper: new module.QwenChatWrapper({ variation: '3.5', thoughts: 'discourage' }),
         });
         try {
           return await session.prompt(prompt, {

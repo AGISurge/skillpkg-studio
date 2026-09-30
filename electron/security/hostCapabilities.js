@@ -2,7 +2,7 @@ const os = require('os');
 
 const GIB = 1024 ** 3;
 const CONTEXT_SIZE = 8192;
-const MAX_OUTPUT_TOKENS = 1024;
+const MAX_OUTPUT_TOKENS = 2048;
 const PROMPT_RESERVE_TOKENS = 512;
 const MAX_CHUNKS = 8;
 // Qwen3.5 hybrid recurrent memory (GatedDeltaNet) is not safe with
