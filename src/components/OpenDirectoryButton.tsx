@@ -9,7 +9,7 @@ type OpenDirectoryButtonProps = {
 const OpenDirectoryButton = ({ disabled = false, onClick }: OpenDirectoryButtonProps) => (
   <Button
     type="button"
-    variant="outline"
+    variant="ghost"
     size="sm"
     className="rounded-full"
     disabled={disabled}

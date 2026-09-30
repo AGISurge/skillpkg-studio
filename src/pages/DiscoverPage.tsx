@@ -668,7 +668,7 @@ const DiscoverPage = () => {
               </p>
                <Button
                 variant="default"
-                className="mt-6"
+                className="mt-6 rounded-full px-6"
                 onClick={() => navigate('/settings')}
               >
                 去设置 API Key

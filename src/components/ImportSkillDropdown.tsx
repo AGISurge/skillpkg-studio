@@ -12,7 +12,6 @@ import { Button } from './ui/button';
 type ImportSourceOption = {
   id: ImportSkillSourceKind;
   label: string;
-  description: string;
   icon: ComponentType<{ className?: string }>;
 };
 
@@ -20,13 +19,11 @@ const IMPORT_SOURCE_OPTIONS: ImportSourceOption[] = [
   {
     id: 'zip',
     label: '本地 zip 文件',
-    description: '选择本机 .zip 包',
     icon: FolderZipRegular,
   },
   {
     id: 'git',
     label: 'Git 仓库地址',
-    description: '从远端仓库拉取',
     icon: BranchForkRegular,
   },
 ];
@@ -68,7 +65,7 @@ const ImportSkillDropdown = ({ status, onSelect }: ImportSkillDropdownProps) => 
     <div className="import-menu" ref={rootRef}>
       <Button
         type="button"
-        variant="outline"
+        variant="ghost"
         size="sm"
         className={`rounded-full import-trigger ${busy ? 'loading' : ''}`}
         onClick={() => setOpen((current) => !current)}
@@ -96,10 +93,7 @@ const ImportSkillDropdown = ({ status, onSelect }: ImportSkillDropdownProps) => 
                 }}
               >
                 <Icon className="icon" />
-                <span>
-                  <span className="import-menu-title">{option.label}</span>
-                  <span className="import-menu-subtitle">{option.description}</span>
-                </span>
+                <span className="import-menu-title">{option.label}</span>
               </button>
             );
           })}

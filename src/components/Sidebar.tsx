@@ -94,10 +94,10 @@ const Sidebar = ({
                 to={route.path}
                 key={route.id}
                 className={({ isActive }: { isActive: boolean }) =>
-                  `!py-1 menu-item ${isActive ? 'active' : ''}`
+                  `menu-item ${isActive ? 'active' : ''}`
                 }
               >
-                <Icon className="icon text-muted-foreground" />
+                <Icon className="icon text-muted-foreground"  />
                 <span>{route.label}</span>
               </NavLink>
             );

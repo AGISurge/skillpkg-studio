@@ -1,5 +1,9 @@
 @import "highlight.js/styles/github-dark-dimmed.css";
 
+button{
+     font-weight: 400;
+}
+
 .app-shell {
   display: grid;
   grid-template-columns: 210px 1fr;
@@ -120,7 +124,7 @@
   background: var(--surface-bg);
   color: inherit;
   border-radius: 10px;
-  padding: 8px 10px;
+  padding: 4px 10px;
   font-size: 12px;
   display: flex;
   align-items: center;
@@ -131,7 +135,7 @@
 
 .menu-subitem.active,
 .menu-subitem:hover {
-  background: var(--accent-bg-strong);
+  background: var(--accent-bg);
 }
 
 .menu-subitem .dot {
@@ -155,11 +159,11 @@
   align-items: center;
   gap: 10px;
   border: 1px solid transparent;
-  padding: 10px 14px;
-  border-radius: 12px;
+  padding: 2px 10px;
+  border-radius: 6px;
   background: transparent;
   color: inherit;
-  font-size: 14px;
+  font-size: 13px;
   cursor: pointer;
   transition: all 0.2s ease;
   text-decoration: none;
@@ -275,7 +279,6 @@
 }
 
 .settings-section {
-  border: 1px solid var(--border-subtle);
   border-radius: 16px;
   background: var(--panel-bg);
   padding: 20px;
@@ -362,9 +365,8 @@
 }
 
 .settings-path-row {
-  border: 1px solid var(--border-subtle);
-  border-radius: 12px;
-  background: var(--surface-bg-strong);
+  border-radius: 8px;
+  background: var(--tag-bg);
   display: flex;
   align-items: center;
   padding: 6px 14px;
@@ -384,9 +386,8 @@
 }
 
 .settings-db-meta span {
-  border: 1px solid var(--border-subtle);
   border-radius: 999px;
-  background: var(--surface-bg);
+  background: var(--color-muted);
   padding: 2px 9px;
   display: inline-flex;
   align-items: center;
@@ -474,7 +475,8 @@
   gap: 4px;
 }
 
-.app-shell-darwin.sidebar-collapsed .topbar-left {
+.app-shell-darwin.sidebar-collapsed .topbar-left,
+.app-shell-darwin.sidebar-floating-mode .topbar-left {
   /* Keep the sidebar toggle to the right of the native traffic lights. */
   padding-left: 75px;
 }
@@ -3305,9 +3307,5 @@ body:not([data-theme='light']) .discover-type-pill.solution {
 @media (max-width: 900px) {
   .app-shell {
     grid-template-columns: 1fr;
-  }
-
-  .content {
-    padding: 64px 20px 20px;
   }
 }

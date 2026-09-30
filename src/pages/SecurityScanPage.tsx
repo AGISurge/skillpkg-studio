@@ -143,7 +143,7 @@ const SecurityScanPage = () => {
         ? '扫描已取消，已完成的结果已保留'
         : task?.phase === 'error'
           ? `扫描失败${task.error ? `：${task.error}` : ''}`
-          : '等待开始扫描';
+          : '';
 
   return (
     <section className="security-page fade-in">
@@ -167,7 +167,6 @@ const SecurityScanPage = () => {
               </Button>
             ) : (
               <Button
-                variant="outline"
                 size="sm"
                 className="rounded-full"
                 onClick={() => void startScan(hasPreviousScan ? 'full' : 'incremental')}

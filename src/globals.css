@@ -100,7 +100,7 @@
   --destructive-foreground: #ffffff;
   --border: rgb(20 30 50 / 10%);
   --input: rgb(20 30 50 / 10%);
-  --ring: rgb(217 93 63 / 38%);
+  --ring: rgb(150 150 150 / 90%);
   --chart-1: #d95d3f;
   --chart-2: #176f68;
   --chart-3: #9a5b00;
@@ -192,7 +192,7 @@
   --destructive-foreground: #451a1a;
   --border: rgb(255 255 255 / 10%);
   --input: rgb(255 255 255 / 10%);
-  --ring: rgb(217 93 63 / 52%);
+  --ring: rgb(100 100 100 / 92%);
   --chart-1: #d95d3f;
   --chart-2: #78bdb6;
   --chart-3: #f2b85b;

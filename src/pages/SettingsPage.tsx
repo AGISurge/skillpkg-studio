@@ -108,9 +108,11 @@ const SettingsPage = () => {
       const result = await action();
       if (result.ok) setModelStatus(successMessage);
       else if (result.reason !== "canceled") {
-        setModelStatus(result.reason === "busy"
-          ? "安全扫描正在使用模型，请等待扫描结束。"
-          : `模型操作失败：${result.reason || "未知错误"}`);
+        setModelStatus(
+          result.reason === "busy"
+            ? "安全扫描正在使用模型，请等待扫描结束。"
+            : `模型操作失败：${result.reason || "未知错误"}`,
+        );
       }
     } finally {
       setModelActionPending(false);
@@ -118,7 +120,8 @@ const SettingsPage = () => {
   };
 
   const handleDeleteModel = async () => {
-    if (!window.confirm("删除本地智能模型？之后的安全扫描会使用规则判断。")) return;
+    if (!window.confirm("删除本地智能模型？之后的安全扫描会使用规则判断。"))
+      return;
     await runModelAction(
       window.skillpkg?.deleteSecurityModel,
       "本地智能模型已删除。",
@@ -146,7 +149,9 @@ const SettingsPage = () => {
   };
 
   const handleRestoreDb = async () => {
-    const confirmed = window.confirm("恢复会覆盖当前数据库。继续前请确认已经备份。");
+    const confirmed = window.confirm(
+      "恢复会覆盖当前数据库。继续前请确认已经备份。",
+    );
     if (!confirmed) return;
     setDbActionPending(true);
     setDbStatus("");
@@ -157,9 +162,11 @@ const SettingsPage = () => {
         setDbStatus("数据库已恢复。");
         await refreshDbInfo();
       } else {
-        setDbStatus(result?.reason === "invalid-database"
-          ? "恢复失败：文件不是有效的 SQLite 数据库。"
-          : "数据库恢复失败。");
+        setDbStatus(
+          result?.reason === "invalid-database"
+            ? "恢复失败：文件不是有效的 SQLite 数据库。"
+            : "数据库恢复失败。",
+        );
       }
     } finally {
       setDbActionPending(false);
@@ -168,8 +175,10 @@ const SettingsPage = () => {
 
   const updateBridgeAvailable = Boolean(window.skillpkg?.checkAppUpdate);
   const updateStatus = appUpdateState?.status;
-  const updatePending = updateStatus === "checking" || updateStatus === "downloading";
-  const updateDisabled = !updateBridgeAvailable || !appUpdateState?.enabled || updatePending;
+  const updatePending =
+    updateStatus === "checking" || updateStatus === "downloading";
+  const updateDisabled =
+    !updateBridgeAvailable || !appUpdateState?.enabled || updatePending;
   const currentVersion = getDisplayVersion(appUpdateState?.currentVersion);
   const availableVersion = getDisplayVersion(appUpdateState?.version);
 
@@ -260,14 +269,14 @@ const SettingsPage = () => {
             <p>用于访问 SkillPKG 服务。</p>
           </div>
         </div>
-        <InputGroup className="settings-api-key-input">
+        <InputGroup className="settings-api-key-input border-none bg-muted rounded-lg">
           <InputGroupAddon>
             <KeyRegular className="icon" />
           </InputGroupAddon>
           <InputGroupInput
             type={apiKeyVisible ? "text" : "password"}
             value={apiKey}
-            className="px-2 focus:outline-none focus:ring-0 focus-visible:ring-0 "
+            className="px-2 focus:outline-none focus:ring-0 focus-visible:ring-0 text-xs "
             onChange={(event) => setApiKey(event.target.value)}
             placeholder="输入 API Key"
             autoComplete="off"
@@ -278,7 +287,6 @@ const SettingsPage = () => {
               onClick={() => setApiKeyVisible((current) => !current)}
               aria-label={apiKeyVisible ? "隐藏 API Key" : "显示 API Key"}
             >
-
               {apiKeyVisible ? (
                 <EyeOffRegular className="icon" />
               ) : (
@@ -292,14 +300,9 @@ const SettingsPage = () => {
       <section className="settings-section">
         <div className="settings-section-head">
           <div>
-            <h2>存放路径</h2>
-            <p>本机 skills 的存放路径</p>
+            <h2>本机 skills 的存放路径</h2>
           </div>
-          <Button
-             size="xs"
-            variant="outline"
-            onClick={handleSelectInstallPath}
-          >
+          <Button size="xs" variant="ghost" onClick={handleSelectInstallPath}>
             <FolderRegular className="icon" />
             选择文件夹
           </Button>
@@ -336,7 +339,11 @@ const SettingsPage = () => {
               {modelState?.kind === "ready" ? (
                 <span>
                   <strong>来源</strong>
-                  {modelState.source === "import" ? "本地导入" : modelState.source === "download" ? "固定源下载" : "已有文件"}
+                  {modelState.source === "import"
+                    ? "本地导入"
+                    : modelState.source === "download"
+                      ? "固定源下载"
+                      : "已有文件"}
                 </span>
               ) : null}
             </div>
@@ -345,7 +352,7 @@ const SettingsPage = () => {
             {modelState?.kind === "downloading" ? (
               <Button
                 size="xs"
-                variant="outline"
+                variant="ghost"
                 onClick={() => {
                   void runModelAction(
                     window.skillpkg?.cancelSecurityModelDownload,
@@ -358,9 +365,11 @@ const SettingsPage = () => {
             ) : modelState?.kind === "ready" ? (
               <Button
                 size="xs"
-                variant="outline"
+                variant="ghost"
                 disabled={modelActionPending}
-                onClick={() => { void handleDeleteModel(); }}
+                onClick={() => {
+                  void handleDeleteModel();
+                }}
               >
                 <DeleteRegular className="icon" />
                 删除
@@ -369,8 +378,11 @@ const SettingsPage = () => {
               <>
                 <Button
                   size="xs"
-                  variant="outline"
-                  disabled={modelActionPending || modelState?.kind === "verifying"}
+                  variant="ghost"
+                  className="text-xs"
+                  disabled={
+                    modelActionPending || modelState?.kind === "verifying"
+                  }
                   onClick={() => {
                     void runModelAction(
                       window.skillpkg?.downloadSecurityModel,
@@ -383,8 +395,10 @@ const SettingsPage = () => {
                 </Button>
                 <Button
                   size="xs"
-                  variant="outline"
-                  disabled={modelActionPending || modelState?.kind === "verifying"}
+                  variant="ghost"
+                  disabled={
+                    modelActionPending || modelState?.kind === "verifying"
+                  }
                   onClick={() => {
                     void runModelAction(
                       window.skillpkg?.importSecurityModel,
@@ -400,7 +414,10 @@ const SettingsPage = () => {
           </div>
         </div>
         {modelState?.kind === "downloading" ? (
-          <div className="security-progress-track" aria-label={`模型下载进度 ${Math.round(modelState.percent)}%`}>
+          <div
+            className="security-progress-track"
+            aria-label={`模型下载进度 ${Math.round(modelState.percent)}%`}
+          >
             <span style={{ width: `${modelState.percent}%` }} />
           </div>
         ) : null}
@@ -412,7 +429,9 @@ const SettingsPage = () => {
         {modelState?.kind === "error" ? (
           <div className="settings-db-status error">{modelState.error}</div>
         ) : null}
-        {modelStatus ? <div className="settings-db-status">{modelStatus}</div> : null}
+        {modelStatus ? (
+          <div className="settings-db-status">{modelStatus}</div>
+        ) : null}
       </section>
 
       <section className="settings-section">
@@ -431,17 +450,13 @@ const SettingsPage = () => {
             </div>
           </div>
           <div className="settings-db-actions">
-            <Button
-              variant="outline"
-              size="xs"
-              onClick={handleOpenDbLocation}
-            >
+            <Button variant="ghost" size="xs" onClick={handleOpenDbLocation}>
               <FolderOpenRegular className="icon" />
               打开位置
             </Button>
             <Button
-              variant="outline"
-               size="xs"
+              variant="ghost"
+              size="xs"
               onClick={handleBackupDb}
               disabled={dbActionPending || !dbInfo?.ok}
             >
@@ -449,8 +464,8 @@ const SettingsPage = () => {
               备份
             </Button>
             <Button
-             size="xs"
-              variant="outline"
+              size="xs"
+              variant="ghost"
               onClick={handleRestoreDb}
               disabled={dbActionPending}
             >
@@ -465,9 +480,7 @@ const SettingsPage = () => {
         {dbInfo?.error && (
           <div className="settings-db-status error">{dbInfo.error}</div>
         )}
-        {dbStatus && (
-          <div className="settings-db-status">{dbStatus}</div>
-        )}
+        {dbStatus && <div className="settings-db-status">{dbStatus}</div>}
       </section>
 
       <section className="settings-section">
@@ -478,7 +491,7 @@ const SettingsPage = () => {
           </div>
           <Button
             size="sm"
-            variant="outline"
+            variant="ghost"
             className={updatePending ? "loading" : ""}
             disabled={updateDisabled}
             aria-busy={updatePending}

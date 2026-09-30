@@ -84,7 +84,7 @@ const SwitchSkillGroupButton = ({
         }}
       >
         <Popover.Trigger asChild>
-          <Button variant="outline" className="rounded-full" disabled={!agent?.skillPath || busy} size="sm">
+          <Button variant="ghost" className="rounded-full" disabled={!agent?.skillPath || busy} size="sm">
             <FolderRegular className="icon" />
             切换技能组
           </Button>

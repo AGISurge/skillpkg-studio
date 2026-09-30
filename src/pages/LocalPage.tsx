@@ -75,7 +75,7 @@ const LocalPage = () => {
           onClick={() => openDirectoryPath(installPath, 'local')}
         />
         <Button
-          variant="outline"
+          variant="ghost"
           size="sm"
           className="rounded-full"
           onClick={() => navigate(routePaths.localOrganize)}
