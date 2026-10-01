@@ -31,15 +31,24 @@ module.exports = {
     },
   },
   jest: {
-    configure: {
-      moduleNameMapper: {
+    configure: (jestConfig) => {
+      jestConfig.moduleNameMapper = {
+        ...jestConfig.moduleNameMapper,
         "^@/(.*)$": "<rootDir>/src/$1",
-        // Jest 27 does not resolve this Radix conditional package export.
-        "^@radix-ui/primitive/is-development$": require.resolve(
+      };
+
+      try {
+        // Resolve only for tests: older Radix versions do not export this path.
+        // Jest 27 needs a mapper for newer Radix conditional package exports.
+        jestConfig.moduleNameMapper["^@radix-ui/primitive/is-development$"] = require.resolve(
           "@radix-ui/primitive/is-development",
           { paths: [path.dirname(require.resolve("radix-ui"))] },
-        ),
-      },
+        );
+      } catch (error) {
+        if (error.code !== "ERR_PACKAGE_PATH_NOT_EXPORTED") throw error;
+      }
+
+      return jestConfig;
     },
   },
 };
