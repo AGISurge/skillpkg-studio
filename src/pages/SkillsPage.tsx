@@ -258,7 +258,7 @@ const SkillsPage = ({
                 onKeyDown={(event) => handleCardKeyDown(event, skill)}
               >
                 <SpotlightCard
-                  className={`skill-card w-full shadow-none bg-white transition-shadow duration-300 hover:shadow-md dark:hover:shadow-lg dark:hover:shadow-primary/20 pt-6 px-6 pb-3 rounded-lg ${selectedSkillId === skill.id ? "active" : ""}`}
+                  className={`skill-card w-full shadow-none transition-shadow duration-300 hover:shadow-md dark:hover:shadow-lg dark:hover:shadow-primary/20 pt-6 px-6 pb-3 rounded-lg ${selectedSkillId === skill.id ? "active" : ""}`}
                 >
                   <div className="skill-card-header">
                     <div>

@@ -335,7 +335,7 @@ const SkillCheckPage = () => {
       {!state.task ? (
         <div className={`skill-check-dropzone ${dragging ? "dragging" : ""}`}>
           <ShieldCheckmarkRegular className="skill-check-empty-icon" />
-          <h2 className="font-semibold">检查此 Skill</h2>
+          <h2 className="font-semibold">检查此技能</h2>
           <p className="text-sm">拖入 Skill 目录或 ZIP 包，开始安全检测</p>
           {selector}
           <span className="skill-check-hint">

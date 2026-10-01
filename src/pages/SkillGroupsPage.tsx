@@ -43,7 +43,7 @@ const SkillGroupCard = ({
 
   return (
     <div className="group-card-item">
-      <SpotlightCard className="group-card w-full shadow-none bg-white transition-shadow duration-300 hover:shadow-md dark:hover:shadow-lg dark:hover:shadow-primary/20 p-0 rounded-lg">
+      <SpotlightCard className="group-card w-full shadow-none transition-shadow duration-300 hover:shadow-md dark:hover:shadow-lg dark:hover:shadow-primary/20 p-0 rounded-lg">
         <button
           type="button"
           className="group-card-open"

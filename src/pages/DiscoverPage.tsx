@@ -620,7 +620,7 @@ const DiscoverPage = () => {
                   onKeyDown={(event) => handleCardKeyDown(event, skill)}
                 >
                   <SpotlightCard
-                    className='discover-card w-full shadow-none bg-white transition-shadow duration-300 hover:shadow-md dark:hover:shadow-lg dark:hover:shadow-primary/20 pt-6 px-6 pb-3 rounded-lg'
+                    className='discover-card w-full shadow-none transition-shadow duration-300 hover:shadow-md dark:hover:shadow-lg dark:hover:shadow-primary/20 pt-6 px-6 pb-3 rounded-lg'
                   >
                   <div className="discover-card-head">
                     <h2>{skill.name}</h2>

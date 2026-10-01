@@ -97,7 +97,7 @@ const Sidebar = ({
                   `menu-item ${isActive ? 'active' : ''}`
                 }
               >
-                <Icon className="icon text-muted-foreground"  />
+                <Icon className="text-muted-foreground"   />
                 <span>{route.label}</span>
               </NavLink>
             );
@@ -105,12 +105,11 @@ const Sidebar = ({
         {routes
           .filter((route) => route.isAgentsRoot)
           .map((route) => {
-            const Icon = route.icon;
             return (
               <button
                 type="button"
                 key={route.id}
-                className={`!py-1 menu-item ${activeSection === 'agents' ? 'active' : ''}`}
+                className={`menu-item ${activeSection === 'agents' ? 'active' : ''}`}
                 onClick={onToggleAgents}
               >
                 {agentsExpanded ? (
@@ -118,8 +117,7 @@ const Sidebar = ({
                 ) : (
                   <ChevronRightRegular className="icon" />
                 )}
-                <Icon className="icon" />
-                <span>{route.label}</span>
+                <span className='font-bold'>{route.label}</span>
                 <span
                   className="menu-refresh"
                   role="button"
