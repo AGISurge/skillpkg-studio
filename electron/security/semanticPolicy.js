@@ -3,7 +3,7 @@ const { normalizeFinding, redactEvidence } = require('./policyEngine');
 
 const SEMANTIC_MODEL_ID = 'qwen3.5-2b-q4_k_m';
 const SEMANTIC_POLICY_VERSION = '1.1.0';
-const SEMANTIC_PROMPT_VERSION = '1.2.0';
+const SEMANTIC_PROMPT_VERSION = '1.3.0';
 const SEMANTIC_SCHEMA_VERSION = '2.0.0';
 const SEMANTIC_CONFIDENCE_THRESHOLD = 0.6;
 
@@ -246,35 +246,39 @@ const parseSemanticAssessments = (value) => {
   return { ok: true, assessments };
 };
 
-const validateSemanticEvidence = (assessments, documents) => {
+const createSemanticEvidenceValidator = (documents) => {
   const documentsByPath = new Map(documents.map((document) => [
     document.filePath,
     String(document.content).split(/\r?\n/),
   ]));
-  const validated = {};
-  for (const dimension of SEMANTIC_DIMENSIONS) {
-    const assessment = assessments[dimension];
-    if (assessment.detected && assessment.evidence.length === 0) {
-      return { ok: false, reason: 'evidence-invalid' };
-    }
-    const evidence = [];
-    for (const item of assessment.evidence) {
-      const lines = documentsByPath.get(item.filePath);
-      if (!lines || item.endLine > lines.length) {
+  return (assessments) => {
+    const validated = {};
+    for (const dimension of SEMANTIC_DIMENSIONS) {
+      const assessment = assessments[dimension];
+      if (assessment.detected && assessment.evidence.length === 0) {
         return { ok: false, reason: 'evidence-invalid' };
       }
-      const quote = lines.slice(item.startLine - 1, item.endLine).join('\n');
-      if (quote !== item.quote) return { ok: false, reason: 'evidence-invalid' };
-      evidence.push({ ...item, quote: redactEvidence(item.quote) });
+      const evidence = [];
+      for (const item of assessment.evidence) {
+        const lines = documentsByPath.get(item.filePath);
+        if (!lines || item.endLine > lines.length) {
+          return { ok: false, reason: 'evidence-invalid' };
+        }
+        const quote = lines.slice(item.startLine - 1, item.endLine).join('\n');
+        if (quote !== item.quote) return { ok: false, reason: 'evidence-invalid' };
+        evidence.push({ ...item, quote: redactEvidence(item.quote) });
+      }
+      validated[dimension] = {
+        ...assessment,
+        evidence,
+        reason: redactEvidence(assessment.reason).slice(0, 240),
+      };
     }
-    validated[dimension] = {
-      ...assessment,
-      evidence,
-      reason: redactEvidence(assessment.reason).slice(0, 240),
-    };
-  }
-  return { ok: true, assessments: validated };
+    return { ok: true, assessments: validated };
+  };
 };
+
+const validateSemanticEvidence = (assessments, documents) => createSemanticEvidenceValidator(documents)(assessments);
 
 const emptySemanticAssessments = () => Object.fromEntries(
   SEMANTIC_DIMENSIONS.map((dimension) => [dimension, {
@@ -360,6 +364,7 @@ module.exports = {
   SEMANTIC_SCHEMA_VERSION,
   assessmentsToFindings,
   createSemanticCacheKey,
+  createSemanticEvidenceValidator,
   emptySemanticAssessments,
   mergeSemanticAssessments,
   parseSemanticAssessments,

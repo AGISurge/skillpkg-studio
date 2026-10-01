@@ -1,12 +1,14 @@
 const { SEMANTIC_DIMENSIONS, parseSemanticAssessments } = require('./semanticPolicy');
 
 // Evidence is a reference to trusted source text, never text invented by the model.
-const createEvidenceSources = (chunk) => chunk.flatMap((document) => (
-  document.content.split('\n').map((quote, index) => ({
-    filePath: document.filePath, startLine: document.startLine + index,
-    endLine: document.startLine + index, quote,
+const createEvidenceSources = (chunk) => chunk.flatMap((document, documentIndex) => (
+  (document.lines || document.content.split('\n').map((quote, index) => ({
+    lineNumber: document.startLine + index, text: quote, quote,
+  }))).map((line) => ({
+    documentIndex, text: line.text, filePath: document.filePath,
+    startLine: line.lineNumber, endLine: line.lineNumber, quote: line.quote,
   }))
-)).map((source, index) => ({ id: index + 1, ...source })).filter((source) => source.quote.trim());
+)).map((source, index) => ({ id: index + 1, ...source })).filter((source) => source.text.trim());
 
 const createGenerationSchema = (sources) => ({
   type: 'object', additionalProperties: false, required: [...SEMANTIC_DIMENSIONS],
@@ -37,8 +39,8 @@ const parseGeneration = (value, sources) => {
     for (const id of entry.evidence) {
       const source = Number.isInteger(id) ? byId.get(id) : null;
       if (!source) return { ok: false, reason: 'evidence-invalid' };
-      const { id: _id, ...citation } = source;
-      evidence.push(citation);
+      const { filePath, startLine, endLine, quote } = source;
+      evidence.push({ filePath, startLine, endLine, quote });
     }
     assessments[dimension] = { ...entry, evidence };
   }

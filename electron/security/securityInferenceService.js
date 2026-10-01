@@ -1,6 +1,7 @@
 const path = require('path');
 const { fork } = require('child_process');
 const { resolveCapabilities } = require('./hostCapabilities');
+const { resolveSkillTimeoutMs } = require('./semanticTimeout');
 
 const defaultProcessFactory = (processPath) => {
   const child = fork(processPath, [], { stdio: ['ignore', 'ignore', 'ignore', 'ipc'] });
@@ -53,7 +54,19 @@ const createSecurityInferenceService = ({
     current.on('message', (message) => {
       if (child !== current || !active || message.id !== active.id) return;
       const job = active;
-      if (message.type === 'chunk') job.input.onChunk?.(message.chunk);
+      if (message.type === 'chunk') {
+        if (job.chunkCount !== message.chunk.count) {
+          job.chunkCount = message.chunk.count;
+          clearTimeout(job.timer);
+          const timeoutMs = resolveSkillTimeoutMs({ chunkCount: job.chunkCount, chunkTimeoutMs, skillTimeoutMs });
+          job.timer = setTimeout(() => {
+            stopChild();
+            finish(job, { ok: false, reason: 'timeout' });
+          }, Math.max(1, Math.min(2 ** 31 - 1, loadTimeoutMs + timeoutMs + cancelGraceMs)
+            - (Date.now() - job.startedAt)));
+        }
+        job.input.onChunk?.(message.chunk);
+      }
       if (message.type === 'progress') {
         const progress = message.progress;
         if (progress.stage === 'generating' && job.chunkIndex !== progress.chunkIndex) {
@@ -77,6 +90,7 @@ const createSecurityInferenceService = ({
     if (disposed || active || !queue.length) return;
     const job = queue.shift();
     active = job;
+    job.startedAt = Date.now();
     // This watchdog runs outside native inference, including synchronous native calls.
     job.timer = setTimeout(() => {
       stopChild();

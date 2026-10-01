@@ -18,21 +18,23 @@ const SEMANTIC_SYSTEM_PROMPT = [
   'Use no more than two evidence items per dimension. Keep each reason under 240 characters.',
 ].join('\n');
 
-const createUserPrompt = ({ skillName, description, chunk, chunkIndex, chunkCount }) => [
-  `Dimensions: ${SEMANTIC_DIMENSIONS.join(', ')}`,
-  `Skill name: ${skillName}`,
-  `Frontmatter description: ${description || '(empty)'}`,
-  `Chunk: ${chunkIndex + 1}/${chunkCount}`,
-  '',
-  ...chunk.flatMap((document) => [
-    `<document path=${JSON.stringify(document.filePath)} startLine="${document.startLine}" endLine="${document.endLine}">`,
-    ...createEvidenceSources(chunk).filter((source) => source.filePath === document.filePath
-      && source.startLine >= document.startLine && source.endLine <= document.endLine)
-      .map((source) => `[${source.id}] ${source.quote}`),
-    '</document>',
+const createUserPrompt = ({ skillName, description, chunk, chunkIndex, chunkCount }) => {
+  const sources = createEvidenceSources(chunk);
+  return [
+    `Dimensions: ${SEMANTIC_DIMENSIONS.join(', ')}`,
+    `Skill name: ${skillName}`,
+    `Frontmatter description: ${description || '(empty)'}`,
+    `Chunk: ${chunkIndex + 1}/${chunkCount}`,
     '',
-  ]),
-].join('\n');
+    ...chunk.flatMap((document, documentIndex) => [
+      `<document path=${JSON.stringify(document.filePath)} startLine="${document.startLine}" endLine="${document.endLine}">`,
+      ...sources.filter((source) => source.documentIndex === documentIndex)
+        .map((source) => `[${source.id}] ${source.text}`),
+      '</document>',
+      '',
+    ]),
+  ].join('\n');
+};
 
 const createPrompt = (input) => `${SEMANTIC_SYSTEM_PROMPT}\n\n${createUserPrompt(input)}`;
 

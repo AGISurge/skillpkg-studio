@@ -22,7 +22,6 @@ const {
   parseSemanticAssessments,
 } = require('./semanticPolicy');
 const { detectHostCapabilities, resolveCapabilities } = require('./hostCapabilities');
-const { splitSemanticDocuments } = require('./semanticChunker');
 const { createLimiter, createMutex, mapPool } = require('./asyncPool');
 
 const COVERAGE_RANK = { complete: 0, partial: 1, incomplete: 2 };
@@ -198,14 +197,11 @@ const createSecurityService = ({
       : task.totalWorkUnits
       ? task.processedWorkUnits / task.totalWorkUnits
       : task.totalFiles ? task.processedFiles / task.totalFiles : 1;
-    const registered = task.semanticRegisteredSkills || 0;
-    const estimatedChunks = Math.max(
-      (task.semanticTotalChunks || 0) + Math.max(0, (task.totalSkills || 0) - registered),
-      1,
-    );
+    // Each Skill owns a fixed share. Discovering additional chunks in a later
+    // Skill cannot invalidate an earlier percentage or leave progress stuck.
     const chunkRatio = Math.min(1, (
-      (task.semanticCompletedChunks || 0) + [...task.semanticFractions.values()].reduce((sum, value) => sum + value, 0)
-    ) / estimatedChunks);
+      (task.semanticCompletedSkills || 0) + [...task.semanticFractions.values()].reduce((sum, value) => sum + value, 0)
+    ) / Math.max(task.totalSkills || 0, 1));
     const hasModel = task.modelSnapshot.kind === 'ready' && Boolean(inferenceService);
     const percent = 10 + Math.min(1, fileRatio) * (hasModel ? 25 : 87) + (hasModel ? chunkRatio * 62 : 0);
     task.percent = Math.max(task.percent, Math.min(97, percent));
@@ -341,7 +337,7 @@ const createSecurityService = ({
   };
 
   const noteSemanticSkipped = (task) => {
-    task.semanticRegisteredSkills += 1;
+    task.semanticCompletedSkills += 1;
     task.semanticTotalChunks += 1;
     task.semanticCompletedChunks += 1;
     updateAnalysisProgress(task, true);
@@ -413,20 +409,6 @@ const createSecurityService = ({
       }
     }
 
-    const maxCorpusBytes = capabilities.documentTokenBudget * capabilities.maxChunks * 2;
-    const totalBytes = semanticResults.reduce((sum, result) => {
-      const file = inventoryFiles.get(result.filePath);
-      return sum + (file?.size || 0);
-    }, 0);
-    if (totalBytes > maxCorpusBytes) {
-      noteSemanticSkipped(task);
-      return {
-        analysis: { kind: 'fallback', reason: 'corpus-too-large' },
-        assessments: null,
-        cache: null,
-      };
-    }
-
     const documents = [];
     const skipChanged = () => {
       noteSemanticSkipped(task);
@@ -457,25 +439,16 @@ const createSecurityService = ({
       return skipChanged();
     }
 
-    const chunks = splitSemanticDocuments(documents, capabilities);
-    if (!chunks) {
-      noteSemanticSkipped(task);
-      return {
-        analysis: { kind: 'fallback', reason: 'corpus-too-large' },
-        assessments: null,
-        cache: null,
-      };
-    }
-
-    const reservedChunks = Math.max(chunks.length, 1);
+    // The inference process plans the corpus and reports its actual chunk count.
+    // Reserve one unit while queued without doing large text work on Electron main.
+    let reservedChunks = 1;
     task.currentSkillId = inventory.skillId;
     task.currentSkillName = inventory.name;
     task.currentFile = '';
-    task.semanticRegisteredSkills += 1;
     task.semanticTotalChunks += reservedChunks;
     task.semanticInFlightChunks += 1;
     task.semanticChunkIndex = 0;
-    task.semanticChunkCount = chunks.length;
+    task.semanticChunkCount = 0;
     updateAnalysisProgress(task, true);
 
     let completedForSkill = 0;
@@ -488,6 +461,9 @@ const createSecurityService = ({
         documents,
         signal: task.abortController.signal,
         onChunk: ({ index, count, done }) => {
+          const actualChunks = Math.max(count, 1);
+          task.semanticTotalChunks += actualChunks - reservedChunks;
+          reservedChunks = actualChunks;
           task.currentSkillId = inventory.skillId;
           task.currentSkillName = inventory.name;
           task.semanticChunkIndex = index;
@@ -495,7 +471,7 @@ const createSecurityService = ({
           if (done) {
             completedForSkill += 1;
             task.semanticCompletedChunks += 1;
-            task.semanticFractions.delete(inventory.skillId);
+            task.semanticFractions.set(inventory.skillId, completedForSkill / reservedChunks);
           }
           updateAnalysisProgress(task, true);
         },
@@ -507,7 +483,7 @@ const createSecurityService = ({
           task.semanticProgress = progress;
           if (progress.stage === 'generating') {
             task.semanticFractions.set(inventory.skillId,
-              Math.min(0.95, progress.completedDimensions / progress.totalDimensions * 0.95));
+              (completedForSkill + Math.min(0.95, progress.completedDimensions / progress.totalDimensions * 0.95)) / reservedChunks);
           }
           updateAnalysisProgress(task, stageChanged);
         },
@@ -517,6 +493,7 @@ const createSecurityService = ({
       if (remaining > 0) task.semanticCompletedChunks += remaining;
       task.semanticInFlightChunks = Math.max(0, task.semanticInFlightChunks - 1);
       task.semanticFractions.delete(inventory.skillId);
+      task.semanticCompletedSkills += 1;
       task.semanticProgress = null;
       updateAnalysisProgress(task, true);
     }
@@ -743,7 +720,7 @@ const createSecurityService = ({
       semanticCompletedChunks: 0,
       semanticTotalChunks: 0,
       semanticInFlightChunks: 0,
-      semanticRegisteredSkills: 0,
+      semanticCompletedSkills: 0,
       semanticProgress: null,
       semanticFractions: new Map(),
       analyzingInFlight: 0,

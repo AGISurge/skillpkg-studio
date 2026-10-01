@@ -89,6 +89,19 @@ test('bounds model loading as well as token generation', async () => {
   await expect(service.analyze(input('load-hang'))).resolves.toEqual({ ok: false, reason: 'timeout' });
 });
 
+test('scales the parent watchdog for a corpus requiring more than eight chunks', async () => {
+  await service.dispose();
+  service = createSecurityInferenceService({
+    processPath: path.join(__dirname, 'fixtures/securityInferenceProcess.cjs'),
+    loadTimeoutMs: 200, skillTimeoutMs: 20, chunkTimeoutMs: 100, cancelGraceMs: 20,
+  });
+  const result = await service.analyze(input('large', {
+    documents: [{ filePath: 'large.md', content: '中文🔐'.repeat(20_000) }],
+  }));
+  expect(result.ok).toBe(true);
+  expect(result.chunkCount).toBeGreaterThan(8);
+});
+
 test('shutdown resolves active and queued jobs and prevents new work', async () => {
   const active = service.analyze(input('hang'));
   const queued = service.analyze(input('single'));
@@ -104,6 +117,7 @@ test('library and single-Skill engines share the process and both reserve 100% f
   const skillRoot = path.join(root, 'library', 'sample');
   await fs.mkdir(skillRoot, { recursive: true });
   await fs.writeFile(path.join(skillRoot, 'SKILL.md'), '# Formatter\nFormat the selected document.');
+  await fs.writeFile(path.join(skillRoot, 'guide.md'), '中文🔐'.repeat(20_000));
   const modelService = { getSnapshot: async () => ({ kind: 'ready', modelPath: '/tmp/test.gguf', modelSha256: 'test' }) };
   const events = [];
   const reports = [];
@@ -128,11 +142,44 @@ test('library and single-Skill engines share the process and both reserve 100% f
     expect(single.getState().report.semanticAnalysis.kind).toBe('model');
     expect(events.filter((task) => task.status === 'scanning').every((task) => task.percent < 100)).toBe(true);
     expect(events.some((task) => task.semanticProgress?.stage === 'generating')).toBe(true);
+    expect(events.some((task) => task.semanticChunkCount > 8)).toBe(true);
+    const activeChunks = events.filter((task) => task.status === 'scanning' && task.semanticChunkIndex > 0);
+    expect(activeChunks.every((task) => task.semanticChunkIndex <= task.semanticChunkCount)).toBe(true);
     expect(events.filter((task) => task.status === 'completed').every((task) => task.percent === 100)).toBe(true);
   } finally { await single.reset(); await fs.rm(root, { recursive: true, force: true }); }
 });
 
 const realModelTest = process.env.SECURITY_MODEL_TEST_PATH ? test : test.skip;
+test('library progress advances within each large Skill without sticking near completion', async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'large-library-progress-'));
+  const events = [];
+  let completed = false;
+  const library = createSecurityService({ inferenceService: service,
+    workerPath: path.resolve('electron/security/worker.js'), hostCapabilities: { fileWorkers: 1 },
+    modelService: { getSnapshot: async () => ({ kind: 'ready', modelPath: '/tmp/test.gguf', modelSha256: 'test' }) },
+    store: { saveTask: () => {}, getLatestTask: () => null, getFileCache: () => null,
+      removeMissingReports: () => {}, saveReport: (report) => report },
+    emit: (event) => { events.push(event.task); if (event.type === 'completed') completed = true; },
+  });
+  try {
+    for (const [name, length] of [['small-guide', 80_000], ['large-guide', 240_000]]) {
+      await fs.mkdir(path.join(root, name));
+      await fs.writeFile(path.join(root, name, 'SKILL.md'), '# Guide\nFormat the selected file.');
+      await fs.writeFile(path.join(root, name, 'guide.md'), 'x'.repeat(length));
+    }
+    await library.startScan({ installPath: root, mode: 'full' });
+    await waitUntil(() => completed);
+    const secondStart = events.find(task => task.completedSkills === 1
+      && task.semanticProgress?.stage === 'generating' && task.semanticProgress.chunkIndex === 1);
+    expect(secondStart).toBeDefined();
+    expect(secondStart.percent).toBeLessThanOrEqual(67);
+    const midSecond = events.find(task => task.completedSkills === 1
+      && task.semanticProgress?.chunkIndex > 3);
+    expect(midSecond.percent).toBeGreaterThan(secondStart.percent);
+    expect(events.map(task => task.percent)).toEqual(events.map(task => task.percent).sort((a, b) => a - b));
+  } finally { await fs.rm(root, { recursive: true, force: true }); }
+});
+
 realModelTest('classifies real Qwen safe and private-key exfiltration samples through the shared process', async () => {
   await service.dispose();
   service = createSecurityInferenceService();

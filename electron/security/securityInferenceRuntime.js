@@ -1,7 +1,7 @@
 const {
   SEMANTIC_DIMENSIONS,
   mergeSemanticAssessments,
-  validateSemanticEvidence,
+  createSemanticEvidenceValidator,
   emptySemanticAssessments,
 } = require('./semanticPolicy');
 const { createUserPrompt } = require('./semanticPrompt');
@@ -13,6 +13,7 @@ const {
 const { createLimiter } = require('./asyncPool');
 const { createNodeLlamaAdapter } = require('./llamaAdapter');
 const { createEvidenceSources, createGenerationSchema, parseGeneration } = require('./semanticProtocol');
+const { resolveSkillTimeoutMs } = require('./semanticTimeout');
 
 const CHUNK_TIMEOUT_MS = 60_000;
 const SKILL_TIMEOUT_MS = 8 * 60_000;
@@ -118,10 +119,11 @@ const createSecurityInferenceRuntime = ({
   }) => {
     if (disposed) return { ok: false, reason: 'inference-failed' };
     const chunks = splitSemanticDocuments(documents, capabilities);
-    if (!chunks) return { ok: false, reason: 'corpus-too-large' };
     if (!chunks.length) {
       return { ok: true, assessments: emptySemanticAssessments(), chunkCount: 0 };
     }
+    onChunk?.({ index: 0, count: chunks.length, done: false });
+    const validateEvidence = createSemanticEvidenceValidator(documents);
 
     let loadedAdapter;
     const loadTimeout = createTimeout(loadTimeoutMs, 'load-timeout');
@@ -136,7 +138,9 @@ const createSecurityInferenceRuntime = ({
       loadTimeout.dispose();
     }
 
-    const skillTimeout = createTimeout(skillTimeoutMs, 'skill-timeout');
+    const skillTimeout = createTimeout(resolveSkillTimeoutMs({
+      chunkCount: chunks.length, chunkTimeoutMs, skillTimeoutMs,
+    }), 'skill-timeout');
     const cancelChunks = new AbortController();
     const skillSignal = createAbortSignal([
       signal,
@@ -215,7 +219,7 @@ const createSecurityInferenceRuntime = ({
             fail(shaped);
             break;
           }
-          const evidenced = validateSemanticEvidence(shaped.assessments, documents);
+          const evidenced = validateEvidence(shaped.assessments);
           if (!evidenced.ok) {
             fail(evidenced);
             break;

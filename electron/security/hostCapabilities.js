@@ -4,7 +4,6 @@ const GIB = 1024 ** 3;
 const CONTEXT_SIZE = 8192;
 const MAX_OUTPUT_TOKENS = 2048;
 const PROMPT_RESERVE_TOKENS = 1024;
-const MAX_CHUNKS = 8;
 // Qwen3.5 hybrid recurrent memory (GatedDeltaNet) is not safe with
 // parallel sequences. Keep one sequence and spend RAM on a larger batch.
 const MAX_SAFE_SEQUENCES = 1;
@@ -45,7 +44,6 @@ const detectHostCapabilities = ({
     maxOutputTokens: MAX_OUTPUT_TOKENS,
     promptReserveTokens: PROMPT_RESERVE_TOKENS,
     documentTokenBudget: CONTEXT_SIZE - MAX_OUTPUT_TOKENS - PROMPT_RESERVE_TOKENS,
-    maxChunks: MAX_CHUNKS,
   };
 };
 
@@ -71,13 +69,11 @@ const resolveCapabilities = (overrides = {}) => {
   merged.documentTokenBudget = (merged.contextSize || CONTEXT_SIZE)
     - (merged.maxOutputTokens || MAX_OUTPUT_TOKENS)
     - (merged.promptReserveTokens || PROMPT_RESERVE_TOKENS);
-  merged.maxChunks = clamp(Number(merged.maxChunks) || MAX_CHUNKS, 1, MAX_CHUNKS);
   return merged;
 };
 
 module.exports = {
   CONTEXT_SIZE,
-  MAX_CHUNKS,
   MAX_OUTPUT_TOKENS,
   MAX_SAFE_SEQUENCES,
   PROMPT_RESERVE_TOKENS,

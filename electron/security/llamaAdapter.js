@@ -71,17 +71,18 @@ const createNodeLlamaAdapter = async ({
         if (signal?.aborted) throw signal.reason;
         const grammar = await llama.createGrammarForJsonSchema(schema);
         const sequence = context.getSequence();
-        const session = new module.LlamaChatSession({
-          contextSequence: sequence,
-          autoDisposeSequence: false,
-          systemPrompt: SEMANTIC_SYSTEM_PROMPT,
-          // Auto-opened thoughts can consume the opening JSON token even with a zero thought budget.
-          chatWrapper: new module.QwenChatWrapper({ variation: '3.5', thoughts: 'discourage' }),
-        });
+        let session;
         let output = '';
         let generatedTokens = 0;
         let lastProgressAt = 0;
         try {
+          session = new module.LlamaChatSession({
+            contextSequence: sequence,
+            autoDisposeSequence: false,
+            systemPrompt: SEMANTIC_SYSTEM_PROMPT,
+            // Auto-opened thoughts can consume the opening JSON token even with a zero thought budget.
+            chatWrapper: new module.QwenChatWrapper({ variation: '3.5', thoughts: 'discourage' }),
+          });
           return await session.prompt(prompt, {
             grammar,
             maxTokens: capabilities.maxOutputTokens || MAX_OUTPUT_TOKENS,
@@ -120,8 +121,13 @@ const createNodeLlamaAdapter = async ({
             },
           });
         } finally {
-          // Await native teardown before the next job can reuse the hybrid context.
-          await session.dispose?.({ disposeSequence: true });
+          // Session.dispose is synchronous and does not await native sequence
+          // reclamation. Own the sequence explicitly and await it before reuse.
+          try {
+            await session?.dispose?.({ disposeSequence: false });
+          } finally {
+            await sequence.dispose();
+          }
         }
       });
     },

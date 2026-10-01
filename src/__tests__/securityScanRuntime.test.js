@@ -4,7 +4,7 @@ const { createLimiter, mapPool } = require('../../electron/security/asyncPool');
 const { createNodeLlamaAdapter } = require('../../electron/security/llamaAdapter');
 const { emptySemanticAssessments } = require('../../electron/security/semanticPolicy');
 const { createGenerationSchema } = require('../../electron/security/semanticProtocol');
-const { SEMANTIC_SYSTEM_PROMPT } = require('../../electron/security/semanticPrompt');
+const { SEMANTIC_SYSTEM_PROMPT, createUserPrompt } = require('../../electron/security/semanticPrompt');
 
 describe('host capabilities', () => {
   test('reserves 2048 output tokens for all semantic dimensions within the existing context', () => {
@@ -63,11 +63,42 @@ describe('semantic chunker', () => {
     expect(chunks[0].map((part) => part.filePath)).toEqual(['SKILL.md', 'notes.md']);
   });
 
-  test('refuses a corpus that cannot fit in eight token-budget chunks', () => {
-    expect(splitSemanticDocuments([{
+  test('covers a large corpus in more than eight bounded chunks without dropping lines', () => {
+    const content = Array.from({ length: 10 }, (_, index) => `Line ${index}: ${'x'.repeat(12_000)}`).join('\n');
+    const chunks = splitSemanticDocuments([{
       filePath: 'large.md',
-      content: Array.from({ length: 10 }, () => 'x'.repeat(12_000)).join('\n'),
-    }])).toBeNull();
+      content,
+    }]);
+    expect(chunks.length).toBeGreaterThan(8);
+    const originalLines = content.split('\n');
+    const plannedLines = chunks.flat().flatMap((part) => part.lines);
+    for (let index = 0; index < originalLines.length; index += 1) {
+      const fragments = plannedLines.filter((line) => line.lineNumber === index + 1);
+      expect(fragments[0].text.startsWith(`Line ${index}: `)).toBe(true);
+      expect(fragments.every((fragment) => fragment.quote === originalLines[index])).toBe(true);
+      expect(fragments.reduce((sum, fragment) => sum + fragment.text.length, 0)).toBeGreaterThanOrEqual(originalLines[index].length);
+    }
+    for (const [chunkIndex, chunk] of chunks.entries()) {
+      const prompt = createUserPrompt({ skillName: 'Large', chunk, chunkIndex, chunkCount: chunks.length });
+      expect(estimateTokens(prompt)).toBeLessThanOrEqual(resolveCapabilities().documentTokenBudget + 1024);
+    }
+  });
+
+  test('splits a long Unicode line with overlap and retains every character', () => {
+    const content = Array.from({ length: 6000 }, (_, index) => `🔐第${index}条中文指令;`).join('');
+    const chunks = splitSemanticDocuments([{ filePath: 'SKILL.md', content }]);
+    expect(chunks.length).toBeGreaterThan(8);
+    const covered = new Uint8Array(content.length);
+    for (const part of chunks.flat()) {
+      for (const line of part.lines) {
+        expect(line.text).not.toContain('\ufffd');
+        expect(line.quote).toBe(content);
+        const start = content.indexOf(line.text);
+        expect(start).toBeGreaterThanOrEqual(0);
+        covered.fill(1, start, start + line.text.length);
+      }
+    }
+    expect(covered.every((value) => value === 1)).toBe(true);
   });
 
   test('estimates tokens from utf8 bytes', () => {
@@ -102,6 +133,7 @@ describe('llama adapter', () => {
     let maxBusy = 0;
     let busy = 0;
     let resetCalls = 0;
+    let sequenceBusy = false;
     const llamaModule = {
       getLlama: async () => ({
         async loadModel() {
@@ -114,7 +146,14 @@ describe('llama adapter', () => {
               expect(options.flashAttention).toBe(true);
               return {
                 contextSize: 8192,
-                getSequence: () => ({ dispose: () => undefined }),
+                getSequence: () => {
+                  if (sequenceBusy) throw new Error('No sequences left');
+                  sequenceBusy = true;
+                  return { dispose: async () => {
+                    await new Promise((resolve) => setTimeout(resolve, 20));
+                    sequenceBusy = false;
+                  } };
+                },
                 dispose: async () => undefined,
               };
             },
@@ -152,7 +191,7 @@ describe('llama adapter', () => {
           return JSON.stringify(emptySemanticAssessments());
         }
 
-        dispose() {}
+        dispose({ disposeSequence }) { expect(disposeSequence).toBe(false); }
       },
     };
 
@@ -171,6 +210,7 @@ describe('llama adapter', () => {
     expect(maxBusy).toBe(1);
     expect(resetCalls).toBe(0);
     expect(prompts).toEqual(['one', 'two']);
+    expect(sequenceBusy).toBe(false);
     expect(adapter.diagnostics).toEqual(expect.objectContaining({
       sequences: 1,
       batchSize: 2048,
