@@ -67,7 +67,7 @@ const ImportSkillDropdown = ({ status, onSelect }: ImportSkillDropdownProps) => 
         type="button"
         variant="ghost"
         size="sm"
-        className={`rounded-full import-trigger ${busy ? 'loading' : ''}`}
+        className={`rounded-full font-semibold import-trigger ${busy ? 'loading' : ''}`}
         onClick={() => setOpen((current) => !current)}
         disabled={busy}
         aria-haspopup="menu"

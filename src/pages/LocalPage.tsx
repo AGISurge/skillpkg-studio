@@ -77,7 +77,7 @@ const LocalPage = () => {
         <Button
           variant="ghost"
           size="sm"
-          className="rounded-full"
+          className="rounded-full font-semibold"
           onClick={() => navigate(routePaths.localOrganize)}
         >
           <BroomRegular className="icon" />

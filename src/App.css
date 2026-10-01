@@ -1,8 +1,5 @@
 @import "highlight.js/styles/github-dark-dimmed.css";
 
-button{
-     font-weight: 600;
-}
 
 .app-shell {
   display: grid;

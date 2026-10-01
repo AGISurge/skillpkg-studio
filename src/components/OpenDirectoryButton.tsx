@@ -11,7 +11,7 @@ const OpenDirectoryButton = ({ disabled = false, onClick }: OpenDirectoryButtonP
     type="button"
     variant="ghost"
     size="sm"
-    className="rounded-full"
+    className="rounded-full font-semibold"
     disabled={disabled}
     aria-label="打开目录"
     title="打开目录"

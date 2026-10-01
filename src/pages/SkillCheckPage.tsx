@@ -75,7 +75,7 @@ const SourceButton = ({
     <div className="import-menu" ref={root}>
       <Button
         size="sm"
-        className="rounded-full"
+        className="rounded-full font-semibold"
         disabled={disabled}
         aria-haspopup="menu"
         aria-expanded={open}
