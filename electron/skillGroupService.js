@@ -139,7 +139,13 @@ const replaceAgentSkillGroup = async ({ skillRoot, installPath, skills, commit, 
       const source = await io.realpath(path.join(skillRoot, id));
       await io.mkdir(target); // Exclusive reservation: an external collision fails.
       try {
-        await io.cp(source, target, { recursive: true, dereference: true, force: false, errorOnExist: true });
+        // The reserved root already exists; copy its children so exclusive
+        // copying still rejects collisions instead of rejecting the root.
+        for (const entry of await io.readdir(source)) {
+          await io.cp(path.join(source, entry), path.join(target, entry), {
+            recursive: true, dereference: true, force: false, errorOnExist: true,
+          });
+        }
         hostedSkillIds.push(id);
       } catch (error) {
         await io.rm(target, { recursive: true, force: true });

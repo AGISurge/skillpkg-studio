@@ -105,6 +105,9 @@ const setupSwitch = async () => {
 };
 test('hosts unmanaged directories before switching and preserves library, external links and unrelated files', async () => {
   const options = await setupSwitch();
+  await fs.mkdir(path.join(agent, 'unmanaged', 'references'));
+  await fs.writeFile(path.join(agent, 'unmanaged', 'references', 'guide.md'), 'nested reference');
+  await fs.writeFile(path.join(agent, 'unmanaged', '.config'), 'hidden configuration');
   const external = await writeSkill(tmp, 'external');
   await fs.symlink(external, path.join(agent, 'external'), 'dir');
   const io = { ...fs, symlink: jest.fn(fs.symlink), unlink: jest.fn(fs.unlink) };
@@ -113,6 +116,8 @@ test('hosts unmanaged directories before switching and preserves library, extern
   expect(result.hostedSkillIds.sort()).toEqual(['external', 'unmanaged']);
   expect(await fs.readdir(agent)).toEqual(['.system', 'config.json', 'target']);
   expect(await fs.readFile(path.join(library, 'unmanaged', 'notes.txt'), 'utf8')).toBe('precious data');
+  expect(await fs.readFile(path.join(library, 'unmanaged', 'references', 'guide.md'), 'utf8')).toBe('nested reference');
+  expect(await fs.readFile(path.join(library, 'unmanaged', '.config'), 'utf8')).toBe('hidden configuration');
   expect(await fs.readFile(path.join(external, 'SKILL.md'), 'utf8')).toContain('external');
   expect(await fs.realpath(path.join(agent, 'target'))).toBe(path.join(library, 'target'));
   const hostCall = io.symlink.mock.calls.findIndex((call) => call[1] === path.join(agent, 'unmanaged'));
@@ -139,10 +144,13 @@ test('managed links through library aliases are unlinked without copying or touc
   expect(result.hostedSkillIds).not.toContain('alias');
   expect(await fs.readFile(path.join(library, 'alias', 'SKILL.md'), 'utf8')).toContain('linked-source');
 });
-test('failed hosting copy leaves Agent originals untouched', async () => {
+test('failed hosting copy removes partial library copies and leaves Agent originals untouched', async () => {
   const options = await setupSwitch();
-  const result = await replaceAgentSkillGroup({ ...options, io: { ...fs, cp: async () => { throw new Error('copy denied'); } } });
+  const cp = jest.fn(fs.cp).mockImplementationOnce(fs.cp).mockRejectedValueOnce(new Error('copy denied'));
+  const result = await replaceAgentSkillGroup({ ...options, io: { ...fs, cp } });
   expect(result.ok).toBe(false); expect(result.error).toBe('copy denied');
+  expect(cp).toHaveBeenCalledTimes(2);
+  expect(options.commit).not.toHaveBeenCalled();
   expect(await fs.readFile(path.join(agent, 'unmanaged', 'notes.txt'), 'utf8')).toBe('precious data');
   expect(await fs.readdir(library)).not.toContain('unmanaged');
 });
@@ -150,6 +158,7 @@ test('database failure rolls back target links and restores original directories
   const options = await setupSwitch();
   const result = await replaceAgentSkillGroup({ ...options, commit: async () => { throw new Error('database failed'); } });
   expect(result.ok).toBe(false); expect(result.recoveryPath).toBeUndefined();
+  expect(result.error).toBe('database failed');
   expect(await fs.readdir(agent)).toEqual(['.system', 'config.json', 'old', 'unmanaged']);
   expect(await fs.realpath(path.join(agent, 'old'))).toBe(path.join(library, 'old'));
   expect(await fs.readFile(path.join(agent, 'unmanaged', 'notes.txt'), 'utf8')).toBe('precious data');
@@ -162,6 +171,9 @@ test('failed target installation restores already moved originals', async () => 
     return fs.rename(from, to);
   } } });
   expect(result.ok).toBe(false); expect(result.recoveryPath).toBeUndefined();
+  expect(result.error).toBe('rename failed');
+  expect(await fs.readdir(agent)).toEqual(['.system', 'config.json', 'old', 'unmanaged']);
+  expect(await fs.realpath(path.join(agent, 'old'))).toBe(path.join(library, 'old'));
   expect(await fs.readFile(path.join(agent, 'unmanaged', 'notes.txt'), 'utf8')).toBe('precious data');
 });
 

@@ -117,7 +117,7 @@ test('downloads an available update from settings in manual mode', () => {
   }));
 
   expect(screen.getByText('发现新版本 v1.1.0。')).toBeInTheDocument();
-  fireEvent.click(screen.getByRole('button', { name: '下载更新' }));
+  fireEvent.click(screen.getByRole('button', { name: '更新' }));
   expect(downloadAppUpdate).toHaveBeenCalledWith('manual');
 });
 

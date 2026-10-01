@@ -134,7 +134,7 @@ test('shows update ready dialog and installs when confirmed', async () => {
     </HashRouter>
   );
 
-  expect(await screen.findByText('更新已下载')).toBeInTheDocument();
+  expect(await screen.findByText('SkillPKG Studio v0.2.0 已准备好安装')).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: '关闭并更新' }));
 
   expect(installAppUpdateNow).toHaveBeenCalledTimes(1);
@@ -196,12 +196,12 @@ test('uses settings as the only update UI after a manual download starts', async
     </HashRouter>
   );
 
-  fireEvent.click(await screen.findByRole('button', { name: '下载更新' }));
+  fireEvent.click(await screen.findByRole('button', { name: '更新' }));
   expect(await screen.findByRole('button', {
     name: 'v1.1.0已就绪，重启更新',
   })).toBeInTheDocument();
   expect(downloadAppUpdate).toHaveBeenCalledWith({ source: 'manual' });
-  expect(screen.queryByText('更新已下载')).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: '关闭并更新' })).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: '已下载 v1.1.0' })).not.toBeInTheDocument();
 });
 
@@ -261,7 +261,7 @@ test('keeps restart update available in settings after postponing an automatic u
     </HashRouter>
   );
 
-  expect(await screen.findByText('更新已下载')).toBeInTheDocument();
+  expect(await screen.findByText('SkillPKG Studio v1.1.0 已准备好安装')).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: '稍后，下次启动更新' }));
   fireEvent.click(screen.getByRole('button', {
     name: 'v1.1.0已就绪，重启更新',
