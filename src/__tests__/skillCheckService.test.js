@@ -102,6 +102,7 @@ describe('single Skill session scanner', () => {
     expect(state.report.name).toBe('picked');
     for (const event of events.filter((item) => item.task?.status === 'scanning')) {
       expect(event.task.percent).toBeLessThan(100);
+      expect(event.files.some((file) => file.status === 'complete')).toBe(false);
     }
     const percents = events.filter((item) => item.task).map((item) => item.task.percent);
     expect(percents).toEqual([...percents].sort((a, b) => a - b));
@@ -190,13 +191,16 @@ describe('single Skill session scanner', () => {
     await service.startScan({ sessionId: source.sessionId, candidateId: source.candidates[0].id });
     await waitUntil(() => analyze.mock.calls.length > 0);
     expect(service.getState().task).toMatchObject({ phase: 'semantic', status: 'scanning', percent: 35, processedFiles: 2, semanticProgress: { stage: 'loading', percent: 50 } });
+    expect(service.getState().files.every((file) => file.status === 'checked')).toBe(true);
     expect(analyze.mock.calls[0][0].documents.map((item) => item.filePath).sort()).toEqual(['SKILL.md', 'notes.md']);
     await expect(service.prepareSource({ sourcePath: root })).rejects.toThrow('取消');
     finish();
     await waitUntil(() => service.getState().task.status === 'completed');
-    expect(service.getState().files.find((file) => file.path === 'notes.md').findings).toEqual(expect.arrayContaining([expect.objectContaining({ detector: 'model' })]));
+    expect(service.getState().files.find((file) => file.path === 'notes.md')).toMatchObject({ status: 'complete', level: 'suspicious', findings: expect.arrayContaining([expect.objectContaining({ detector: 'model' })]) });
     expect(service.getState().files.find((file) => file.path === 'SKILL.md').level).toBe('safe');
     expect(events.filter((event) => event.task?.status === 'scanning').every((event) => event.task.percent < 100)).toBe(true);
+    expect(events.some((event) => event.task?.phase === 'finalizing')).toBe(true);
+    expect(events.filter((event) => event.task?.status === 'scanning').every((event) => event.files.every((file) => file.status !== 'complete'))).toBe(true);
   });
 
   test('cancel keeps checked files as incomplete, reset drops reports, and a fresh service starts empty', async () => {

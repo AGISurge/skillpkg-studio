@@ -16,6 +16,7 @@ type TreeNode = {
 };
 type Props = {
   files: SkillCheckFile[];
+  scanning: boolean;
   selectedPath: string;
   collapsed: Set<string>;
   onToggle: (path: string) => void;
@@ -24,6 +25,7 @@ type Props = {
 
 export const SkillCheckTree = ({
   files,
+  scanning,
   selectedPath,
   collapsed,
   onToggle,
@@ -105,16 +107,21 @@ export const SkillCheckTree = ({
               )}
               <span className="skill-check-tree-name">{entry.name}</span>
               {file &&
+              !scanning &&
               (file.status === "checked" || file.status === "complete") ? (
                 <LevelBadge
                   level={file.level}
                   partial={
-                    file.status === "complete" && file.coverage !== "complete"
+                    file.status !== "complete" || file.coverage !== "complete"
                   }
                 />
               ) : file ? (
                 <span className="security-level security-level-pending">
-                  {file.status === "pending" ? "待扫描" : "分析中"}
+                  {file.status === "pending"
+                    ? "待扫描"
+                    : file.status === "analyzing"
+                      ? "分析中"
+                      : "待评级"}
                 </span>
               ) : null}
             </button>

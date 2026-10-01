@@ -166,7 +166,8 @@ const createSkillCheckService = ({ tempRoot, emit, ...engineOptions }) => {
       getFileCache: () => null,
       getSemanticCache: () => null,
       removeMissingReports: () => {},
-      saveReport(report) { applyReport({ ...report, id: sessionId }, true); return runState.report; },
+      // Saving a report precedes finalizing; file ratings become final only with task completion.
+      saveReport(report) { applyReport({ ...report, id: sessionId }, false); return runState.report; },
     };
     const publicTask = (task) => ({
       id: task.id, status: task.status, phase: task.phase, percent: task.percent,
@@ -205,6 +206,7 @@ const createSkillCheckService = ({ tempRoot, emit, ...engineOptions }) => {
       },
       emit(event) {
         runState.task = publicTask(event.task);
+        if (event.type === 'completed' && runState.report) applyReport(runState.report, true);
         if ((event.type === 'canceled' || event.type === 'error') && inventory && !runState.report) {
           const findings = [
             ...inventory.findings,

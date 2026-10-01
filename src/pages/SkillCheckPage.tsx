@@ -301,7 +301,11 @@ const SkillCheckPage = () => {
     : fileResult?.findings || [];
   const overallFindings =
     state.report?.findings.filter((finding) => !finding.filePath) || [];
-  const level = overall ? state.report?.effectiveLevel : fileResult?.level;
+  const level = scanning
+    ? undefined
+    : overall
+      ? state.report?.effectiveLevel
+      : fileResult?.level;
   const coverage = overall ? state.report?.coverage : fileResult?.coverage;
   const percent = Math.round(state.task?.percent || 0);
   const selectFile = (value: string) => {
@@ -436,6 +440,7 @@ const SkillCheckPage = () => {
                 ) : null}
                 <SkillCheckTree
                   files={state.files}
+                  scanning={scanning}
                   selectedPath={selectedPath}
                   collapsed={collapsed}
                   onSelect={selectFile}
@@ -465,8 +470,8 @@ const SkillCheckPage = () => {
                         {coverage
                           ? `覆盖度：${coverageLabel[coverage]}`
                           : "等待文件检查"}
-                        {fileResult?.status === "checked" && scanning
-                          ? " · 最终评级将在智能判断结束后确定"
+                        {fileResult && scanning
+                          ? " · 最终评级将在扫描完成后确定"
                           : ""}
                       </p>
                     </div>
@@ -496,6 +501,8 @@ const SkillCheckPage = () => {
                         ? "该文件尚未完成检查。"
                         : "该文件未完成扫描，结果不完整。"}
                     </div>
+                  ) : scanning ? (
+                    <div className="empty-state">正在确定最终安全等级</div>
                   ) : (
                     <div className="security-safe-empty">
                       <ShieldCheckmarkRegular className="icon" />

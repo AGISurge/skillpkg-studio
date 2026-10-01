@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import SkillCheckPage from './SkillCheckPage';
 import type { SkillCheckSource, SkillCheckState } from '../security/skillCheckTypes';
 import type { SecurityFinding, SecurityReport } from '../security/types';
@@ -101,9 +101,53 @@ test('shows semantic progress below 100% and keeps cancellation available', asyn
   expect(screen.getByText('智能判断 1 / 2 · 已分析 8 / 16 项')).toBeInTheDocument();
   expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '66');
   expect(screen.queryByText('扫描完成')).not.toBeInTheDocument();
+  expect(within(screen.getByRole('tree')).queryByText('安全')).not.toBeInTheDocument();
+  expect(within(screen.getByRole('tree')).queryByText('危险')).not.toBeInTheDocument();
+  expect(screen.queryByText('当前检查范围内未发现安全问题')).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: '选择 Skill' })).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: '取消扫描' }));
   await waitFor(() => expect(api.cancelSkillCheck).toHaveBeenCalledWith({ taskId: 'task' }));
+});
+
+test('keeps checked files unrated through semantic analysis and finalizing, then shows final ratings', async () => {
+  const checkedFiles: SkillCheckState['files'] = result.files.map((file) =>
+    file.status === 'complete' ? { ...file, status: 'checked' } : file);
+  current = { ...result, report: null, files: checkedFiles,
+    task: result.task && { ...result.task, phase: 'semantic', status: 'scanning', completedAt: null, percent: 66 } };
+  const view = render(<SkillCheckPage />);
+  await screen.findByText('正在智能判断');
+  const tree = within(screen.getByRole('tree'));
+  expect(tree.getAllByText('待评级')).toHaveLength(2);
+  expect(tree.queryByText('危险')).not.toBeInTheDocument();
+  expect(tree.queryByText('安全')).not.toBeInTheDocument();
+  // Findings remain inspectable before the final file rating is available.
+  expect(await screen.findByText('下载并立即执行')).toBeInTheDocument();
+  expect(view.container.querySelector('.security-detail-header .security-level')).toBeNull();
+  expect(screen.getByText(/最终评级将在扫描完成后确定/)).toBeInTheDocument();
+  fireEvent.click(tree.getByRole('button', { name: 'SKILL.md 待评级' }));
+  expect(screen.getByText('正在确定最终安全等级')).toBeInTheDocument();
+  expect(screen.queryByText('当前检查范围内未发现安全问题')).not.toBeInTheDocument();
+  act(() => listener?.({ ...current, report, task: current.task && { ...current.task, phase: 'finalizing', percent: 97 } }));
+  expect(screen.getByText('正在汇总结果')).toBeInTheDocument();
+  expect(tree.getAllByText('待评级')).toHaveLength(2);
+  act(() => listener?.(result));
+  expect(screen.getByText('扫描完成')).toBeInTheDocument();
+  expect(tree.getByRole('button', { name: 'SKILL.md 安全' })).toBeInTheDocument();
+  expect(tree.getByRole('button', { name: 'run.sh 危险' })).toBeInTheDocument();
+  expect(screen.getByText('当前检查范围内未发现安全问题')).toBeInTheDocument();
+});
+
+test.each(['canceled', 'error'] as const)('retains incomplete checked results when the scan is %s', async (status) => {
+  current = { ...result, report: { ...report, coverage: 'incomplete' },
+    files: result.files.map((file) =>
+      file.status === 'complete' ? { ...file, status: 'checked', coverage: 'incomplete' } : file),
+    task: result.task && { ...result.task, phase: status, status, percent: 66 } };
+  render(<SkillCheckPage />);
+  await screen.findByText(status === 'canceled' ? '扫描已取消' : '扫描失败');
+  const tree = within(screen.getByRole('tree'));
+  expect(tree.getByRole('button', { name: 'run.sh 危险 · 扫描不完整' })).toBeInTheDocument();
+  expect(tree.getByRole('button', { name: 'SKILL.md 安全 · 扫描不完整' })).toBeInTheDocument();
+  expect(await screen.findByText('下载并立即执行')).toBeInTheDocument();
 });
 
 test('drops one source through the Electron path bridge and refuses multiple sources', async () => {
