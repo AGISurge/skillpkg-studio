@@ -1,7 +1,7 @@
 @import "highlight.js/styles/github-dark-dimmed.css";
 
 button{
-     font-weight: 400;
+     font-weight: 600;
 }
 
 .app-shell {
@@ -290,7 +290,7 @@ button{
 .settings-section-head {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: top;
   gap: 18px;
 }
 
@@ -307,19 +307,32 @@ button{
   margin: 5px 0 0;
 }
 
+.settings-appearance {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.settings-appearance .settings-section-head {
+  flex: 1 1 180px;
+}
+
 .theme-segment {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(3, 80px);
   gap: 10px;
+  margin-left: auto;
 }
 
 .theme-choice {
-  min-height: 44px;
+  aspect-ratio: 1;
   border: 1px solid var(--border-subtle);
   border-radius: 12px;
   background: var(--surface-bg-strong);
   color: inherit;
   display: inline-flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 8px;
@@ -2263,7 +2276,7 @@ body:not([data-theme='light']) .discover-type-pill.solution {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
-  margin-top: 10px;
+  margin-top: 16px;
 }
 
 .source-tag {
@@ -2321,11 +2334,11 @@ body:not([data-theme='light']) .discover-type-pill.solution {
 .detail-title {
   font-size: 22px;
   font-weight: 600;
-  font-family: "Space Grotesk", sans-serif;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+
 }
 
 
@@ -2340,6 +2353,7 @@ body:not([data-theme='light']) .discover-type-pill.solution {
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 4;
+  line-clamp:4;
   overflow: hidden;
 }
 

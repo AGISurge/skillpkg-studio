@@ -46,7 +46,7 @@ const getUpdateButtonLabel = (state: AppUpdateState) => {
   return version ? `更新 ${version}` : '更新';
 };
 
-const logoSrc = `${process.env.PUBLIC_URL || ''}/logo.png`;
+const logoSrc = `${process.env.PUBLIC_URL || ''}/logo.webp`;
 
 /**
  * 左侧导航与设置区域。
@@ -77,10 +77,10 @@ const Sidebar = ({
   return (
     <aside className={`sidebar ${isFloating ? 'floating' : ''}`}>
       <div className="sidebar-head mt-3">
-        <div className="flex justify-start gap-2 items-center">
-          <img src={logoSrc} className="size-8" alt="SkillPKG Logo" />
+        <div className="flex justify-start gap-2 items-center ml-2">
+          <img src={logoSrc} className="size-6" alt="SkillPKG Logo" />
           <div>
-            <div className="font-bold">SkillPKG Studio</div>
+            <div className="font-semibold text-sm text-muted-foreground opacity-85">SkillPkg Studio</div>
           </div>
         </div>
       </div>

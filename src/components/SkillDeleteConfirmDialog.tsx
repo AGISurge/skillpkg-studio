@@ -80,10 +80,10 @@ const SkillDeleteConfirmDialog = ({
           )}
         </div>
         <div className="dialog-footer">
-          <Button type="button" variant="ghost" onClick={onClose} disabled={submitting}>
+          <Button type="button" variant="ghost" size="sm" className='rounded-full' onClick={onClose} disabled={submitting}>
             取消
           </Button>
-          <Button type="button" variant="destructive" onClick={onConfirm} disabled={submitting}>
+          <Button type="button" variant="destructive"  size="sm" className='rounded-full' onClick={onConfirm} disabled={submitting}>
             {submitting ? <span className="mini-spinner" aria-hidden="true" /> : <CheckmarkCircleRegular className="icon" />}
             {copy.confirmLabel}
           </Button>

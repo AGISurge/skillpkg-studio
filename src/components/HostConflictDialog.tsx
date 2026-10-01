@@ -1,4 +1,5 @@
 import { CheckmarkCircleRegular, DismissCircleRegular } from '@fluentui/react-icons';
+import {Button} from '@/components/ui/button'
 import type { Skill } from '../types/models';
 
 type HostConflictDialogProps = {
@@ -33,14 +34,14 @@ const HostConflictDialog = ({
             请选择使用当前已托管的 Skill，或用当前 Agent 中的 Skill 覆盖托管版本。默认建议使用已托管版本。
           </div>
         </div>
-        <div className="dialog-footer">
-          <button type="button" className="btn ghost" onClick={onOverwrite}>
+        <div className="dialog-footer mt-4">
+          <Button type="button" size="sm" variant="ghost" className='rounded-full'  onClick={onOverwrite}>
             覆盖托管
-          </button>
-          <button type="button" className="btn primary" onClick={onUseManaged}>
+          </Button>
+          <Button type="button" size="sm" className='rounded-full'  onClick={onUseManaged}>
             <CheckmarkCircleRegular className="icon" />
             使用已托管
-          </button>
+          </Button>
         </div>
       </div>
     </div>

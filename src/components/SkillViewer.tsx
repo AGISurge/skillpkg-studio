@@ -259,7 +259,7 @@ const SkillViewer = ({
                 disabled={!canEdit}
                 title={!canEdit && file ? "此文件不支持编辑" : undefined}
               >
-                <EditRegular className="icon" />
+                <EditRegular className="size-3.5" />
                 编辑
               </Button>
             )}

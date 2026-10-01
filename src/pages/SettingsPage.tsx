@@ -231,11 +231,10 @@ const SettingsPage = () => {
 
   return (
     <div className="settings-page">
-      <section className="settings-section">
+      <section className="settings-section settings-appearance">
         <div className="settings-section-head">
-          <div>
-            <h2>Appearance</h2>
-            <p>选择应用的显示外观。</p>
+          <div className="-mt-8">
+            <h2>显示外观</h2>
           </div>
         </div>
         <div

@@ -333,7 +333,7 @@ const SkillsPage = ({
                           {onInstallToggle && (
                             <button
                               type="button"
-                              className={`btn mini primary ${isPending ? "loading" : ""}`}
+                              className={`btn mini  ${isPending ? "loading" : ""}`}
                               disabled={isPending}
                               aria-busy={isPending}
                               onClick={(event) => {
@@ -349,7 +349,7 @@ const SkillsPage = ({
                               ) : (
                                 <SettingsRegular className="icon" />
                               )}
-                              {isPending ? "处理中" : "托管"}
+                              <span className="text-xs">{isPending ? "处理中" : "托管"}</span>
                             </button>
                           )}
                           {onDeleteSkill && (
@@ -395,7 +395,7 @@ const SkillsPage = ({
             <div className="detail-header">
               <div>
                 <div className="flex justify-between items-center">
-                  <div className="detail-title">{selectedSkill.name}</div>
+                  <div className="detail-title text-red-500 dark:text-red-400">{selectedSkill.name}</div>
                   <div className="detail-actions">
                     {onOpenSkillDirectory && (
                       <Button
